@@ -1,0 +1,35 @@
+services:
+  frontend:
+    build:
+      context: ./front
+      dockerfile: dockerfile
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./front:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+
+  # La parte de Simón: API (Python/Django)
+  backend:
+    build:
+      context: ./backend
+      dockerfile: dockerfile
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+    depends_on:
+      - database
+
+  # La parte de Tavo: Base de Datos (MongoDB)
+  database:
+    image: mongo:latest
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+
+volumes:
+mongodb_data:

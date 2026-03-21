@@ -1,0 +1,164 @@
+{
+  "database": "gym_reservas_universitario",
+  "description": "Esquema de base de datos MongoDB para sistema de reservas de gimnasio universitario",
+
+  "collections": {
+    "users": {
+      "description": "Estudiantes, entrenadores y administradores del sistema",
+      "schema": {
+        "_id": "ObjectId",
+        "nombre": "string (required)",
+        "correo_institucional": "string (required, unique)",
+        "rol": "string (enum: ESTUDIANTE, ENTRENADOR, ADMIN)",
+        "estado": "string (enum: ACTIVO, PENALIZADO, INACTIVO)",
+        "fecha_creacion": "ISODate",
+        "ultimo_acceso": "ISODate (opcional)",
+        "penalizacion_hasta": "ISODate (opcional) - fecha hasta la que está penalizado"
+      },
+      "ejemplo": {
+        "_id": "ObjectId('65f8a2b3c4d5e6f7a8b9c0d1')",
+        "nombre": "Juan Pérez García",
+        "correo_institucional": "juan.perez@universidad.edu",
+        "rol": "ESTUDIANTE",
+        "estado": "ACTIVO",
+        "fecha_creacion": "ISODate('2025-01-15T10:30:00Z')",
+        "ultimo_acceso": "ISODate('2025-03-20T08:15:00Z')"
+      }
+    },
+
+    "schedules": {
+      "description": "Horarios disponibles para reserva (lunes a viernes, bloques de 2 horas)",
+      "schema": {
+        "_id": "ObjectId",
+        "fecha": "ISODate (solo fecha, sin hora)",
+        "hora_inicio": "string (formato HH:MM, ej: 06:00)",
+        "hora_fin": "string (formato HH:MM, ej: 08:00)",
+        "aforo_maximo": "integer (min: 1)",
+        "cupos_disponibles": "integer (min: 0)",
+        "estado": "string (enum: DISPONIBLE, LLENO, CANCELADO)",
+        "entrenador_id": "ObjectId (opcional) - referencia a users con rol ENTRENADOR",
+        "notas": "string (opcional)",
+        "fecha_creacion": "ISODate",
+        "ultima_actualizacion": "ISODate"
+      },
+      "ejemplo": {
+        "_id": "ObjectId('65f8a2b3c4d5e6f7a8b9c0d2')",
+        "fecha": "ISODate('2025-03-24T00:00:00Z')",
+        "hora_inicio": "06:00",
+        "hora_fin": "08:00",
+        "aforo_maximo": 30,
+        "cupos_disponibles": 12,
+        "estado": "DISPONIBLE",
+        "entrenador_id": "ObjectId('65f8a2b3c4d5e6f7a8b9c0d3')",
+        "notas": "Clase de spinning",
+        "fecha_creacion": "ISODate('2025-03-01T00:00:00Z')",
+        "ultima_actualizacion": "ISODate('2025-03-20T14:30:00Z')"
+      }
+    },
+
+    "reservations": {
+      "description": "Reservas realizadas por los usuarios",
+      "schema": {
+        "_id": "ObjectId",
+        "usuario_id": "ObjectId (referencia a users)",
+        "horario_id": "ObjectId (referencia a schedules)",
+        "fecha_reserva": "ISODate (fecha del horario reservado)",
+        "hora_inicio": "string (copia del horario)",
+        "hora_fin": "string (copia del horario)",
+        "estado": "string (enum: ACTIVA, CANCELADA, COMPLETADA, NO_SHOW)",
+        "creada_por": "ObjectId (referencia a users - quien creó la reserva)",
+        "fecha_creacion": "ISODate (timestamp de creación)",
+        "fecha_cancelacion": "ISODate (opcional)",
+        "motivo_cancelacion": "string (opcional)",
+        "fecha_completacion": "ISODate (opcional) - cuando asistió"
+      },
+      "ejemplo": {
+        "_id": "ObjectId('65f8a2b3c4d5e6f7a8b9c0d4')",
+        "usuario_id": "ObjectId('65f8a2b3c4d5e6f7a8b9c0d1')",
+        "horario_id": "ObjectId('65f8a2b3c4d5e6f7a8b9c0d2')",
+        "fecha_reserva": "ISODate('2025-03-24T00:00:00Z')",
+        "hora_inicio": "06:00",
+        "hora_fin": "08:00",
+        "estado": "ACTIVA",
+        "creada_por": "ObjectId('65f8a2b3c4d5e6f7a8b9c0d1')",
+        "fecha_creacion": "ISODate('2025-03-20T09:00:00Z')"
+      }
+    },
+
+    "audit_log": {
+      "description": "Registro de operaciones importantes (cambios de estado, cancelaciones, etc.)",
+      "schema": {
+        "_id": "ObjectId",
+        "tipo_operacion": "string (enum: RESERVA_CREADA, RESERVA_CANCELADA, CUPO_LIBERADO, CUPO_OCUPADO, PENALIZACION_APLICADA, HORARIO_CREADO, HORARIO_MODIFICADO)",
+        "coleccion_afectada": "string",
+        "documento_id": "ObjectId",
+        "usuario_ejecutor": "ObjectId",
+        "datos_anteriores": "object (opcional)",
+        "datos_nuevos": "object (opcional)",
+        "timestamp": "ISODate"
+      },
+      "ejemplo": {
+        "_id": "ObjectId('65f8a2b3c4d5e6f7a8b9c0d5')",
+        "tipo_operacion": "RESERVA_CANCELADA",
+        "coleccion_afectada": "reservations",
+        "documento_id": "ObjectId('65f8a2b3c4d5e6f7a8b9c0d4')",
+        "usuario_ejecutor": "ObjectId('65f8a2b3c4d5e6f7a8b9c0d1')",
+        "datos_anteriores": {
+          "estado": "ACTIVA",
+          "cupos_disponibles": 11
+        },
+        "datos_nuevos": {
+          "estado": "CANCELADA",
+          "cupos_disponibles": 12
+        },
+        "timestamp": "ISODate('2025-03-20T15:30:00Z')"
+      }
+    },
+
+    "configuration": {
+      "description": "Configuración del sistema (aforo default, horarios, etc.)",
+      "schema": {
+        "_id": "ObjectId",
+        "clave": "string (unique)",
+        "valor": "any",
+        "descripcion": "string",
+        "ultima_actualizacion": "ISODate",
+        "actualizado_por": "ObjectId"
+      },
+      "ejemplos": [
+        {
+          "_id": "ObjectId('65f8a2b3c4d5e6f7a8b9c0d6')",
+          "clave": "AFORO_DEFAULT",
+          "valor": 30,
+          "descripcion": "Aforo máximo por defecto para nuevos horarios",
+          "ultima_actualizacion": "ISODate('2025-01-01T00:00:00Z')",
+          "actualizado_por": "ObjectId('65f8a2b3c4d5e6f7a8b9c0d0')"
+        },
+        {
+          "_id": "ObjectId('65f8a2b3c4d5e6f7a8b9c0d7')",
+          "clave": "BLOQUES_HORARIOS",
+          "valor": ["06:00", "08:00", "10:00", "12:00", "14:00", "16:00"],
+          "descripcion": "Horarios de inicio de bloques disponibles",
+          "ultima_actualizacion": "ISODate('2025-01-01T00:00:00Z')",
+          "actualizado_por": "ObjectId('65f8a2b3c4d5e6f7a8b9c0d0')"
+        },
+        {
+          "_id": "ObjectId('65f8a2b3c4d5e6f7a8b9c0d8')",
+          "clave": "MAX_RESERVAS_ACTIVAS",
+          "valor": 2,
+          "descripcion": "Máximo de reservas activas por usuario",
+          "ultima_actualizacion": "ISODate('2025-01-01T00:00:00Z')",
+          "actualizado_por": "ObjectId('65f8a2b3c4d5e6f7a8b9c0d0')"
+        },
+        {
+          "_id": "ObjectId('65f8a2b3c4d5e6f7a8b9c0d9')",
+          "clave": "HORAS_CANCELLATION_WINDOW",
+          "valor": 2,
+          "descripcion": "Horas antes del horario para permitir cancelación",
+          "ultima_actualizacion": "ISODate('2025-01-01T00:00:00Z')",
+          "actualizado_por": "ObjectId('65f8a2b3c4d5e6f7a8b9c0d0')"
+        }
+      ]
+    }
+  }
+}
