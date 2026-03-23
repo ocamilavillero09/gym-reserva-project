@@ -1,17 +1,18 @@
 services:
   frontend:
     build:
-      context: ./front
+      context: ./frontend
       dockerfile: dockerfile
     ports:
-      - "3000:3000"
+      - "5173:5173"
     volumes:
-      - ./front:/app
+      - ./frontend:/app
       - /app/node_modules
     depends_on:
       - backend
+    environment:
+      - VITE_API_URL=http://localhost:8000/api
 
-  # La parte de Simón: API (Python/Django)
   backend:
     build:
       context: ./backend
@@ -20,10 +21,12 @@ services:
       - "8000:8000"
     volumes:
       - ./backend:/app
+    environment:
+      - MONGO_URI=mongodb://database:27017
+      - MONGO_DB=gym_udem
     depends_on:
       - database
 
-  # La parte de Tavo: Base de Datos (MongoDB)
   database:
     image: mongo:latest
     ports:
@@ -32,4 +35,4 @@ services:
       - mongodb_data:/data/db
 
 volumes:
-mongodb_data:
+  mongodb_data:
