@@ -7,8 +7,8 @@ Sistema de gestión de reservas para el gimnasio de la Universidad de Medellín.
 ## Tecnologías y Versiones
 
 ### Frontend
-- **Framework:** React 18
-- **Build Tool:** Vite 4.4
+- **Framework:** React 18.2.0
+- **Build Tool:** Vite 4.4.0
 - **Lenguaje:** JavaScript (JSX)
 - **Imagen Base:** Node.js 18-alpine
 
@@ -17,16 +17,16 @@ Sistema de gestión de reservas para el gimnasio de la Universidad de Medellín.
 - **Framework:** Django 4.2.7
 - **API Toolkit:** Django REST Framework 3.14.0
 - **Documentación API:** drf-yasg 1.21.7 (Swagger/OpenAPI 2.0)
-- **Base de Datos:** MongoDB (vía PyMongo 4.6.0)
+- **Base de Datos:** MongoDB 6.0 (vía PyMongo 4.6.0)
 - **CORS:** django-cors-headers 4.3.0
 
 ### Base de Datos
-- **Motor:** MongoDB latest
+- **Motor:** MongoDB 6.0
 - **Esquema:** Ver carpeta `database/` con validaciones e índices
 
 ### Infraestructura
-- **Contenedores:** Docker 20+
-- **Orquestación:** Docker Compose 2+
+- **Contenedores:** Docker 20.10+
+- **Orquestación:** Docker Compose 2.0+
 
 ---
 
@@ -41,7 +41,7 @@ cd gym-reserva-project
 
 ## Cómo Descargar desde DockerHub
 
-Cada servicio tiene su imagen publicada:
+Cada servicio tiene su imagen publicada en DockerHub:
 
 ```bash
 # Frontend
@@ -54,12 +54,49 @@ docker pull tav07/gym-backend:latest
 docker pull tav07/gym-database:latest
 ```
 
-Para ejecutar con imágenes de DockerHub (sin clonar):
+### Ejecutar con imágenes de DockerHub (sin clonar)
+
+Usa este `docker-compose` inline para levantar los 3 servicios conectados:
 
 ```bash
-docker run -p 5173:5173 tav07/gym-frontend:latest
-docker run -p 8000:8000 -e MONGO_URI=mongodb://host.docker.internal:27017 tav07/gym-backend:latest
-docker run -p 27017:27017 tav07/gym-database:latest
+cat > docker-compose-hub.yml << 'EOF'
+version: "3.8"
+services:
+  frontend:
+    image: tav07/gym-frontend:latest
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_URL=http://localhost:8000/api
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  backend:
+    image: tav07/gym-backend:latest
+    ports:
+      - "8000:8000"
+    environment:
+      - MONGO_URI=mongodb://database:27017
+      - MONGO_DB=gym_udem
+      - SECRET_KEY=django-insecure-gym-udem-2024-change-in-production
+    depends_on:
+      - database
+    restart: unless-stopped
+
+  database:
+    image: tav07/gym-database:latest
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    restart: unless-stopped
+
+volumes:
+  mongodb_data:
+EOF
+
+docker-compose -f docker-compose-hub.yml up
 ```
 
 ---
@@ -69,9 +106,9 @@ docker run -p 27017:27017 tav07/gym-database:latest
 ### Requisitos
 - Docker 20.10+
 - Docker Compose 2.0+
-- Puerto 5173, 8000, 27017 disponibles
+- Puertos 5173, 8000, 27017 disponibles
 
-### Instrucciones
+### Instrucciones paso a paso
 
 1. **Clonar el repositorio:**
    ```bash
@@ -83,9 +120,10 @@ docker run -p 27017:27017 tav07/gym-database:latest
    ```bash
    docker-compose up --build
    ```
+   > Nota: la primera vez descarga las imágenes base e instala dependencias. Puede tardar 2-3 minutos.
 
 3. **Acceder a las aplicaciones:**
-   - Frontend: http://localhost:5173
+   - Frontend: http://localhost:5173/index.html
    - Backend API: http://localhost:8000/api/
    - Swagger UI: http://localhost:8000/swagger/
    - ReDoc: http://localhost:8000/redoc/
@@ -96,7 +134,7 @@ docker run -p 27017:27017 tav07/gym-database:latest
    docker-compose down
    ```
 
-   Para eliminar también los volúmenes (borra datos):
+   Para eliminar también los volúmenes (borra todos los datos):
    ```bash
    docker-compose down -v
    ```
@@ -108,26 +146,55 @@ docker run -p 27017:27017 tav07/gym-database:latest
 ### Frontend
 | Variable | Descripción | Default |
 |----------|-------------|---------|
-| `VITE_API_URL` | URL del backend API | `http://localhost:8000/api` |
+| `VITE_API_URL` | URL completa del backend API | `http://localhost:8000/api` |
 
 ### Backend
 | Variable | Descripción | Default |
 |----------|-------------|---------|
+| `SECRET_KEY` | Clave secreta de Django | `django-insecure-gym-udem-2024-change-in-production` |
+| `DEBUG` | Modo debug de Django | `True` |
 | `MONGO_URI` | URI de conexión MongoDB | `mongodb://database:27017` |
 | `MONGO_DB` | Nombre de la base de datos | `gym_udem` |
 
 ---
 
-## Flujo de Prueba Completo
+## Flujo de Prueba Completo (End-to-End)
 
-1. **Acceder al frontend** en `http://localhost:5173`
+Sigue estos pasos para verificar que frontend, backend y base de datos se comunican correctamente:
+
+1. **Abrir el frontend** en http://localhost:5173/index.html
 2. **Registrarse** con un correo institucional (`@udem.edu.co` o `@soyudemedellin.edu.co`)
-3. **Iniciar sesión**
-4. **Ver horarios disponibles** en el Dashboard
-5. **Crear una reserva** (descuenta cupo automáticamente)
-6. **Ver "Mis Reservas"** (lista reservas activas)
-7. **Cancelar una reserva** (libera cupo inmediatamente)
-8. **Verificar en Swagger UI** (`http://localhost:8000/swagger/`) que todos los endpoints responden correctamente
+3. **Iniciar sesión** con el correo registrado
+4. **Ver horarios disponibles** en el Dashboard (carga desde MongoDB vía backend)
+5. **Crear una reserva** — el cupo disponible se decrementa automáticamente
+6. **Ver "Mis Reservas"** — lista las reservas activas guardadas en MongoDB
+7. **Cancelar una reserva** — el cupo se libera inmediatamente
+8. **Verificar en Swagger UI** (`http://localhost:8000/swagger/`) que todos los endpoints responden con los códigos esperados
+
+### Verificación rápida con curl
+
+```bash
+# 1. Registrar usuario
+curl -X POST http://localhost:8000/api/auth/register/ \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Test","email":"test@udem.edu.co","password":"test123"}'
+
+# 2. Iniciar sesión
+curl -X POST http://localhost:8000/api/auth/login/ \
+  -H "Content-Type: application/json" \
+  -d '{"email":"test@udem.edu.co","password":"test123"}'
+
+# 3. Consultar horarios
+curl http://localhost:8000/api/slots/
+
+# 4. Crear reserva
+curl -X POST http://localhost:8000/api/reservations/ \
+  -H "Content-Type: application/json" \
+  -d '{"email":"test@udem.edu.co","slotId":1}'
+
+# 5. Ver reservas del usuario
+curl "http://localhost:8000/api/reservations/?email=test@udem.edu.co"
+```
 
 ---
 
@@ -135,16 +202,20 @@ docker run -p 27017:27017 tav07/gym-database:latest
 
 ```
 gym-reserva-project/
-├── frontend/          # React + Vite
+├── frontend/          # React 18 + Vite
 │   ├── dockerfile
 │   ├── src/
+│   │   ├── App.jsx
+│   │   ├── components/
+│   │   └── services/
+│   ├── index.html
 │   └── vite.config.js
-├── backend/           # Django + DRF
+├── backend/           # Django 4.2.7 + DRF 3.14.0
 │   ├── dockerfile
 │   ├── requirements.txt
 │   ├── api/
 │   └── gym_api/
-├── database/          # MongoDB
+├── database/          # MongoDB 6.0
 │   ├── Dockerfile
 │   ├── init.mongodb.js
 │   └── schema.json
@@ -155,27 +226,58 @@ gym-reserva-project/
 
 ## Desarrollo Local (Sin Docker)
 
+### Requisitos previos
+- Node.js 18+
+- Python 3.11+
+- MongoDB corriendo localmente en el puerto 27017
+
 ### Backend
+
 ```bash
 cd backend
+
+# Crear entorno virtual
 python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
+
+# Activar entorno virtual
+# Windows:
+venv\Scripts\activate
+# macOS/Linux:
+source venv/bin/activate
+
+# Instalar dependencias
 pip install -r requirements.txt
+
+# Crear archivo .env
+echo SECRET_KEY=tu-clave-secreta > .env
+echo DEBUG=True >> .env
+echo MONGO_URI=mongodb://localhost:27017 >> .env
+echo MONGO_DB=gym_udem >> .env
+
+# Ejecutar servidor
 python manage.py runserver
 ```
 
+El backend estará disponible en http://localhost:8000
+
 ### Frontend
+
 ```bash
 cd frontend
+
+# Instalar dependencias
 npm install
+
+# Ejecutar servidor de desarrollo
 npm run dev
 ```
 
-### MongoDB
-Asegúrate de tener MongoDB corriendo localmente en el puerto 27017.
+El frontend estará disponible en http://localhost:5173/index.html
+
+> Nota: Asegúrate de que el backend esté corriendo antes de abrir el frontend, ya que la aplicación React necesita conectarse a la API.
 
 ---
 
 ## Autores
 
-Proyecto desarrollado para el curso de Ingeniería de Software - Universidad de Medellín.
+Proyecto desarrollado para el curso de Ingeniería de Software — Universidad de Medellín.
