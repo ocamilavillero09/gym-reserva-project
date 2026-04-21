@@ -12,6 +12,7 @@ services:
       - backend
     environment:
       - VITE_API_URL=http://localhost:8000/api
+    restart: unless-stopped
 
   backend:
     build:
@@ -26,13 +27,17 @@ services:
       - MONGO_DB=gym_udem
     depends_on:
       - database
+    restart: unless-stopped
 
   database:
-    image: mongo:latest
+    build:
+      context: ./database
+      dockerfile: Dockerfile
     ports:
       - "27017:27017"
     volumes:
       - mongodb_data:/data/db
+    restart: unless-stopped
 
 volumes:
   mongodb_data:
