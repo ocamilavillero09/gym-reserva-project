@@ -1,0 +1,18 @@
+# Kustomize permite que el pipeline (GitHub Actions) fije el TAG exacto de la
+# imagen publicada en Docker Hub. ArgoCD detecta el cambio de tag en Git y
+# despliega esa versión, bajando la imagen desde Docker Hub (CD real).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - 00-namespace.yaml
+  - 01-mongodb.yaml
+  - 02-backend.yaml
+  - 03-frontend.yaml
+
+# El CI actualiza estos newTag con el SHA del commit (`kustomize edit set image`).
+images:
+  - name: ocamilavillero09/gym-backend
+    newTag: latest
+  - name: ocamilavillero09/gym-frontend
+    newTag: latest

@@ -1,6 +1,7 @@
 # ── Imagen de PRODUCCIÓN del frontend (la que despliega Jenkins/ArgoCD) ──
 # Etapa 1: compila el bundle estático de React/Vite.
-FROM node:18-alpine AS build
+# Node 20: vite-plugin-pwa (workbox) requiere Node >= 20 para el build.
+FROM node:20-alpine AS build
 WORKDIR /app
 COPY package*.json ./
 RUN npm install

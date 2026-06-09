@@ -97,6 +97,33 @@ En Jenkins:
 
 Cuando Jenkins publica una nueva imagen `:latest`, ArgoCD/k8s la toma en el siguiente rollout.
 
+## CI/CD con GitHub Actions + ArgoCD (entrega continua real)
+
+`.github/workflows/ci-cd.yml` hace, en cada push a `main`:
+1. **test** — pruebas unitarias de backend (Django) y frontend (Vitest).
+2. **build-and-push** — si pasan, construye y publica las imágenes en Docker Hub
+   con dos tags: `:latest` y `:<sha-del-commit>`.
+3. **deploy** — `kustomize edit set image` fija el tag al SHA en `k8s/kustomization.yaml`
+   y lo commitea. **ArgoCD** detecta el cambio y despliega esa imagen exacta en
+   minikube, bajándola desde Docker Hub (CD real).
+
+> Configurar en GitHub → Settings → Secrets and variables → Actions:
+> `DOCKERHUB_USERNAME` y `DOCKERHUB_TOKEN`.
+
+El pipeline de **Jenkins** (`jenkins/Jenkinsfile`) hace lo mismo (tests→build→push)
+y queda como alternativa on-prem.
+
+## Reglas de negocio implementadas (documento de análisis)
+
+- **RF02 / HU11** — Roles ESTUDIANTE / ENTRENADOR / ADMIN (el panel del entrenador
+  solo aparece para esos roles).
+- **RF07** — El entrenador/admin reserva para un tercero (`actor_email`).
+- **RN05 / HU08** — Máximo 2 reservas activas por usuario.
+- **RN07** — Una reserva activa por usuario y bloque.
+- **RN09 / HU20** — 3 inasistencias (No-Show, marcadas por el entrenador) → estado
+  PENALIZADO por 5 días hábiles; el penalizado no puede reservar.
+- **RNF2** — Frontend como PWA instalable (manifest + service worker).
+
 ## Casos de uso críticos
 
 Marcados en `backend/api/views.py` como `CASO DE USO CRÍTICO #N`:

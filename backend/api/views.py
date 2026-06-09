@@ -5,7 +5,11 @@ from rest_framework.response import Response
 from rest_framework import status
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
-from .db import get_db, seed_slots, hash_password, verify_password, serialize
+from .db import (
+    get_db, seed_slots, hash_password, verify_password, serialize,
+    add_business_days, ROLES, ESTADOS,
+    MAX_RESERVAS_ACTIVAS, NO_SHOW_LIMITE, PENALIZACION_DIAS_HABILES,
+)
 from .notifications import send_reservation_confirmation, send_cancellation_notice
 
 
@@ -74,10 +78,20 @@ def register(request):
     if db.users.find_one({'email': email}):
         return Response({'error': 'Ya existe una cuenta con este correo.'}, status=409)
 
+    # RF02 — Rol del usuario. Por defecto ESTUDIANTE; se admite crear
+    # ENTRENADOR/ADMIN para la gestión (en un entorno real lo asignaría un admin).
+    role = request.data.get('role', 'ESTUDIANTE').strip().upper()
+    if role not in ROLES:
+        return Response({'error': f'Rol inválido. Use uno de: {", ".join(ROLES)}.'}, status=400)
+
     db.users.insert_one({
-        'name':     name,
-        'email':    email,
-        'password': hash_password(password),
+        'name':       name,
+        'email':      email,
+        'password':   hash_password(password),
+        'role':       role,
+        'estado':     'ACTIVO',          # RN09: ACTIVO | PENALIZADO | INACTIVO
+        'no_show_count': 0,
+        'penalizado_hasta': None,
         'created_at': datetime.utcnow(),
     })
 
@@ -117,7 +131,14 @@ def login(request):
     if not user or not verify_password(user['password'], password):
         return Response({'error': 'Correo o contraseña incorrectos.'}, status=401)
 
-    return Response({'name': user['name'], 'email': user['email']})
+    # Se devuelve el rol y el estado para que el frontend (HU11) muestre las
+    # herramientas de cada perfil y advierta si el usuario está PENALIZADO.
+    return Response({
+        'name':   user['name'],
+        'email':  user['email'],
+        'role':   user.get('role', 'ESTUDIANTE'),
+        'estado': user.get('estado', 'ACTIVO'),
+    })
 
 
 # ──────────────────────────────────────────
@@ -197,7 +218,8 @@ def reservations(request):
         email = request.query_params.get('email', '').lower()
         if not email:
             return Response({'error': 'Parámetro email requerido.'}, status=400)
-        docs = [serialize(r) for r in db.reservations.find({'email': email})]
+        # Solo las ACTIVA: las canceladas o marcadas No-Show no se listan.
+        docs = [serialize(r) for r in db.reservations.find({'email': email, 'estado': 'ACTIVA'})]
         return Response(docs)
 
     # ╔══════════════════════════════════════════════════════════════════╗
@@ -210,20 +232,49 @@ def reservations(request):
     # ║ (available > 0) en una sola operación atómica de MongoDB. Si el     ║
     # ║ documento devuelto es None, no había cupo y se rechaza SIN crear     ║
     # ║ reserva. La reserva solo se inserta DESPUÉS de ganar el cupo.       ║
+    # ║ Aquí también se aplican RN05 (máx. 2 activas), RN07 (1 por bloque),  ║
+    # ║ RN09 (bloqueo si PENALIZADO) y RF07 (el entrenador reserva a otros). ║
     # ╚══════════════════════════════════════════════════════════════════╝
-    email   = request.data.get('email', '').strip().lower()
-    slot_id = request.data.get('slotId')
+    # 'email' = dueño de la reserva. Un ENTRENADOR/ADMIN puede crear la reserva
+    # para un tercero enviando además 'actor_email' (quién la registra, RF07).
+    email       = request.data.get('email', '').strip().lower()
+    actor_email = request.data.get('actor_email', email).strip().lower()
+    slot_id     = request.data.get('slotId')
 
     if not email or slot_id is None:
         return Response({'error': 'email y slotId son obligatorios.'}, status=400)
+
+    # RF07 — Si reserva para un tercero distinto a sí mismo, el actor debe ser
+    # ENTRENADOR o ADMIN.
+    if actor_email != email:
+        actor = db.users.find_one({'email': actor_email})
+        if not actor or actor.get('role') not in ('ENTRENADOR', 'ADMIN'):
+            return Response({'error': 'Solo un entrenador o administrador puede reservar para otro usuario.'}, status=403)
+
+    owner = db.users.find_one({'email': email})
+    if not owner:
+        return Response({'error': 'El usuario de la reserva no existe.'}, status=404)
+
+    # RN09 — Un usuario PENALIZADO no puede crear reservas (sí consultar).
+    if owner.get('estado') == 'PENALIZADO':
+        hasta = owner.get('penalizado_hasta')
+        if hasta and hasta > datetime.utcnow():
+            return Response({'error': 'Tu cuenta está penalizada por inasistencias. No puedes reservar por ahora.'}, status=403)
+        # Penalización vencida: se reactiva la cuenta.
+        db.users.update_one({'email': email}, {'$set': {'estado': 'ACTIVO', 'no_show_count': 0, 'penalizado_hasta': None}})
 
     slot = db.slots.find_one({'slotId': slot_id})
     if not slot:
         return Response({'error': 'Horario no encontrado.'}, status=404)
 
-    # Una reserva por usuario y bloque (regla de negocio).
-    if db.reservations.find_one({'email': email, 'slotId': slot_id}):
+    # RN07 — Una reserva ACTIVA por usuario y bloque.
+    if db.reservations.find_one({'email': email, 'slotId': slot_id, 'estado': 'ACTIVA'}):
         return Response({'error': 'Ya tienes una reserva en este horario.'}, status=409)
+
+    # RN05 — Máximo de reservas activas simultáneas por usuario.
+    activas = db.reservations.count_documents({'email': email, 'estado': 'ACTIVA'})
+    if activas >= MAX_RESERVAS_ACTIVAS:
+        return Response({'error': f'Has alcanzado el límite de {MAX_RESERVAS_ACTIVAS} reservas activas.'}, status=409)
 
     # Descuento ATÓMICO: solo descuenta si todavía queda cupo (available > 0).
     claimed = db.slots.find_one_and_update(
@@ -236,16 +287,17 @@ def reservations(request):
 
     now = datetime.utcnow()
     result = db.reservations.insert_one({
-        'email':   email,
-        'slotId':  slot_id,
-        'hour':    slot['hour'],
-        'date':    now.strftime('%A %d de %B de %Y'),
+        'email':      email,
+        'slotId':     slot_id,
+        'hour':       slot['hour'],
+        'date':       now.strftime('%A %d de %B de %Y'),
+        'estado':     'ACTIVA',          # ACTIVA | CANCELADA | NO_SHOW
+        'created_by': actor_email,        # quién la registró (RF07)
         'created_at': now,
     })
 
     # Confirmación por correo (CASO DE USO de notificación que la UI anuncia).
-    user = db.users.find_one({'email': email})
-    send_reservation_confirmation(email, (user or {}).get('name', ''), slot['hour'],
+    send_reservation_confirmation(email, (owner or {}).get('name', ''), slot['hour'],
                                   now.strftime('%A %d de %B de %Y'))
 
     new_res = db.reservations.find_one({'_id': result.inserted_id})
@@ -269,9 +321,9 @@ def cancel_reservation(request, reservation_id):
     # ╔══════════════════════════════════════════════════════════════════╗
     # ║ CASO DE USO CRÍTICO #5 — CANCELAR RESERVA Y LIBERAR CUPO            ║
     # ║ Crítico para no "perder" cupos: el cupo solo se devuelve (+1) si la  ║
-    # ║ reserva existía y se eliminó realmente. Se borra PRIMERO y se usa el ║
-    # ║ deleted_count como guardia, evitando que una doble cancelación sume  ║
-    # ║ el cupo dos veces (lo que dejaría available > total).               ║
+    # ║ reserva estaba ACTIVA y esta operación la pasó a CANCELADA. Se usa    ║
+    # ║ find_one_and_update CONDICIONAL (estado='ACTIVA') como guardia: una   ║
+    # ║ doble cancelación no vuelve a sumar el cupo (no dejaría available>total).║
     # ╚══════════════════════════════════════════════════════════════════╝
     db = get_db()
     try:
@@ -279,14 +331,84 @@ def cancel_reservation(request, reservation_id):
     except Exception:
         return Response({'error': 'ID de reserva inválido.'}, status=400)
 
-    reservation = db.reservations.find_one({'_id': oid})
-    if not reservation:
+    # Transición atómica ACTIVA -> CANCELADA. Devuelve el doc previo o None.
+    reservation = db.reservations.find_one_and_update(
+        {'_id': oid, 'estado': 'ACTIVA'},
+        {'$set': {'estado': 'CANCELADA', 'cancelled_at': datetime.utcnow()}},
+    )
+    if reservation is None:
+        # O no existe, o ya no estaba activa (cancelada / no-show).
+        if db.reservations.find_one({'_id': oid}):
+            return Response({'error': 'La reserva ya no está activa.'}, status=409)
         return Response({'error': 'Reserva no encontrada.'}, status=404)
 
-    # Borrar primero: solo si esta operación eliminó el documento liberamos cupo.
-    deleted = db.reservations.delete_one({'_id': oid}).deleted_count
-    if deleted:
-        db.slots.update_one({'slotId': reservation['slotId']}, {'$inc': {'available': 1}})
-        send_cancellation_notice(reservation['email'], reservation['hour'])
+    db.slots.update_one({'slotId': reservation['slotId']}, {'$inc': {'available': 1}})
+    send_cancellation_notice(reservation['email'], reservation['hour'])
 
     return Response({'message': 'Reserva cancelada. Cupo liberado.'})
+
+
+@swagger_auto_schema(
+    method='post',
+    operation_description="El entrenador/admin marca una inasistencia (No-Show). Suma al contador y, al llegar al límite, penaliza al usuario (RN09).",
+    manual_parameters=[
+        openapi.Parameter('reservation_id', openapi.IN_PATH, description="ID de la reserva (ObjectId)", type=openapi.TYPE_STRING, required=True),
+    ],
+    request_body=openapi.Schema(
+        type=openapi.TYPE_OBJECT,
+        required=['actor_email'],
+        properties={'actor_email': openapi.Schema(type=openapi.TYPE_STRING, example='entrenador@udem.edu.co')},
+    ),
+    responses={
+        200: openapi.Response('No-Show registrado.', openapi.Schema(type=openapi.TYPE_OBJECT)),
+        403: openapi.Response('Sin permisos.', openapi.Schema(type=openapi.TYPE_OBJECT)),
+        404: openapi.Response('Reserva no encontrada.', openapi.Schema(type=openapi.TYPE_OBJECT)),
+    }
+)
+@api_view(['POST'])
+def mark_no_show(request, reservation_id):
+    # ╔══════════════════════════════════════════════════════════════════╗
+    # ║ CASO DE USO — RN09: POLÍTICA DE INASISTENCIA Y PENALIZACIÓN         ║
+    # ║ Solo ENTRENADOR/ADMIN. Marca la reserva como NO_SHOW, incrementa el  ║
+    # ║ contador del usuario y, al alcanzar NO_SHOW_LIMITE inasistencias,    ║
+    # ║ cambia su estado a PENALIZADO por N días hábiles.                    ║
+    # ╚══════════════════════════════════════════════════════════════════╝
+    db = get_db()
+    actor_email = request.data.get('actor_email', '').strip().lower()
+    actor = db.users.find_one({'email': actor_email})
+    if not actor or actor.get('role') not in ('ENTRENADOR', 'ADMIN'):
+        return Response({'error': 'Solo un entrenador o administrador puede registrar inasistencias.'}, status=403)
+
+    try:
+        oid = ObjectId(reservation_id)
+    except Exception:
+        return Response({'error': 'ID de reserva inválido.'}, status=400)
+
+    # ACTIVA -> NO_SHOW de forma atómica (no se devuelve el cupo: se desperdició).
+    reservation = db.reservations.find_one_and_update(
+        {'_id': oid, 'estado': 'ACTIVA'},
+        {'$set': {'estado': 'NO_SHOW', 'no_show_at': datetime.utcnow()}},
+    )
+    if reservation is None:
+        return Response({'error': 'Reserva no encontrada o ya no está activa.'}, status=404)
+
+    # Incrementa el contador de inasistencias del usuario dueño.
+    owner = db.users.find_one_and_update(
+        {'email': reservation['email']},
+        {'$inc': {'no_show_count': 1}},
+        return_document=True,
+    )
+    penalizado = False
+    if owner and owner.get('no_show_count', 0) >= NO_SHOW_LIMITE:
+        hasta = add_business_days(datetime.utcnow(), PENALIZACION_DIAS_HABILES)
+        db.users.update_one(
+            {'email': reservation['email']},
+            {'$set': {'estado': 'PENALIZADO', 'penalizado_hasta': hasta}},
+        )
+        penalizado = True
+
+    return Response({
+        'message': 'Inasistencia registrada.',
+        'no_show_count': (owner or {}).get('no_show_count', 0),
+        'penalizado': penalizado,
+    })

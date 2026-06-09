@@ -7,4 +7,5 @@ urlpatterns = [
     path('slots/',                      views.get_slots,           name='slots'),
     path('reservations/',               views.reservations,        name='reservations'),
     path('reservations/<str:reservation_id>/', views.cancel_reservation, name='cancel-reservation'),
+    path('reservations/<str:reservation_id>/no-show/', views.mark_no_show, name='mark-no-show'),
 ]

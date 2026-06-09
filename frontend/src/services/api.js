@@ -23,4 +23,7 @@ export const reservationsApi = {
   getByEmail: (email) => request(`/reservations/?email=${encodeURIComponent(email)}`),
   create:     (body)  => request('/reservations/', { method: 'POST', body: JSON.stringify(body) }),
   cancel:     (id)    => request(`/reservations/${id}/`, { method: 'DELETE' }),
+  // RN09 — el entrenador/admin marca una inasistencia (No-Show).
+  noShow:     (id, actorEmail) =>
+    request(`/reservations/${id}/no-show/`, { method: 'POST', body: JSON.stringify({ actor_email: actorEmail }) }),
 };

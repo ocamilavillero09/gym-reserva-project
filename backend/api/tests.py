@@ -1,9 +1,10 @@
 """
 Pruebas unitarias del sistema de reservas.
 
-Cubren los 5 casos de uso críticos definidos en views.py. Se usa `mongomock`
-para simular MongoDB en memoria, de modo que el pipeline (Jenkins) pueda
-ejecutar las pruebas sin levantar una base de datos real.
+Cubren los casos de uso críticos (views.py) y las reglas de negocio del
+documento de análisis: RN05 (máx. 2 activas), RN07 (1 por bloque), RN09
+(penalización por No-Show) y RF07 (reserva por entrenador). Se usa `mongomock`
+para simular MongoDB en memoria.
 """
 import mongomock
 from django.test import TestCase, override_settings
@@ -14,10 +15,7 @@ from api import db as db_module
 
 @override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
 class GymApiTestCase(TestCase):
-    """Base: reemplaza el cliente de Mongo por uno en memoria antes de cada test."""
-
     def setUp(self):
-        # Inyecta un cliente mongomock; get_db() lo reutiliza vía db_module._client.
         db_module._client = mongomock.MongoClient()
         self.client = APIClient()
 
@@ -25,54 +23,73 @@ class GymApiTestCase(TestCase):
         db_module._client = None
 
     # Helpers ----------------------------------------------------------------
-    def _register(self, email='juan.perez@udem.edu.co', name='Juan Perez', password='secreto123'):
-        return self.client.post('/api/auth/register/',
-                                {'name': name, 'email': email, 'password': password}, format='json')
+    def _register(self, email='juan.perez@udem.edu.co', name='Juan Perez',
+                  password='secreto123', role=None):
+        body = {'name': name, 'email': email, 'password': password}
+        if role:
+            body['role'] = role
+        return self.client.post('/api/auth/register/', body, format='json')
+
+    def _reserve(self, email, slot_id, actor_email=None):
+        body = {'email': email, 'slotId': slot_id}
+        if actor_email:
+            body['actor_email'] = actor_email
+        return self.client.post('/api/reservations/', body, format='json')
 
     def _slot(self, slot_id):
         return db_module.get_db().slots.find_one({'slotId': slot_id})
+
+    def _user(self, email):
+        return db_module.get_db().users.find_one({'email': email})
 
 
 # ── CU-1: REGISTRO ────────────────────────────────────────────────────────
 class RegisterTests(GymApiTestCase):
 
-    def test_registro_exitoso_guarda_password_hasheada(self):
+    def test_registro_exitoso_guarda_password_hasheada_y_rol(self):
         resp = self._register()
         self.assertEqual(resp.status_code, 201)
-        user = db_module.get_db().users.find_one({'email': 'juan.perez@udem.edu.co'})
-        self.assertIsNotNone(user)
-        # La contraseña nunca se guarda en claro.
+        user = self._user('juan.perez@udem.edu.co')
         self.assertNotEqual(user['password'], 'secreto123')
-        self.assertIn(':', user['password'])  # formato salt:hash
+        self.assertIn(':', user['password'])
+        self.assertEqual(user['role'], 'ESTUDIANTE')   # rol por defecto
+        self.assertEqual(user['estado'], 'ACTIVO')
+
+    def test_puede_crear_entrenador(self):
+        resp = self._register(email='coach@udem.edu.co', role='ENTRENADOR')
+        self.assertEqual(resp.status_code, 201)
+        self.assertEqual(self._user('coach@udem.edu.co')['role'], 'ENTRENADOR')
+
+    def test_rol_invalido_rechazado(self):
+        resp = self._register(email='x@udem.edu.co', role='SUPERMAN')
+        self.assertEqual(resp.status_code, 400)
 
     def test_rechaza_correo_no_institucional(self):
-        resp = self._register(email='juan@gmail.com')
-        self.assertEqual(resp.status_code, 400)
+        self.assertEqual(self._register(email='juan@gmail.com').status_code, 400)
 
     def test_rechaza_password_corta(self):
-        resp = self._register(password='123')
-        self.assertEqual(resp.status_code, 400)
+        self.assertEqual(self._register(password='123').status_code, 400)
 
     def test_rechaza_correo_duplicado(self):
         self._register()
-        resp = self._register()
-        self.assertEqual(resp.status_code, 409)
+        self.assertEqual(self._register().status_code, 409)
 
 
 # ── CU-2: LOGIN ─────────────────────────────────────────────────────────────
 class LoginTests(GymApiTestCase):
 
-    def test_login_correcto(self):
+    def test_login_correcto_devuelve_rol_y_estado(self):
         self._register()
         resp = self.client.post('/api/auth/login/',
                                 {'email': 'juan.perez@udem.edu.co', 'password': 'secreto123'}, format='json')
         self.assertEqual(resp.status_code, 200)
-        self.assertEqual(resp.data['email'], 'juan.perez@udem.edu.co')
+        self.assertEqual(resp.data['role'], 'ESTUDIANTE')
+        self.assertEqual(resp.data['estado'], 'ACTIVO')
 
     def test_login_password_incorrecta(self):
         self._register()
         resp = self.client.post('/api/auth/login/',
-                                {'email': 'juan.perez@udem.edu.co', 'password': 'malaclave'}, format='json')
+                                {'email': 'juan.perez@udem.edu.co', 'password': 'mala'}, format='json')
         self.assertEqual(resp.status_code, 401)
 
     def test_login_usuario_inexistente(self):
@@ -83,7 +100,6 @@ class LoginTests(GymApiTestCase):
 
 # ── CU-3: CONSULTA DE CUPOS ─────────────────────────────────────────────────
 class SlotsTests(GymApiTestCase):
-
     def test_slots_se_siembran_y_devuelven(self):
         resp = self.client.get('/api/slots/')
         self.assertEqual(resp.status_code, 200)
@@ -91,68 +107,124 @@ class SlotsTests(GymApiTestCase):
         self.assertEqual(resp.data[0]['available'], 20)
 
 
-# ── CU-4: CREAR RESERVA (descuento atómico) ─────────────────────────────────
+# ── CU-4: CREAR RESERVA ─────────────────────────────────────────────────────
 class ReservationTests(GymApiTestCase):
-
-    def setUp(self):
-        super().setUp()
-        self._register()
-        self.client.get('/api/slots/')  # siembra los slots
-
-    def test_reserva_descuenta_cupo(self):
-        resp = self.client.post('/api/reservations/',
-                                {'email': 'juan.perez@udem.edu.co', 'slotId': 1}, format='json')
-        self.assertEqual(resp.status_code, 201)
-        self.assertEqual(self._slot(1)['available'], 19)
-
-    def test_no_permite_doble_reserva_mismo_bloque(self):
-        self.client.post('/api/reservations/', {'email': 'juan.perez@udem.edu.co', 'slotId': 1}, format='json')
-        resp = self.client.post('/api/reservations/', {'email': 'juan.perez@udem.edu.co', 'slotId': 1}, format='json')
-        self.assertEqual(resp.status_code, 409)
-        self.assertEqual(self._slot(1)['available'], 19)  # no descuenta de nuevo
-
-    def test_rechaza_sin_cupos(self):
-        db_module.get_db().slots.update_one({'slotId': 1}, {'$set': {'available': 0}})
-        resp = self.client.post('/api/reservations/', {'email': 'juan.perez@udem.edu.co', 'slotId': 1}, format='json')
-        self.assertEqual(resp.status_code, 409)
-
-    def test_rechaza_slot_inexistente(self):
-        resp = self.client.post('/api/reservations/', {'email': 'juan.perez@udem.edu.co', 'slotId': 999}, format='json')
-        self.assertEqual(resp.status_code, 404)
-
-    def test_descuento_atomico_no_sobrevende_ultimo_cupo(self):
-        """Con 1 cupo, dos estudiantes distintos compiten: solo uno gana."""
-        db_module.get_db().slots.update_one({'slotId': 1}, {'$set': {'available': 1}})
-        r1 = self.client.post('/api/reservations/', {'email': 'juan.perez@udem.edu.co', 'slotId': 1}, format='json')
-        r2 = self.client.post('/api/reservations/', {'email': 'ana.gomez@udem.edu.co', 'slotId': 1}, format='json')
-        codes = sorted([r1.status_code, r2.status_code])
-        self.assertEqual(codes, [201, 409])           # uno crea, el otro es rechazado
-        self.assertEqual(self._slot(1)['available'], 0)  # nunca queda negativo
-
-
-# ── CU-5: CANCELAR RESERVA ──────────────────────────────────────────────────
-class CancelTests(GymApiTestCase):
-
     def setUp(self):
         super().setUp()
         self._register()
         self.client.get('/api/slots/')
-        resp = self.client.post('/api/reservations/',
-                                {'email': 'juan.perez@udem.edu.co', 'slotId': 1}, format='json')
-        self.reservation_id = resp.data['id']
+
+    def test_reserva_descuenta_cupo(self):
+        resp = self._reserve('juan.perez@udem.edu.co', 1)
+        self.assertEqual(resp.status_code, 201)
+        self.assertEqual(resp.data['estado'], 'ACTIVA')
+        self.assertEqual(self._slot(1)['available'], 19)
+
+    def test_usuario_inexistente_no_reserva(self):
+        self.assertEqual(self._reserve('fantasma@udem.edu.co', 1).status_code, 404)
+
+    def test_rn07_no_doble_reserva_mismo_bloque(self):
+        self._reserve('juan.perez@udem.edu.co', 1)
+        resp = self._reserve('juan.perez@udem.edu.co', 1)
+        self.assertEqual(resp.status_code, 409)
+        self.assertEqual(self._slot(1)['available'], 19)
+
+    def test_rn05_maximo_dos_reservas_activas(self):
+        self.assertEqual(self._reserve('juan.perez@udem.edu.co', 1).status_code, 201)
+        self.assertEqual(self._reserve('juan.perez@udem.edu.co', 2).status_code, 201)
+        # La tercera debe ser rechazada (límite = 2).
+        resp = self._reserve('juan.perez@udem.edu.co', 3)
+        self.assertEqual(resp.status_code, 409)
+        self.assertEqual(self._slot(3)['available'], 20)  # no descontó
+
+    def test_rechaza_sin_cupos(self):
+        db_module.get_db().slots.update_one({'slotId': 1}, {'$set': {'available': 0}})
+        self.assertEqual(self._reserve('juan.perez@udem.edu.co', 1).status_code, 409)
+
+    def test_rechaza_slot_inexistente(self):
+        self.assertEqual(self._reserve('juan.perez@udem.edu.co', 999).status_code, 404)
+
+    def test_descuento_atomico_no_sobrevende(self):
+        self._register(email='ana.gomez@udem.edu.co', name='Ana Gomez')
+        db_module.get_db().slots.update_one({'slotId': 1}, {'$set': {'available': 1}})
+        r1 = self._reserve('juan.perez@udem.edu.co', 1)
+        r2 = self._reserve('ana.gomez@udem.edu.co', 1)
+        self.assertEqual(sorted([r1.status_code, r2.status_code]), [201, 409])
+        self.assertEqual(self._slot(1)['available'], 0)
+
+    def test_solo_muestra_activas(self):
+        r = self._reserve('juan.perez@udem.edu.co', 1)
+        self.client.delete(f"/api/reservations/{r.data['id']}/")
+        listado = self.client.get('/api/reservations/?email=juan.perez@udem.edu.co')
+        self.assertEqual(len(listado.data), 0)  # la cancelada no aparece
+
+
+# ── RF07: RESERVA POR ENTRENADOR ────────────────────────────────────────────
+class TrainerReservationTests(GymApiTestCase):
+    def setUp(self):
+        super().setUp()
+        self._register(email='coach@udem.edu.co', role='ENTRENADOR')
+        self._register(email='estu@udem.edu.co', name='Estudiante')
+        self.client.get('/api/slots/')
+
+    def test_entrenador_reserva_para_tercero(self):
+        resp = self._reserve('estu@udem.edu.co', 1, actor_email='coach@udem.edu.co')
+        self.assertEqual(resp.status_code, 201)
+        self.assertEqual(resp.data['created_by'], 'coach@udem.edu.co')
+
+    def test_estudiante_no_puede_reservar_para_otro(self):
+        self._register(email='otro@udem.edu.co')
+        resp = self._reserve('otro@udem.edu.co', 1, actor_email='estu@udem.edu.co')
+        self.assertEqual(resp.status_code, 403)
+
+
+# ── CU-5: CANCELAR ──────────────────────────────────────────────────────────
+class CancelTests(GymApiTestCase):
+    def setUp(self):
+        super().setUp()
+        self._register()
+        self.client.get('/api/slots/')
+        self.rid = self._reserve('juan.perez@udem.edu.co', 1).data['id']
 
     def test_cancelar_libera_cupo(self):
         self.assertEqual(self._slot(1)['available'], 19)
-        resp = self.client.delete(f'/api/reservations/{self.reservation_id}/')
+        resp = self.client.delete(f'/api/reservations/{self.rid}/')
         self.assertEqual(resp.status_code, 200)
-        self.assertEqual(self._slot(1)['available'], 20)  # cupo devuelto
+        self.assertEqual(self._slot(1)['available'], 20)
 
     def test_doble_cancelacion_no_suma_cupo_de_mas(self):
-        self.client.delete(f'/api/reservations/{self.reservation_id}/')
-        resp = self.client.delete(f'/api/reservations/{self.reservation_id}/')
-        self.assertEqual(resp.status_code, 404)
-        self.assertEqual(self._slot(1)['available'], 20)  # no pasa de 20 (total)
+        self.client.delete(f'/api/reservations/{self.rid}/')
+        resp = self.client.delete(f'/api/reservations/{self.rid}/')
+        self.assertEqual(resp.status_code, 409)         # ya no está activa
+        self.assertEqual(self._slot(1)['available'], 20)
 
     def test_id_invalido(self):
-        resp = self.client.delete('/api/reservations/no-es-un-objectid/')
-        self.assertEqual(resp.status_code, 400)
+        self.assertEqual(self.client.delete('/api/reservations/no-es-objectid/').status_code, 400)
+
+
+# ── RN09: NO-SHOW Y PENALIZACIÓN ────────────────────────────────────────────
+class NoShowTests(GymApiTestCase):
+    def setUp(self):
+        super().setUp()
+        self._register(email='coach@udem.edu.co', role='ENTRENADOR')
+        self._register(email='estu@udem.edu.co', name='Estudiante')
+        self.client.get('/api/slots/')
+
+    def _no_show(self, rid):
+        return self.client.post(f'/api/reservations/{rid}/no-show/',
+                                {'actor_email': 'coach@udem.edu.co'}, format='json')
+
+    def test_solo_entrenador_marca_no_show(self):
+        rid = self._reserve('estu@udem.edu.co', 1).data['id']
+        resp = self.client.post(f'/api/reservations/{rid}/no-show/',
+                                {'actor_email': 'estu@udem.edu.co'}, format='json')
+        self.assertEqual(resp.status_code, 403)
+
+    def test_tres_no_show_penaliza_y_bloquea_reserva(self):
+        for slot in (1, 2, 3):
+            rid = self._reserve('estu@udem.edu.co', slot).data['id']
+            self._no_show(rid)
+        self.assertEqual(self._user('estu@udem.edu.co')['estado'], 'PENALIZADO')
+        # Penalizado: no puede crear nuevas reservas.
+        resp = self._reserve('estu@udem.edu.co', 4)
+        self.assertEqual(resp.status_code, 403)

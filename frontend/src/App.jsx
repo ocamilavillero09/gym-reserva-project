@@ -3,6 +3,7 @@ import Login from './components/Login';
 import Navbar from './components/Navbar';
 import Dashboard from './components/Dashboard';
 import MyReservations from './components/MyReservations';
+import TrainerPanel from './components/TrainerPanel';
 import { slotsApi, reservationsApi } from './services/api';
 
 function Toast({ message, type, onClose }) {
@@ -136,6 +137,14 @@ export default function App() {
               reservations={reservations}
               onCancel={handleCancel}
               onNavigate={setView}
+            />
+          )}
+          {view === 'trainer' && (user?.role === 'ENTRENADOR' || user?.role === 'ADMIN') && (
+            <TrainerPanel
+              user={user}
+              slots={slots}
+              showToast={showToast}
+              onChanged={() => refreshData(user.email)}
             />
           )}
         </>

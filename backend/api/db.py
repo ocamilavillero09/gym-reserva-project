@@ -1,9 +1,30 @@
 import hashlib
 import os
+from datetime import datetime, timedelta
 from pymongo import MongoClient
 from django.conf import settings
 
 _client = None
+
+# Roles y estados de usuario (RF02 / RN09 del documento de análisis).
+ROLES = ('ESTUDIANTE', 'ENTRENADOR', 'ADMIN')
+ESTADOS = ('ACTIVO', 'PENALIZADO', 'INACTIVO')
+
+# Reglas de negocio configurables.
+MAX_RESERVAS_ACTIVAS = 2     # RN05: hasta 2 reservas activas por usuario
+NO_SHOW_LIMITE = 3           # RN09: 3 inasistencias -> PENALIZADO
+PENALIZACION_DIAS_HABILES = 5  # RN09: penalización de 5 días hábiles
+
+
+def add_business_days(start: datetime, days: int) -> datetime:
+    """Suma N días hábiles (lunes-viernes) a una fecha."""
+    current = start
+    added = 0
+    while added < days:
+        current += timedelta(days=1)
+        if current.weekday() < 5:  # 0-4 = lunes a viernes
+            added += 1
+    return current
 
 def get_db():
     global _client

@@ -44,6 +44,13 @@ export default function Navbar({ user, view, reservationCount, onNavigate, onLog
             )}
           </div>
 
+          {/* Panel del entrenador/admin — solo visible para esos roles (HU11) */}
+          {(user?.role === 'ENTRENADOR' || user?.role === 'ADMIN') && (
+            <NavBtn active={view === 'trainer'} onClick={() => onNavigate('trainer')}>
+              Panel entrenador
+            </NavBtn>
+          )}
+
           <div style={{ width: 1, height: 28, backgroundColor: 'rgba(255,255,255,0.3)', margin: '0 6px' }} />
 
           {/* Avatar */}
