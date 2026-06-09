@@ -6,6 +6,23 @@ from rest_framework import status
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 from .db import get_db, seed_slots, hash_password, verify_password, serialize
+from .notifications import send_reservation_confirmation, send_cancellation_notice
+
+
+# ══════════════════════════════════════════════════════════════════════════
+#  CASOS DE USO CRÍTICOS DEL SISTEMA
+#  --------------------------------------------------------------------------
+#  Este archivo concentra los 5 casos de uso críticos del sistema de reservas.
+#  Cada uno está marcado con un encabezado «CASO DE USO CRÍTICO #N» que explica
+#  la regla de negocio que protege y por qué es crítico. Son los flujos que,
+#  si fallan, comprometen la integridad de los datos o la seguridad:
+#
+#    CU-1  Registro con correo institucional      (seguridad / control de acceso)
+#    CU-2  Inicio de sesión y verificación de hash (seguridad / credenciales)
+#    CU-3  Consulta de cupos en tiempo real        (consistencia de lectura)
+#    CU-4  Crear reserva con descuento ATÓMICO     (concurrencia / no sobreventa)
+#    CU-5  Cancelar reserva y liberar cupo         (consistencia / no perder cupos)
+# ══════════════════════════════════════════════════════════════════════════
 
 
 # ──────────────────────────────────────────
@@ -32,6 +49,13 @@ from .db import get_db, seed_slots, hash_password, verify_password, serialize
 )
 @api_view(['POST'])
 def register(request):
+    # ╔══════════════════════════════════════════════════════════════════╗
+    # ║ CASO DE USO CRÍTICO #1 — REGISTRO CON CORREO INSTITUCIONAL          ║
+    # ║ Crítico porque es el control de acceso: solo miembros de la         ║
+    # ║ universidad (@udem.edu.co / @soyudemedellin.edu.co) pueden crear    ║
+    # ║ cuenta, la contraseña se almacena HASHEADA (PBKDF2, nunca en claro) ║
+    # ║ y el correo es único — evita cuentas duplicadas y accesos externos. ║
+    # ╚══════════════════════════════════════════════════════════════════╝
     db = get_db()
     name     = request.data.get('name', '').strip()
     email    = request.data.get('email', '').strip().lower()
@@ -78,6 +102,13 @@ def register(request):
 )
 @api_view(['POST'])
 def login(request):
+    # ╔══════════════════════════════════════════════════════════════════╗
+    # ║ CASO DE USO CRÍTICO #2 — INICIO DE SESIÓN                          ║
+    # ║ Crítico por seguridad: la verificación compara el hash PBKDF2       ║
+    # ║ almacenado (verify_password) sin exponer la contraseña, y devuelve  ║
+    # ║ un mensaje genérico ante correo o clave incorrectos para no revelar ║
+    # ║ si el correo existe (mitiga enumeración de usuarios).               ║
+    # ╚══════════════════════════════════════════════════════════════════╝
     db = get_db()
     email    = request.data.get('email', '').strip().lower()
     password = request.data.get('password', '')
@@ -110,6 +141,12 @@ def login(request):
 )
 @api_view(['GET'])
 def get_slots(request):
+    # ╔══════════════════════════════════════════════════════════════════╗
+    # ║ CASO DE USO CRÍTICO #3 — CONSULTA DE CUPOS EN TIEMPO REAL           ║
+    # ║ Crítico para la consistencia: el frontend muestra disponibilidad    ║
+    # ║ "en vivo" y decide qué bloques se pueden reservar a partir de este  ║
+    # ║ valor. Debe reflejar siempre el estado real de la colección slots.  ║
+    # ╚══════════════════════════════════════════════════════════════════╝
     seed_slots()
     db = get_db()
     slots = [
@@ -163,7 +200,17 @@ def reservations(request):
         docs = [serialize(r) for r in db.reservations.find({'email': email})]
         return Response(docs)
 
-    # POST — crear reserva
+    # ╔══════════════════════════════════════════════════════════════════╗
+    # ║ CASO DE USO CRÍTICO #4 — CREAR RESERVA (DESCUENTO ATÓMICO DE CUPO)  ║
+    # ║ El más crítico del sistema. Bajo concurrencia (varios estudiantes   ║
+    # ║ reservando el último cupo a la vez), un patrón "leer-luego-escribir" ║
+    # ║ permite SOBREVENTA: dos peticiones leen available=1, ambas crean la  ║
+    # ║ reserva y el cupo queda en -1.                                      ║
+    # ║ Solución: se descuenta con find_one_and_update CONDICIONAL          ║
+    # ║ (available > 0) en una sola operación atómica de MongoDB. Si el     ║
+    # ║ documento devuelto es None, no había cupo y se rechaza SIN crear     ║
+    # ║ reserva. La reserva solo se inserta DESPUÉS de ganar el cupo.       ║
+    # ╚══════════════════════════════════════════════════════════════════╝
     email   = request.data.get('email', '').strip().lower()
     slot_id = request.data.get('slotId')
 
@@ -173,10 +220,19 @@ def reservations(request):
     slot = db.slots.find_one({'slotId': slot_id})
     if not slot:
         return Response({'error': 'Horario no encontrado.'}, status=404)
-    if slot['available'] <= 0:
-        return Response({'error': 'No hay cupos disponibles en este horario.'}, status=409)
+
+    # Una reserva por usuario y bloque (regla de negocio).
     if db.reservations.find_one({'email': email, 'slotId': slot_id}):
         return Response({'error': 'Ya tienes una reserva en este horario.'}, status=409)
+
+    # Descuento ATÓMICO: solo descuenta si todavía queda cupo (available > 0).
+    claimed = db.slots.find_one_and_update(
+        {'slotId': slot_id, 'available': {'$gt': 0}},
+        {'$inc': {'available': -1}},
+    )
+    if claimed is None:
+        # Otro estudiante tomó el último cupo entre la lectura y este punto.
+        return Response({'error': 'No hay cupos disponibles en este horario.'}, status=409)
 
     now = datetime.utcnow()
     result = db.reservations.insert_one({
@@ -186,7 +242,11 @@ def reservations(request):
         'date':    now.strftime('%A %d de %B de %Y'),
         'created_at': now,
     })
-    db.slots.update_one({'slotId': slot_id}, {'$inc': {'available': -1}})
+
+    # Confirmación por correo (CASO DE USO de notificación que la UI anuncia).
+    user = db.users.find_one({'email': email})
+    send_reservation_confirmation(email, (user or {}).get('name', ''), slot['hour'],
+                                  now.strftime('%A %d de %B de %Y'))
 
     new_res = db.reservations.find_one({'_id': result.inserted_id})
     return Response(serialize(new_res), status=201)
@@ -206,6 +266,13 @@ def reservations(request):
 )
 @api_view(['DELETE'])
 def cancel_reservation(request, reservation_id):
+    # ╔══════════════════════════════════════════════════════════════════╗
+    # ║ CASO DE USO CRÍTICO #5 — CANCELAR RESERVA Y LIBERAR CUPO            ║
+    # ║ Crítico para no "perder" cupos: el cupo solo se devuelve (+1) si la  ║
+    # ║ reserva existía y se eliminó realmente. Se borra PRIMERO y se usa el ║
+    # ║ deleted_count como guardia, evitando que una doble cancelación sume  ║
+    # ║ el cupo dos veces (lo que dejaría available > total).               ║
+    # ╚══════════════════════════════════════════════════════════════════╝
     db = get_db()
     try:
         oid = ObjectId(reservation_id)
@@ -216,7 +283,10 @@ def cancel_reservation(request, reservation_id):
     if not reservation:
         return Response({'error': 'Reserva no encontrada.'}, status=404)
 
-    db.reservations.delete_one({'_id': oid})
-    db.slots.update_one({'slotId': reservation['slotId']}, {'$inc': {'available': 1}})
+    # Borrar primero: solo si esta operación eliminó el documento liberamos cupo.
+    deleted = db.reservations.delete_one({'_id': oid}).deleted_count
+    if deleted:
+        db.slots.update_one({'slotId': reservation['slotId']}, {'$inc': {'available': 1}})
+        send_cancellation_notice(reservation['email'], reservation['hour'])
 
     return Response({'message': 'Reserva cancelada. Cupo liberado.'})

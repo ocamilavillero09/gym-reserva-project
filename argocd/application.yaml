@@ -1,0 +1,26 @@
+# ── ArgoCD Application ──
+# Observa la carpeta k8s/ del repositorio y la sincroniza con el namespace gym
+# del cluster de minikube. Cualquier cambio en los manifiestos (o una nueva
+# imagen :latest publicada por Jenkins) se despliega automáticamente.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: gym-reserva
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/ocamilavillero09/gym-reserva-project.git
+    targetRevision: main
+    path: k8s
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: gym
+  syncPolicy:
+    automated:
+      prune: true      # elimina recursos que ya no están en el repo
+      selfHeal: true   # revierte cambios manuales en el cluster
+    syncOptions:
+      - CreateNamespace=true

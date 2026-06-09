@@ -1,0 +1,75 @@
+// ──────────────────────────────────────────────────────────────────────────
+//  Pipeline CI/CD — Gym Reserva
+//  1) Corre las pruebas unitarias del backend (Django + mongomock)
+//  2) Construye las imágenes Docker de backend y frontend
+//  3) Las publica en Docker Hub (usuario ocamilavillero09)
+//  ArgoCD detecta la imagen :latest y despliega en el cluster de minikube.
+//
+//  Requisitos en Jenkins:
+//   - Docker disponible en el agente (el agente puede ejecutar `docker`).
+//   - Credencial tipo "Username with password" con ID: dockerhub-creds
+// ──────────────────────────────────────────────────────────────────────────
+pipeline {
+  agent any
+
+  environment {
+    DOCKERHUB_USER = 'ocamilavillero09'
+    BACKEND_IMAGE  = "${DOCKERHUB_USER}/gym-backend"
+    FRONTEND_IMAGE = "${DOCKERHUB_USER}/gym-frontend"
+    IMAGE_TAG      = "${env.BUILD_NUMBER}"
+  }
+
+  stages {
+
+    stage('Checkout') {
+      steps {
+        checkout scm
+      }
+    }
+
+    stage('Pruebas unitarias (backend)') {
+      steps {
+        // Se ejecutan dentro de un contenedor python efímero para no depender
+        // de la configuración del agente. Si fallan, el pipeline se detiene
+        // y NO se publica ninguna imagen.
+        sh '''
+          docker run --rm -v "$WORKSPACE/backend":/app -w /app python:3.11-slim \
+            sh -c "pip install --no-cache-dir -r requirements.txt && python manage.py test api -v 2"
+        '''
+      }
+    }
+
+    stage('Build imágenes') {
+      steps {
+        sh 'docker build -f backend/dockerfile          -t $BACKEND_IMAGE:$IMAGE_TAG  -t $BACKEND_IMAGE:latest  ./backend'
+        sh 'docker build -f frontend/Dockerfile.prod     -t $FRONTEND_IMAGE:$IMAGE_TAG -t $FRONTEND_IMAGE:latest ./frontend'
+      }
+    }
+
+    stage('Push a Docker Hub') {
+      steps {
+        withCredentials([usernamePassword(credentialsId: 'dockerhub-creds',
+                                           usernameVariable: 'DH_USER',
+                                           passwordVariable: 'DH_PASS')]) {
+          sh 'echo "$DH_PASS" | docker login -u "$DH_USER" --password-stdin'
+          sh 'docker push $BACKEND_IMAGE:$IMAGE_TAG'
+          sh 'docker push $BACKEND_IMAGE:latest'
+          sh 'docker push $FRONTEND_IMAGE:$IMAGE_TAG'
+          sh 'docker push $FRONTEND_IMAGE:latest'
+        }
+      }
+    }
+  }
+
+  post {
+    always {
+      sh 'docker logout || true'
+    }
+    success {
+      echo "✅ Imágenes publicadas: $BACKEND_IMAGE:$IMAGE_TAG y $FRONTEND_IMAGE:$IMAGE_TAG"
+    }
+    failure {
+      echo '❌ Pipeline falló. Revisa los logs de la etapa correspondiente.'
+    }
+  }
+}

@@ -1,0 +1,70 @@
+# ── Backend Django + DRF ──
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backend-config
+  namespace: gym
+data:
+  MONGO_URI: "mongodb://mongodb:27017"
+  MONGO_DB: "gym_udem"
+  DEBUG: "False"
+  # Sin EMAIL_HOST, las confirmaciones de reserva se imprimen en los logs
+  # (visibles en Grafana/Loki). Para SMTP real, añadir EMAIL_HOST aquí + Secret.
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  namespace: gym
+  labels:
+    app: backend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      containers:
+        - name: backend
+          # Imagen publicada por el pipeline de Jenkins en Docker Hub.
+          image: ocamilavillero09/gym-backend:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+          envFrom:
+            - configMapRef:
+                name: backend-config
+          readinessProbe:
+            httpGet:
+              path: /api/slots/
+              port: 8000
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /api/slots/
+              port: 8000
+            initialDelaySeconds: 30
+            periodSeconds: 20
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "384Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend
+  namespace: gym
+spec:
+  selector:
+    app: backend
+  ports:
+    - port: 8000
+      targetPort: 8000

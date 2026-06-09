@@ -1,0 +1,27 @@
+# Valores de Helm para el chart grafana/loki-stack
+# (Grafana + Loki + Promtail) en minikube.
+#
+# Instalación:
+#   helm repo add grafana https://grafana.github.io/helm-charts
+#   helm repo update
+#   helm upgrade --install loki grafana/loki-stack \
+#     --namespace observability --create-namespace \
+#     -f observability/loki-stack-values.yaml
+#
+# Grafana queda expuesto en NodePort 30030.
+# Contraseña de admin:
+#   kubectl get secret loki-grafana -n observability \
+#     -o jsonpath='{.data.admin-password}' | base64 -d
+
+loki:
+  persistence:
+    enabled: false
+
+promtail:
+  enabled: true   # recolecta los logs de todos los pods (incluido el backend)
+
+grafana:
+  enabled: true
+  service:
+    type: NodePort
+    nodePort: 30030

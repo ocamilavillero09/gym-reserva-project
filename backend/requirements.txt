@@ -4,3 +4,4 @@ django-cors-headers==4.3.0
 pymongo==4.6.0
 python-dotenv==1.0.0
 drf-yasg==1.21.7
+mongomock==4.1.2
