@@ -1,0 +1,43 @@
+# Jenkins Configuration as Code
+# Crea: usuario admin, credencial de Docker Hub y el job del pipeline.
+# Los valores sensibles se leen de variables de entorno del contenedor.
+jenkins:
+  systemMessage: "Gym Reserva — CI/CD"
+  numExecutors: 2
+  securityRealm:
+    local:
+      allowsSignup: false
+      users:
+        - id: "admin"
+          password: "${JENKINS_ADMIN_PASSWORD:-admin}"
+  authorizationStrategy:
+    loggedInUsersCanDoAnything:
+      allowAnonymousRead: false
+
+credentials:
+  system:
+    domainCredentials:
+      - credentials:
+          - usernamePassword:
+              scope: GLOBAL
+              id: "dockerhub-creds"
+              description: "Docker Hub (push de imágenes)"
+              username: "${DOCKERHUB_USER}"
+              password: "${DOCKERHUB_TOKEN}"
+
+jobs:
+  - script: >
+      pipelineJob('gym-reserva-pipeline') {
+        description('CI/CD: tests + build + push a Docker Hub')
+        definition {
+          cpsScm {
+            scm {
+              git {
+                remote { url('https://github.com/ocamilavillero09/gym-reserva-project.git') }
+                branches('main')
+              }
+            }
+            scriptPath('jenkins/Jenkinsfile')
+          }
+        }
+      }
