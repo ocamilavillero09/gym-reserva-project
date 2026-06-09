@@ -45,6 +45,29 @@ def seed_slots():
             {'slotId': 6, 'hour': '16:00', 'available': 20, 'total': 20},
         ])
 
+def seed_machines():
+    """Inicializa el catálogo de máquinas si está vacío (RF18)."""
+    db = get_db()
+    if db.machines.count_documents({}) == 0:
+        db.machines.insert_many([
+            {'machineId': 1, 'name': 'Caminadora 1',    'estado': 'DISPONIBLE', 'note': ''},
+            {'machineId': 2, 'name': 'Caminadora 2',    'estado': 'DISPONIBLE', 'note': ''},
+            {'machineId': 3, 'name': 'Banco de pesas',  'estado': 'DISPONIBLE', 'note': ''},
+            {'machineId': 4, 'name': 'Bicicleta estática', 'estado': 'DISPONIBLE', 'note': ''},
+            {'machineId': 5, 'name': 'Multifuerza',     'estado': 'DISPONIBLE', 'note': ''},
+        ])
+
+
+def get_config(key: str, default=None):
+    """Lee un valor de la colección de configuración (p. ej. claves VAPID)."""
+    doc = get_db().config.find_one({'_id': key})
+    return doc['value'] if doc else default
+
+
+def set_config(key: str, value):
+    get_db().config.update_one({'_id': key}, {'$set': {'value': value}}, upsert=True)
+
+
 def hash_password(password: str) -> str:
     salt = os.urandom(32)
     key = hashlib.pbkdf2_hmac('sha256', password.encode(), salt, 100_000)

@@ -345,6 +345,10 @@ def cancel_reservation(request, reservation_id):
     db.slots.update_one({'slotId': reservation['slotId']}, {'$inc': {'available': 1}})
     send_cancellation_notice(reservation['email'], reservation['hour'])
 
+    # RF12 — al liberar el cupo, avisa al primero en la lista de espera.
+    from .features import notify_next_in_waitlist
+    notify_next_in_waitlist(reservation['slotId'])
+
     return Response({'message': 'Reserva cancelada. Cupo liberado.'})
 
 

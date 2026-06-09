@@ -2,7 +2,7 @@ import { useState } from 'react';
 
 const RED = '#CC0000';
 
-function SlotCard({ slot, isReserved, onReserve }) {
+function SlotCard({ slot, isReserved, onReserve, onJoinWaitlist }) {
   const isFull    = slot.available === 0;
   const isAlmostFull = slot.available > 0 && slot.available <= 4;
   const pct       = Math.round((slot.available / slot.total) * 100);
@@ -66,20 +66,33 @@ function SlotCard({ slot, isReserved, onReserve }) {
       </div>
 
       {/* Botón */}
-      <button
-        onClick={() => !isFull && !isReserved && onReserve(slot)}
-        disabled={isFull || isReserved}
-        style={{
-          width: '100%', padding: '13px 0', border: 'none', borderRadius: 12,
-          cursor: isFull || isReserved ? 'not-allowed' : 'pointer',
-          backgroundColor: isReserved ? '#F5F5F5' : isFull ? '#EFEFEF' : RED,
-          color: isReserved ? '#999' : isFull ? '#BBB' : 'white',
-          fontWeight: 700, fontSize: 14,
-          boxShadow: !isFull && !isReserved ? '0 4px 14px rgba(204,0,0,0.3)' : 'none',
-        }}
-      >
-        {isReserved ? '✓ Ya reservado' : isFull ? 'Sin cupos disponibles' : 'Reservar cupo'}
-      </button>
+      {/* RF12 — Si el bloque está lleno y no lo tienes reservado, ofrece lista de espera */}
+      {isFull && !isReserved ? (
+        <button
+          onClick={() => onJoinWaitlist(slot)}
+          style={{
+            width: '100%', padding: '13px 0', border: `1.5px solid ${RED}`, borderRadius: 12,
+            cursor: 'pointer', backgroundColor: 'white', color: RED, fontWeight: 700, fontSize: 14,
+          }}
+        >
+          ⏳ Unirme a la lista de espera
+        </button>
+      ) : (
+        <button
+          onClick={() => !isFull && !isReserved && onReserve(slot)}
+          disabled={isFull || isReserved}
+          style={{
+            width: '100%', padding: '13px 0', border: 'none', borderRadius: 12,
+            cursor: isReserved ? 'not-allowed' : 'pointer',
+            backgroundColor: isReserved ? '#F5F5F5' : RED,
+            color: isReserved ? '#999' : 'white',
+            fontWeight: 700, fontSize: 14,
+            boxShadow: !isReserved ? '0 4px 14px rgba(204,0,0,0.3)' : 'none',
+          }}
+        >
+          {isReserved ? '✓ Ya reservado' : 'Reservar cupo'}
+        </button>
+      )}
     </div>
   );
 }
@@ -147,7 +160,7 @@ function ReserveModal({ slot, onConfirm, onClose }) {
   );
 }
 
-export default function Dashboard({ slots, user, reservations, onReserve }) {
+export default function Dashboard({ slots, user, reservations, onReserve, onJoinWaitlist }) {
   const [pendingSlot, setPendingSlot] = useState(null);
 
   const today = new Date().toLocaleDateString('es-CO', {
@@ -216,6 +229,7 @@ export default function Dashboard({ slots, user, reservations, onReserve }) {
             slot={slot}
             isReserved={reservations.some(r => r.slotId === slot.id)}
             onReserve={setPendingSlot}
+            onJoinWaitlist={onJoinWaitlist}
           />
         ))}
       </div>

@@ -53,6 +53,20 @@ def send_reservation_confirmation(email: str, name: str, hour: str, date: str) -
     )
 
 
+def send_waitlist_available(email: str, hour: str) -> None:
+    """Avisa al primero en lista de espera que se liberó un cupo (RF12)."""
+    _send(
+        email,
+        '¡Se liberó un cupo! — Gimnasio UdeM',
+        (
+            f'Hola,\n\n'
+            f'Se liberó un cupo en el bloque de las {hour}. Ingresa a la app y '
+            'resérvalo antes de que otro compañero lo tome.\n\n'
+            'Gimnasio Universidad de Medellín.'
+        ),
+    )
+
+
 def send_cancellation_notice(email: str, hour: str) -> None:
     """Aviso de cancelación: confirma que el cupo quedó liberado."""
     _send(

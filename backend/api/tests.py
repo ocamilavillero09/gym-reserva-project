@@ -228,3 +228,83 @@ class NoShowTests(GymApiTestCase):
         # Penalizado: no puede crear nuevas reservas.
         resp = self._reserve('estu@udem.edu.co', 4)
         self.assertEqual(resp.status_code, 403)
+
+
+# ── RF11–RF18: FEATURES COMPLEMENTARIAS ─────────────────────────────────────
+class FeaturesTests(GymApiTestCase):
+    def setUp(self):
+        super().setUp()
+        self._register(email='coach@udem.edu.co', role='ENTRENADOR')
+        self._register(email='ana@udem.edu.co', name='Ana')
+        self.client.get('/api/slots/')
+
+    def test_rf11_historial_incluye_canceladas(self):
+        rid = self._reserve('ana@udem.edu.co', 1).data['id']
+        self.client.delete(f'/api/reservations/{rid}/')
+        resp = self.client.get('/api/reservations/history/?email=ana@udem.edu.co')
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.data[0]['estado'], 'CANCELADA')
+
+    def test_rf17_completar_asistencia(self):
+        rid = self._reserve('ana@udem.edu.co', 1).data['id']
+        resp = self.client.post(f'/api/reservations/{rid}/complete/',
+                                {'actor_email': 'coach@udem.edu.co'}, format='json')
+        self.assertEqual(resp.status_code, 200)
+        hist = self.client.get('/api/reservations/history/?email=ana@udem.edu.co')
+        self.assertEqual(hist.data[0]['estado'], 'COMPLETADA')
+
+    def test_rf12_lista_de_espera(self):
+        db_module.get_db().slots.update_one({'slotId': 1}, {'$set': {'available': 0}})
+        r1 = self.client.post('/api/slots/1/waitlist/', {'email': 'ana@udem.edu.co'}, format='json')
+        self.assertEqual(r1.status_code, 201)
+        # Duplicado -> 409
+        r2 = self.client.post('/api/slots/1/waitlist/', {'email': 'ana@udem.edu.co'}, format='json')
+        self.assertEqual(r2.status_code, 409)
+
+    def test_rf12_no_lista_si_hay_cupos(self):
+        resp = self.client.post('/api/slots/1/waitlist/', {'email': 'ana@udem.edu.co'}, format='json')
+        self.assertEqual(resp.status_code, 409)
+
+    def test_rf13_perfil_fisico(self):
+        resp = self.client.put('/api/users/profile/',
+                               {'email': 'ana@udem.edu.co', 'peso': 65, 'altura': 170, 'meta': 'Resistencia'},
+                               format='json')
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.data['peso'], 65)
+        self.assertEqual(resp.data['meta'], 'Resistencia')
+
+    def test_rf15_calificacion(self):
+        self.client.post('/api/ratings/', {'email': 'ana@udem.edu.co', 'stars': 5, 'comment': 'Excelente'}, format='json')
+        self.client.post('/api/ratings/', {'email': 'ana@udem.edu.co', 'stars': 3}, format='json')
+        resp = self.client.get('/api/ratings/')
+        self.assertEqual(resp.data['total'], 2)
+        self.assertEqual(resp.data['promedio'], 4.0)
+
+    def test_rf15_stars_invalido(self):
+        resp = self.client.post('/api/ratings/', {'email': 'ana@udem.edu.co', 'stars': 9}, format='json')
+        self.assertEqual(resp.status_code, 400)
+
+    def test_rf16_occupancy(self):
+        self._reserve('ana@udem.edu.co', 1)
+        resp = self.client.get('/api/reports/occupancy/')
+        self.assertEqual(resp.status_code, 200)
+        bloque1 = next(b for b in resp.data if b['slotId'] == 1)
+        self.assertEqual(bloque1['reservados'], 1)
+
+    def test_rf18_maquinas_seed_y_mantenimiento(self):
+        listado = self.client.get('/api/machines/')
+        self.assertEqual(len(listado.data), 5)
+        # Estudiante NO puede cambiar estado
+        deny = self.client.patch('/api/machines/1/', {'actor_email': 'ana@udem.edu.co', 'estado': 'FUERA_DE_SERVICIO'}, format='json')
+        self.assertEqual(deny.status_code, 403)
+        # Entrenador SÍ
+        ok = self.client.patch('/api/machines/1/', {'actor_email': 'coach@udem.edu.co', 'estado': 'FUERA_DE_SERVICIO', 'note': 'Mantenimiento'}, format='json')
+        self.assertEqual(ok.status_code, 200)
+        m = db_module.get_db().machines.find_one({'machineId': 1})
+        self.assertEqual(m['estado'], 'FUERA_DE_SERVICIO')
+
+    def test_csv_export(self):
+        resp = self.client.get('/api/reports/usage.csv')
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn('text/csv', resp['Content-Type'])
+        self.assertIn('bloque', resp.content.decode())

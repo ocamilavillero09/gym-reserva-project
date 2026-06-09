@@ -130,6 +130,18 @@ y queda como alternativa on-prem.
 - **RN09 / HU20** — 3 inasistencias (No-Show, marcadas por el entrenador) → estado
   PENALIZADO por 5 días hábiles; el penalizado no puede reservar.
 - **RNF2** — Frontend como PWA instalable (manifest + service worker).
+- **RF11** — Historial de entrenamiento (`/reservations/history/`).
+- **RF12** — Lista de espera para bloques llenos; al liberarse un cupo se avisa al primero.
+- **RF13** — Perfil de usuario y metas (peso/altura/meta).
+- **RF14** — Notificaciones push web (VAPID + service worker); disparo desde el panel del entrenador.
+- **RF15** — Calificación del servicio (estrellas + comentarios).
+- **RF16** — Dashboard de aforo proyectado (vista del entrenador).
+- **RF17** — Asistencia (COMPLETADA) e inasistencia (No-Show) + reporte.
+- **RF18** — Mantenimiento de máquinas (estado DISPONIBLE / FUERA_DE_SERVICIO).
+- **RF19** — Exportación de reportes de uso en CSV y PDF (`/reports/usage.csv|pdf`).
+
+Módulos backend: `api/views.py` (core), `api/features.py` (RF11–RF18),
+`api/reports.py` (RF19), `api/push.py` (RF14).
 
 ## Casos de uso críticos
 

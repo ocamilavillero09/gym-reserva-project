@@ -44,6 +44,13 @@ export default function Navbar({ user, view, reservationCount, onNavigate, onLog
             )}
           </div>
 
+          <NavBtn active={view === 'history'} onClick={() => onNavigate('history')}>
+            Historial
+          </NavBtn>
+          <NavBtn active={view === 'profile'} onClick={() => onNavigate('profile')}>
+            Perfil
+          </NavBtn>
+
           {/* Panel del entrenador/admin — solo visible para esos roles (HU11) */}
           {(user?.role === 'ENTRENADOR' || user?.role === 'ADMIN') && (
             <NavBtn active={view === 'trainer'} onClick={() => onNavigate('trainer')}>

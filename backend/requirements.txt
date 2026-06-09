@@ -6,3 +6,5 @@ python-dotenv==1.0.0
 drf-yasg==1.21.7
 mongomock==4.1.2
 coverage==7.4.4
+reportlab==4.1.0
+pywebpush==2.0.0

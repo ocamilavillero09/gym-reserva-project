@@ -4,7 +4,9 @@ import Navbar from './components/Navbar';
 import Dashboard from './components/Dashboard';
 import MyReservations from './components/MyReservations';
 import TrainerPanel from './components/TrainerPanel';
-import { slotsApi, reservationsApi } from './services/api';
+import HistoryView from './components/HistoryView';
+import ProfileView from './components/ProfileView';
+import { slotsApi, reservationsApi, waitlistApi } from './services/api';
 
 function Toast({ message, type, onClose }) {
   const styles = {
@@ -82,6 +84,15 @@ export default function App() {
     }
   };
 
+  const handleJoinWaitlist = async (slot) => {
+    try {
+      const r = await waitlistApi.join(slot.id, user.email);
+      showToast(`Estás en la lista de espera de las ${slot.hour} (posición ${r.posicion}).`, 'info');
+    } catch (err) {
+      showToast(err.message, 'warning');
+    }
+  };
+
   const handleCancel = async (id) => {
     try {
       await reservationsApi.cancel(id);
@@ -130,8 +141,11 @@ export default function App() {
               user={user}
               reservations={reservations}
               onReserve={handleReserve}
+              onJoinWaitlist={handleJoinWaitlist}
             />
           )}
+          {view === 'history' && <HistoryView user={user} showToast={showToast} />}
+          {view === 'profile' && <ProfileView user={user} showToast={showToast} />}
           {view === 'my-reservations' && (
             <MyReservations
               reservations={reservations}
