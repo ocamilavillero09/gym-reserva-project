@@ -29,26 +29,55 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - name: Backend — pruebas unitarias
+      - name: Backend — pruebas unitarias + cobertura
         working-directory: backend
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          python manage.py test api -v 2
+          coverage run manage.py test api -v 2
+          coverage report
 
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-      - name: Frontend — pruebas unitarias (Vitest)
+      - name: Frontend — pruebas unitarias (Vitest) + cobertura
         working-directory: frontend
         run: |
           npm ci
-          npm test
+          npm run test:coverage
 
-  # ── 2) Build + push de imágenes a Docker Hub (solo si pasan las pruebas) ──
+  # ── 2) Pruebas E2E (Playwright) contra el stack completo en docker compose ──
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Levantar stack (front + back + mongo)
+        run: docker compose up -d --build
+      - name: Esperar a que el backend responda
+        run: |
+          for i in $(seq 1 50); do
+            curl -sf http://localhost:8000/api/slots/ >/dev/null && break
+            sleep 3
+          done
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Instalar Playwright + navegador
+        working-directory: frontend
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+      - name: Ejecutar E2E
+        working-directory: frontend
+        run: npx playwright test
+      - name: Apagar stack
+        if: always()
+        run: docker compose down -v
+
+  # ── 3) Build + push de imágenes a Docker Hub (solo si pasan las pruebas) ──
   build-and-push:
-    needs: test
+    needs: [test, e2e]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

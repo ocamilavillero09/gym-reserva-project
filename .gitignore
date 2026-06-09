@@ -18,3 +18,11 @@ Thumbs.db
 
 # Docker logs
 *.log
+
+# Cobertura y artefactos de pruebas
+coverage/
+htmlcov/
+.coverage
+test-results/
+playwright-report/
+.playwright/

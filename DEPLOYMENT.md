@@ -100,12 +100,19 @@ Cuando Jenkins publica una nueva imagen `:latest`, ArgoCD/k8s la toma en el sigu
 ## CI/CD con GitHub Actions + ArgoCD (entrega continua real)
 
 `.github/workflows/ci-cd.yml` hace, en cada push a `main`:
-1. **test** — pruebas unitarias de backend (Django) y frontend (Vitest).
-2. **build-and-push** — si pasan, construye y publica las imágenes en Docker Hub
+1. **test** — pruebas unitarias backend (Django + `coverage`) y frontend
+   (Vitest + cobertura v8).
+2. **e2e** — Playwright contra el stack completo levantado con `docker compose`
+   (registro → login → reservar → cancelar). Local: `cd frontend && npm run test:e2e`.
+3. **build-and-push** — si pasan tests y e2e, construye y publica en Docker Hub
    con dos tags: `:latest` y `:<sha-del-commit>`.
-3. **deploy** — `kustomize edit set image` fija el tag al SHA en `k8s/kustomization.yaml`
+4. **deploy** — `kustomize edit set image` fija el tag al SHA en `k8s/kustomization.yaml`
    y lo commitea. **ArgoCD** detecta el cambio y despliega esa imagen exacta en
    minikube, bajándola desde Docker Hub (CD real).
+
+Cobertura local:
+- Backend: `cd backend && coverage run manage.py test api && coverage report` (~93%).
+- Frontend: `cd frontend && npm run test:coverage`.
 
 > Configurar en GitHub → Settings → Secrets and variables → Actions:
 > `DOCKERHUB_USERNAME` y `DOCKERHUB_TOKEN`.
