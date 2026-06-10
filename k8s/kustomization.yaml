@@ -14,7 +14,7 @@ resources:
 images:
 - name: ocamilavillero09/gym-backend
   newName: ocamilavillero09/gym-backend
-  newTag: 3b1d21a47ce7000e0a87ab729d994e036dd418f0
+  newTag: 98e55099d93f0e11599c28755bfee224ee2626e3
 - name: ocamilavillero09/gym-frontend
   newName: ocamilavillero09/gym-frontend
-  newTag: 3b1d21a47ce7000e0a87ab729d994e036dd418f0
+  newTag: 98e55099d93f0e11599c28755bfee224ee2626e3
