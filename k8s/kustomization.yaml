@@ -5,14 +5,16 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
 resources:
-  - 00-namespace.yaml
-  - 01-mongodb.yaml
-  - 02-backend.yaml
-  - 03-frontend.yaml
+- 00-namespace.yaml
+- 01-mongodb.yaml
+- 02-backend.yaml
+- 03-frontend.yaml
 
 # El CI actualiza estos newTag con el SHA del commit (`kustomize edit set image`).
 images:
-  - name: ocamilavillero09/gym-backend
-    newTag: latest
-  - name: ocamilavillero09/gym-frontend
-    newTag: latest
+- name: ocamilavillero09/gym-backend
+  newName: ocamilavillero09/gym-backend
+  newTag: 8029e67d020a6c8efb8533a732ad16acb3ba58b1
+- name: ocamilavillero09/gym-frontend
+  newName: ocamilavillero09/gym-frontend
+  newTag: 8029e67d020a6c8efb8533a732ad16acb3ba58b1
