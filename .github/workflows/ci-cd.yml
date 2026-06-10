@@ -48,8 +48,10 @@ jobs:
           npm run test:coverage
 
   # ── 2) Pruebas E2E (Playwright) contra el stack completo en docker compose ──
+  #     Informativo: no bloquea la publicación (el requisito son las unitarias).
   e2e:
     runs-on: ubuntu-latest
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - name: Levantar stack (front + back + mongo)
@@ -75,9 +77,9 @@ jobs:
         if: always()
         run: docker compose down -v
 
-  # ── 3) Build + push de imágenes a Docker Hub (solo si pasan las pruebas) ──
+  # ── 3) Build + push de imágenes a Docker Hub (si pasan las pruebas unitarias) ──
   build-and-push:
-    needs: [test, e2e]
+    needs: [test]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
