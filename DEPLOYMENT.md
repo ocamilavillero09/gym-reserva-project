@@ -122,26 +122,44 @@ y queda como alternativa on-prem.
 
 ## Reglas de negocio implementadas (documento de análisis)
 
-- **RF02 / HU11** — Roles ESTUDIANTE / ENTRENADOR / ADMIN (el panel del entrenador
-  solo aparece para esos roles).
-- **RF07** — El entrenador/admin reserva para un tercero (`actor_email`).
-- **RN05 / HU08** — Máximo 2 reservas activas por usuario.
-- **RN07** — Una reserva activa por usuario y bloque.
-- **RN09 / HU20** — 3 inasistencias (No-Show, marcadas por el entrenador) → estado
+- **RN01 / RF02 / HU11** — **Tres tipos de correo institucional** determinan el rol
+  (el cliente nunca lo elige):
+
+  | Dominio | Rol |
+  |---|---|
+  | `@soyudemedellin.edu.co` | ESTUDIANTE |
+  | `@udem.edu.co` | ENTRENADOR (profesor) |
+  | `@udemedellin.edu.co` | ADMIN |
+
+- **Gestión de usuarios** — Solo un ADMIN crea cuentas nuevas, incluidos otros
+  administradores (`/api/admin/users/`).
+- **RN02** — Profesores y administradores **no tienen interfaz de reserva**: solo
+  consultan el aforo. El backend también rechaza sus reservas (403).
+- **RN03** — La reserva es **siempre para el día siguiente**, y la fecha se muestra
+  de forma explícita en la app (`/api/slots/` devuelve `fecha` y `fecha_label`).
+- **RN05 / HU08** — **Una sola reserva por día** por estudiante.
+- **RN09 / HU20** — 3 inasistencias (No-Show, marcadas por el profesor) → estado
   PENALIZADO por 5 días hábiles; el penalizado no puede reservar.
+- **RN10** — 5 cancelaciones → PENALIZADO. El estudiante ve su contador de
+  cancelaciones y recibe una **alerta dentro de la app** cuando le faltan 2.
+- **Sesión persistente** — La sesión se guarda en `localStorage` y se rehidrata
+  contra `/api/auth/session/`: recargar la página ya no cierra sesión.
 - **RNF2** — Frontend como PWA instalable (manifest + service worker).
 - **RF11** — Historial de entrenamiento (`/reservations/history/`).
-- **RF12** — Lista de espera para bloques llenos; al liberarse un cupo se avisa al primero.
-- **RF13** — Perfil de usuario y metas (peso/altura/meta).
-- **RF14** — Notificaciones push web (VAPID + service worker); disparo desde el panel del entrenador.
+- **RF12** — Lista de espera para bloques llenos; al liberarse un cupo entra el primero.
+- **RF13** — Perfil de usuario, metas y contador de cancelaciones.
 - **RF15** — Calificación del servicio (estrellas + comentarios).
-- **RF16** — Dashboard de aforo proyectado (vista del entrenador).
-- **RF17** — Asistencia (COMPLETADA) e inasistencia (No-Show) + reporte.
+- **RF16** — Dashboard de aforo proyectado (única vista de profesor/admin).
+- **RF17** — Asistencia (COMPLETADA), inasistencia (No-Show) y **reporte por
+  estudiante** (`/reports/students/`), no por bloque horario.
 - **RF18** — Mantenimiento de máquinas (estado DISPONIBLE / FUERA_DE_SERVICIO).
-- **RF19** — Exportación de reportes de uso en CSV y PDF (`/reports/usage.csv|pdf`).
+- **RF19** — Exportación del reporte por estudiante en CSV y PDF (`/reports/usage.csv|pdf`).
 
-Módulos backend: `api/views.py` (core), `api/features.py` (RF11–RF18),
-`api/reports.py` (RF19), `api/push.py` (RF14).
+> Las notificaciones (push web y correos automáticos) se retiraron por innecesarias:
+> la app informa en pantalla mediante avisos y alertas.
+
+Módulos backend: `api/views.py` (core + administración de usuarios),
+`api/features.py` (RF11–RF18), `api/reports.py` (RF19).
 
 ## Casos de uso críticos
 

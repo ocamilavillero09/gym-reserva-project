@@ -48,7 +48,7 @@ function CancelModal({ reservation, onConfirm, onClose }) {
   );
 }
 
-export default function MyReservations({ reservations, onCancel, onNavigate }) {
+export default function MyReservations({ reservations, reservaFecha, onCancel, onNavigate }) {
   const [cancelTarget, setCancelTarget] = useState(null);
 
   const handleConfirmCancel = () => {
@@ -62,7 +62,11 @@ export default function MyReservations({ reservations, onCancel, onNavigate }) {
         Mis reservas
       </h2>
       <p style={{ color: '#999', fontSize: 15, marginBottom: 32 }}>
-        Gestiona tus reservas activas
+        {/* RN03 — se deja explícito para qué día es la reserva */}
+        Tu reserva de mañana
+        {reservaFecha?.label && (
+          <strong style={{ color: '#555', textTransform: 'capitalize' }}> · {reservaFecha.label}</strong>
+        )}
       </p>
 
       {reservations.length === 0 ? (
@@ -98,7 +102,8 @@ export default function MyReservations({ reservations, onCancel, onNavigate }) {
             <span style={{ fontSize: 18, flexShrink: 0 }}>⚠️</span>
             <p style={{ color: '#78350f', fontSize: 13, lineHeight: 1.6, margin: 0 }}>
               Recuerda: si no puedes asistir, <strong>debes cancelar tu reserva</strong> para
-              que otro compañero pueda usar ese cupo.
+              que otro compañero pueda usar ese cupo. Ten en cuenta que las cancelaciones
+              se acumulan y, al llegar al límite, tu cuenta queda penalizada.
             </p>
           </div>
 
@@ -124,14 +129,22 @@ export default function MyReservations({ reservations, onCancel, onNavigate }) {
                   <p style={{ fontSize: 13, color: '#999', marginBottom: 6, textTransform: 'capitalize' }}>
                     {res.date}
                   </p>
-                  <span style={{
-                    display: 'inline-flex', alignItems: 'center', gap: 5,
-                    backgroundColor: '#dcfce7', color: '#15803d',
-                    fontSize: 11, fontWeight: 800, padding: '3px 10px', borderRadius: 24,
-                    letterSpacing: 0.2,
-                  }}>
-                    ● Activa
-                  </span>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    <span style={{
+                      display: 'inline-flex', alignItems: 'center', gap: 5,
+                      backgroundColor: '#dcfce7', color: '#15803d',
+                      fontSize: 11, fontWeight: 800, padding: '3px 10px', borderRadius: 24,
+                      letterSpacing: 0.2,
+                    }}>
+                      ● Activa
+                    </span>
+                    <span style={{
+                      backgroundColor: '#FEE2E2', color: RED,
+                      fontSize: 11, fontWeight: 800, padding: '3px 10px', borderRadius: 24,
+                    }}>
+                      📅 Para mañana
+                    </span>
+                  </div>
                 </div>
               </div>
 

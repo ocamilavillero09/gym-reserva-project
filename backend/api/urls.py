@@ -1,10 +1,14 @@
 from django.urls import path
-from . import views, features, reports, push
+from . import views, features, reports
 
 urlpatterns = [
     # Auth
     path('auth/register/',              views.register,            name='register'),
     path('auth/login/',                 views.login,               name='login'),
+    path('auth/session/',               views.session,             name='session'),
+
+    # Gestión de usuarios por el administrador (incluye crear otros ADMIN)
+    path('admin/users/',                views.admin_users,         name='admin-users'),
 
     # Slots y reservas (core)
     path('slots/',                      views.get_slots,           name='slots'),
@@ -26,20 +30,15 @@ urlpatterns = [
     # RF15 — Calificaciones
     path('ratings/',                    features.ratings,           name='ratings'),
 
-    # RF16 / RF17 — Reportes
+    # RF16 — Aforo · RF17 — Reporte por estudiante
     path('reports/occupancy/',          features.occupancy_report,  name='occupancy'),
-    path('reports/no-shows/',           features.no_show_report,    name='no-shows'),
+    path('reports/students/',           features.students_report,   name='students-report'),
 
     # RF18 — Máquinas
     path('machines/',                   features.machines,          name='machines'),
     path('machines/<int:machine_id>/',  features.machine_detail,    name='machine-detail'),
 
-    # RF19 — Exportación
+    # RF19 — Exportación del reporte por estudiante
     path('reports/usage.csv',           reports.usage_csv,          name='usage-csv'),
     path('reports/usage.pdf',           reports.usage_pdf,          name='usage-pdf'),
-
-    # RF14 — Push
-    path('push/public-key/',            push.public_key,            name='push-public-key'),
-    path('push/subscribe/',             push.subscribe,             name='push-subscribe'),
-    path('push/remind/',                push.remind,                name='push-remind'),
 ]

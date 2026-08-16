@@ -28,19 +28,25 @@ docker run -p 5173:5173 gym-frontend
 
 Estructura de la Aplicación (src/)
 Carpeta / Archivo	Función
-components/	Contiene los elementos visuales (Login, Dashboard, Navbar, MyReservations).
+components/	Elementos visuales (Login, Dashboard, Navbar, MyReservations, TrainerPanel, AdminPanel, ProfileView, HistoryView).
 services/api.js	Capa de servicio que gestiona todas las peticiones fetch al backend de Django.
-App.jsx	Orquestador principal de la lógica, manejo de rutas internas y sistema de notificaciones (Toast).
+App.jsx	Orquestador principal: sesión persistente, rutas internas por rol y avisos en pantalla (Toast + alerta de cancelaciones).
 index.jsx	Punto de entrada que renderiza la aplicación en el DOM.
 
 Características Destacadas
 Diseño Mobile-First: Interfaz limpia y minimalista utilizando el color institucional (#CC0000).
 
-Sistema de Notificaciones: Toasts personalizados para confirmar acciones (reservas, cancelaciones) o mostrar errores de validación.
+Sesión Persistente: La sesión se guarda en localStorage y se rehidrata contra /api/auth/session/, de modo que recargar la página (F5) no cierra la sesión.
+
+Avisos en Pantalla: Toasts para confirmar acciones y una alerta fija que avisa al estudiante cuando está a 2 cancelaciones de ser penalizado.
+
+Reserva para el Día Siguiente: La fecha efectiva de la reserva se muestra de forma explícita en el Dashboard, en el modal de confirmación y en "Mis reservas". Solo se permite una reserva por día.
+
+Interfaz por Rol: Los profesores y administradores no ven la interfaz de reserva, solo el aforo; el administrador además gestiona usuarios.
 
 Actualización Atómica: Al reservar o cancelar, la interfaz refresca los datos globalmente sin recargar la página, manteniendo la consistencia del aforo.
 
-Validación Institucional: El formulario de acceso restringe el ingreso solo a dominios @udem.edu.co o @soyudemedellin.edu.co.
+Validación Institucional: Tres dominios diferencian a los usuarios — @soyudemedellin.edu.co (estudiante), @udem.edu.co (profesor) y @udemedellin.edu.co (administrador).
 
 Notas sobre la PWA
 Para instalar la aplicación en un dispositivo móvil:

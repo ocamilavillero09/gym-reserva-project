@@ -3,6 +3,16 @@ import { authApi } from '../services/api';
 
 const RED = '#CC0000';
 
+// RN01 — Tres tipos de correo institucional: el dominio determina el rol.
+const DOMINIOS = [
+  { dominio: '@soyudemedellin.edu.co', etiqueta: 'Estudiante' },
+  { dominio: '@udem.edu.co',           etiqueta: 'Profesor' },
+  { dominio: '@udemedellin.edu.co',    etiqueta: 'Administrador' },
+];
+
+const rolDeCorreo = (email) =>
+  DOMINIOS.find((d) => email.trim().toLowerCase().endsWith(d.dominio))?.etiqueta ?? null;
+
 const inputStyle = {
   width: '100%',
   padding: '12px 16px',
@@ -103,7 +113,7 @@ export default function Login({ onLogin }) {
             Sistema de reserva de cupos para la comunidad universitaria de Medellín
           </p>
           <div style={{ marginTop: 48, display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
-            {['Reservas en línea', 'Horarios en tiempo real', 'Confirmación por correo'].map(f => (
+            {['Reservas en línea', 'Horarios en tiempo real', 'Aforo actualizado'].map(f => (
               <span key={f} style={{
                 backgroundColor: 'rgba(255,255,255,0.18)',
                 border: '1px solid rgba(255,255,255,0.3)',
@@ -140,7 +150,9 @@ export default function Login({ onLogin }) {
               {tab === 'login' ? 'Bienvenido de nuevo' : 'Crear cuenta'}
             </h2>
             <p style={{ color: '#888', fontSize: 14, marginBottom: 28 }}>
-              {tab === 'login' ? 'Ingresa con tu correo institucional' : 'Regístrate con tu correo @udem.edu.co'}
+              {tab === 'login'
+                ? 'Ingresa con tu correo institucional'
+                : 'Tu rol se asigna según el dominio de tu correo institucional'}
             </p>
 
             {/* Tabs */}
@@ -193,6 +205,14 @@ export default function Login({ onLogin }) {
                   autoCapitalize="none"
                   autoCorrect="off"
                 />
+                {/* RN01 — se avisa en vivo qué rol otorga el dominio escrito */}
+                {tab === 'register' && email.trim() !== '' && (
+                  <p style={{ fontSize: 12, marginTop: 6, color: rolDeCorreo(email) ? '#15803D' : '#991B1B' }}>
+                    {rolDeCorreo(email)
+                      ? `✓ Entrarás como ${rolDeCorreo(email).toUpperCase()}`
+                      : '⚠ Ese dominio no es institucional'}
+                  </p>
+                )}
               </div>
 
               <div>
@@ -226,9 +246,14 @@ export default function Login({ onLogin }) {
               </button>
 
               <div style={{ padding: '12px 16px', backgroundColor: '#FFF8F0', borderRadius: 10, border: '1px solid #FFD9A0' }}>
-                <p style={{ fontSize: 12, color: '#92400e', margin: 0, textAlign: 'center' }}>
-                  🔒 Solo se permiten correos <strong>@soyudemedellin.edu.co</strong> o <strong>@udem.edu.co</strong>
+                <p style={{ fontSize: 12, color: '#92400e', margin: 0, marginBottom: 8, textAlign: 'center', fontWeight: 700 }}>
+                  🔒 Tres tipos de correo institucional
                 </p>
+                {DOMINIOS.map(d => (
+                  <p key={d.dominio} style={{ fontSize: 12, color: '#92400e', margin: 0, textAlign: 'center', lineHeight: 1.7 }}>
+                    <strong>{d.dominio}</strong> → {d.etiqueta}
+                  </p>
+                ))}
               </div>
             </form>
           </div>

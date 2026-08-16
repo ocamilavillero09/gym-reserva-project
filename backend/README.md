@@ -37,17 +37,26 @@ La API está organizada bajo el prefijo /api/.
 
 | Método | Endpoint | Descripción | Requisito Relacionado |
 | :--- | :--- | :--- | :--- |
-| **POST** | `/api/auth/register/` | Registro de usuarios con correo institucional. | [cite_start]RF01 [cite: 48] |
+| **POST** | `/api/auth/register/` | Registro; el rol se deduce del dominio del correo. | [cite_start]RF01 [cite: 48] |
 | **POST** | `/api/auth/login/` | Inicio de sesión y validación de credenciales. | [cite_start]RF01 [cite: 48] |
-| **GET** | `/api/slots/` | Consulta de bloques horarios (pares) y cupos. | [cite_start]RF03 [cite: 51] |
-| **POST** | `/api/reservations/` | Crea una reserva y descuenta cupo en MongoDB. | [cite_start]RF04 [cite: 52] |
+| **GET** | `/api/auth/session/` | Rehidrata la sesión al recargar la página. | Sesión persistente |
+| **GET/POST** | `/api/admin/users/` | El ADMIN lista y crea usuarios (incluidos otros ADMIN). | Gestión de usuarios |
+| **GET** | `/api/slots/` | Bloques horarios, cupos y **fecha del día siguiente**. | [cite_start]RF03 [cite: 51] |
+| **POST** | `/api/reservations/` | Crea la reserva del día siguiente y descuenta cupo. | [cite_start]RF04 [cite: 52] |
 | **GET** | `/api/reservations/` | Lista las reservas activas de un estudiante. | [cite_start]RF02 [cite: 49] |
-| **DELETE** | `/api/reservations/<id>/` | Cancela reserva y libera cupo inmediatamente. | [cite_start]RF06 [cite: 54] |
+| **DELETE** | `/api/reservations/<id>/` | Cancela, libera cupo y suma al contador de cancelaciones. | [cite_start]RF06 [cite: 54] |
+| **GET** | `/api/reports/students/` | Reporte **por estudiante** (persona), no por bloque. | RF17 |
 
 Seguridad y Reglas de Negocio
 Hash de Contraseñas: Se utiliza PBKDF2 con SHA-256 y salt de 32 bytes para el almacenamiento seguro de credenciales.
 
-Validación de Dominio: Restricción estricta a correos institucionales de la Universidad de Medellín.
+Validación de Dominio: Tres correos institucionales diferencian a los usuarios y determinan el rol — @soyudemedellin.edu.co (ESTUDIANTE), @udem.edu.co (ENTRENADOR/profesor) y @udemedellin.edu.co (ADMIN). El cliente no puede elegir su propio rol.
+
+Reserva del Día Siguiente: Toda reserva se fecha para el día siguiente, y solo se permite una reserva por día y por estudiante.
+
+Perfiles sin Reserva: Los profesores y administradores no pueden crear reservas (403); su acceso es de consulta del aforo.
+
+Penalizaciones: 3 inasistencias (No-Show) o 5 cancelaciones dejan la cuenta PENALIZADA por 5 días hábiles. La API devuelve la alerta que la app muestra cuando faltan 2 cancelaciones.
 
 Atomicidad: Las actualizaciones de cupos se realizan mediante operadores $inc para evitar inconsistencias de aforo en accesos concurrentes.
 
