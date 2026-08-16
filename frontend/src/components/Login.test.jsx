@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import Login from './Login';
 
@@ -15,8 +15,20 @@ describe('Login', () => {
     expect(screen.getByPlaceholderText(/María García/i)).toBeInTheDocument();
   });
 
-  it('exige correo institucional en el aviso', () => {
+  it('anuncia los tres dominios institucionales y su rol', () => {
     render(<Login onLogin={() => {}} />);
-    expect(screen.getByText(/@udem\.edu\.co/i)).toBeInTheDocument();
+    expect(screen.getByText(/Tres tipos de correo institucional/i)).toBeInTheDocument();
+    expect(screen.getByText('@soyudemedellin.edu.co')).toBeInTheDocument();
+    expect(screen.getByText('@udem.edu.co')).toBeInTheDocument();
+    expect(screen.getByText('@udemedellin.edu.co')).toBeInTheDocument();
+  });
+
+  it('al escribir el correo en el registro indica el rol que se asignará', () => {
+    render(<Login onLogin={() => {}} />);
+    fireEvent.click(screen.getByText('Registrarse'));
+    fireEvent.change(screen.getByPlaceholderText(/nombre@soyudemedellin/i), {
+      target: { value: 'jefa@udemedellin.edu.co' },
+    });
+    expect(screen.getByText(/Entrarás como ADMINISTRADOR/i)).toBeInTheDocument();
   });
 });

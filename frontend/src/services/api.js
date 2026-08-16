@@ -13,9 +13,18 @@ async function request(path, options = {}) {
 export const authApi = {
   register: (body) => request('/auth/register/', { method: 'POST', body: JSON.stringify(body) }),
   login:    (body) => request('/auth/login/',    { method: 'POST', body: JSON.stringify(body) }),
+  // Rehidrata la sesión al recargar la página (la sesión no se pierde con F5).
+  session:  (email) => request(`/auth/session/?email=${encodeURIComponent(email)}`),
+};
+
+// Gestión de usuarios por el administrador (incluye crear otros ADMIN).
+export const adminApi = {
+  listUsers:  (actorEmail) => request(`/admin/users/?actor_email=${encodeURIComponent(actorEmail)}`),
+  createUser: (body)       => request('/admin/users/', { method: 'POST', body: JSON.stringify(body) }),
 };
 
 export const slotsApi = {
+  // Devuelve { fecha, fecha_label, slots } — la fecha es SIEMPRE el día siguiente.
   getAll: () => request('/slots/'),
 };
 
@@ -23,10 +32,10 @@ export const reservationsApi = {
   getByEmail: (email) => request(`/reservations/?email=${encodeURIComponent(email)}`),
   create:     (body)  => request('/reservations/', { method: 'POST', body: JSON.stringify(body) }),
   cancel:     (id)    => request(`/reservations/${id}/`, { method: 'DELETE' }),
-  // RN09 — el entrenador/admin marca una inasistencia (No-Show).
+  // RN09 — el profesor/admin marca una inasistencia (No-Show).
   noShow:     (id, actorEmail) =>
     request(`/reservations/${id}/no-show/`, { method: 'POST', body: JSON.stringify({ actor_email: actorEmail }) }),
-  // RF17 — el entrenador confirma asistencia.
+  // RF17 — el profesor confirma asistencia.
   complete:   (id, actorEmail) =>
     request(`/reservations/${id}/complete/`, { method: 'POST', body: JSON.stringify({ actor_email: actorEmail }) }),
   // RF11 — historial.
@@ -50,10 +59,10 @@ export const ratingsApi = {
   create: (body) => request('/ratings/', { method: 'POST', body: JSON.stringify(body) }),
 };
 
-// RF16 / RF17 — Reportes para el entrenador.
+// RF16 — Aforo · RF17 — Reporte por estudiante · RF19 — Exportación.
 export const reportsApi = {
   occupancy: () => request('/reports/occupancy/'),
-  noShows:   () => request('/reports/no-shows/'),
+  students:  () => request('/reports/students/'),
   csvUrl:    `${BASE}/reports/usage.csv`,
   pdfUrl:    `${BASE}/reports/usage.pdf`,
 };
@@ -63,11 +72,4 @@ export const machinesApi = {
   list:      ()                         => request('/machines/'),
   create:    (name, actorEmail)         => request('/machines/', { method: 'POST', body: JSON.stringify({ name, actor_email: actorEmail }) }),
   setEstado: (id, estado, note, actor)  => request(`/machines/${id}/`, { method: 'PATCH', body: JSON.stringify({ estado, note, actor_email: actor }) }),
-};
-
-// RF14 — Push.
-export const pushApi = {
-  publicKey: ()              => request('/push/public-key/'),
-  subscribe: (email, sub)    => request('/push/subscribe/', { method: 'POST', body: JSON.stringify({ email, subscription: sub }) }),
-  remind:    (slotId, actor) => request('/push/remind/', { method: 'POST', body: JSON.stringify({ slotId, actor_email: actor }) }),
 };

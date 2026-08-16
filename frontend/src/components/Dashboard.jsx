@@ -2,12 +2,15 @@ import { useState } from 'react';
 
 const RED = '#CC0000';
 
-function SlotCard({ slot, isReserved, onReserve, onJoinWaitlist }) {
-  const isFull    = slot.available === 0;
+function SlotCard({ slot, isReserved, yaReservoElDia, onReserve, onJoinWaitlist }) {
+  const isFull       = slot.available === 0;
   const isAlmostFull = slot.available > 0 && slot.available <= 4;
-  const pct       = Math.round((slot.available / slot.total) * 100);
-  const barColor  = isFull ? '#dc2626' : isAlmostFull ? '#d97706' : '#16a34a';
-  const statusLabel = isFull ? 'Sin cupos' : isAlmostFull ? 'Casi lleno' : 'Disponible';
+  const pct          = Math.round((slot.available / slot.total) * 100);
+  const barColor     = isFull ? '#dc2626' : isAlmostFull ? '#d97706' : '#16a34a';
+  const statusLabel  = isFull ? 'Sin cupos' : isAlmostFull ? 'Casi lleno' : 'Disponible';
+  // RN05 — una sola reserva por día: si ya reservó otro bloque, este se bloquea.
+  const bloqueadoPorLimite = yaReservoElDia && !isReserved;
+  const deshabilitado = isFull || isReserved || bloqueadoPorLimite;
 
   return (
     <div
@@ -21,9 +24,10 @@ function SlotCard({ slot, isReserved, onReserve, onJoinWaitlist }) {
         transition: 'transform 0.2s, box-shadow 0.2s',
         position: 'relative',
         overflow: 'hidden',
-        cursor: isFull || isReserved ? 'default' : 'pointer',
+        opacity: bloqueadoPorLimite ? 0.65 : 1,
+        cursor: deshabilitado ? 'default' : 'pointer',
       }}
-      onMouseEnter={e => { if (!isFull && !isReserved) e.currentTarget.style.transform = 'translateY(-5px)'; }}
+      onMouseEnter={e => { if (!deshabilitado) e.currentTarget.style.transform = 'translateY(-5px)'; }}
       onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; }}
     >
       {/* Badge reservado */}
@@ -67,7 +71,7 @@ function SlotCard({ slot, isReserved, onReserve, onJoinWaitlist }) {
 
       {/* Botón */}
       {/* RF12 — Si el bloque está lleno y no lo tienes reservado, ofrece lista de espera */}
-      {isFull && !isReserved ? (
+      {isFull && !isReserved && !bloqueadoPorLimite ? (
         <button
           onClick={() => onJoinWaitlist(slot)}
           style={{
@@ -79,25 +83,28 @@ function SlotCard({ slot, isReserved, onReserve, onJoinWaitlist }) {
         </button>
       ) : (
         <button
-          onClick={() => !isFull && !isReserved && onReserve(slot)}
-          disabled={isFull || isReserved}
+          onClick={() => !deshabilitado && onReserve(slot)}
+          disabled={deshabilitado}
           style={{
             width: '100%', padding: '13px 0', border: 'none', borderRadius: 12,
-            cursor: isReserved ? 'not-allowed' : 'pointer',
-            backgroundColor: isReserved ? '#F5F5F5' : RED,
-            color: isReserved ? '#999' : 'white',
+            cursor: deshabilitado ? 'not-allowed' : 'pointer',
+            backgroundColor: deshabilitado ? '#F5F5F5' : RED,
+            color: deshabilitado ? '#999' : 'white',
             fontWeight: 700, fontSize: 14,
-            boxShadow: !isReserved ? '0 4px 14px rgba(204,0,0,0.3)' : 'none',
+            boxShadow: !deshabilitado ? '0 4px 14px rgba(204,0,0,0.3)' : 'none',
           }}
         >
-          {isReserved ? '✓ Ya reservado' : 'Reservar cupo'}
+          {isReserved ? '✓ Ya reservado'
+            : bloqueadoPorLimite ? 'Ya reservaste este día'
+            : isFull ? 'Sin cupos'
+            : 'Reservar cupo'}
         </button>
       )}
     </div>
   );
 }
 
-function ReserveModal({ slot, onConfirm, onClose }) {
+function ReserveModal({ slot, fechaLabel, onConfirm, onClose }) {
   return (
     <div style={{
       position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.55)',
@@ -119,7 +126,20 @@ function ReserveModal({ slot, onConfirm, onClose }) {
           </p>
         </div>
 
-        {/* Aviso RF08 */}
+        {/* RN03 — la fecha efectiva de la reserva, siempre a la vista */}
+        <div style={{
+          backgroundColor: '#F4F4F6', borderRadius: 14, padding: '14px 18px',
+          marginBottom: 18, textAlign: 'center',
+        }}>
+          <p style={{ fontSize: 12, color: '#888', fontWeight: 700, letterSpacing: 0.6, textTransform: 'uppercase', marginBottom: 4 }}>
+            Reserva para mañana
+          </p>
+          <p style={{ fontSize: 15, fontWeight: 800, color: '#1A1A1A', textTransform: 'capitalize', margin: 0 }}>
+            {fechaLabel || 'el día siguiente'}
+          </p>
+        </div>
+
+        {/* Aviso RF08 / RN05 */}
         <div style={{
           backgroundColor: '#FFF8E6', border: '1.5px solid #FFC107',
           borderRadius: 14, padding: '16px 18px', marginBottom: 26,
@@ -128,15 +148,11 @@ function ReserveModal({ slot, onConfirm, onClose }) {
             ⚠️ Política de asistencia
           </p>
           <p style={{ color: '#78350f', fontSize: 13, lineHeight: 1.7, margin: 0 }}>
-            Si realizas esta reserva y <strong>no puedes asistir</strong>, tienes la
-            <strong> obligación de cancelarla</strong> con anticipación para liberar el cupo
-            y permitir el ingreso de otros compañeros.
+            Solo puedes tener <strong>una reserva por día</strong>. Si no puedes asistir,
+            tienes la <strong>obligación de cancelarla</strong> con anticipación; ten en
+            cuenta que las cancelaciones se acumulan y pueden penalizar tu cuenta.
           </p>
         </div>
-
-        <p style={{ fontSize: 13, color: '#888', textAlign: 'center', marginBottom: 24 }}>
-          Al confirmar, recibirás un correo de confirmación automático.
-        </p>
 
         <div style={{ display: 'flex', gap: 12 }}>
           <button onClick={onClose} style={{
@@ -160,14 +176,16 @@ function ReserveModal({ slot, onConfirm, onClose }) {
   );
 }
 
-export default function Dashboard({ slots, user, reservations, onReserve, onJoinWaitlist }) {
+export default function Dashboard({ slots, user, reservaFecha, reservations, onReserve, onJoinWaitlist }) {
   const [pendingSlot, setPendingSlot] = useState(null);
 
-  const today = new Date().toLocaleDateString('es-CO', {
+  const hoy = new Date().toLocaleDateString('es-CO', {
     weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
   });
 
   const totalAvailable = slots.reduce((sum, s) => sum + s.available, 0);
+  // RN05 — con una reserva activa para el día siguiente ya no puede reservar más.
+  const yaReservoElDia = reservations.length > 0;
 
   const handleConfirm = () => {
     onReserve(pendingSlot);
@@ -182,33 +200,41 @@ export default function Dashboard({ slots, user, reservations, onReserve, onJoin
         <h2 style={{ fontSize: 30, fontWeight: 900, color: '#1A1A1A', marginBottom: 4, letterSpacing: -0.5 }}>
           Hola, {user?.name?.split(' ')[0]} 👋
         </h2>
-        <p style={{ color: '#999', fontSize: 15, textTransform: 'capitalize' }}>{today}</p>
+        <p style={{ color: '#999', fontSize: 15, textTransform: 'capitalize' }}>Hoy es {hoy}</p>
+      </div>
+
+      {/* RN03 — Banner de la fecha de reserva: se reserva para el DÍA SIGUIENTE */}
+      <div style={{
+        background: `linear-gradient(120deg, ${RED} 0%, #990000 100%)`,
+        borderRadius: 18, padding: '22px 26px', marginBottom: 24,
+        display: 'flex', gap: 18, alignItems: 'center', color: 'white',
+        boxShadow: '0 6px 24px rgba(204,0,0,0.25)',
+      }}>
+        <span style={{ fontSize: 38, flexShrink: 0 }}>📅</span>
+        <div>
+          <p style={{ fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', opacity: 0.85, marginBottom: 4 }}>
+            Estás reservando para mañana
+          </p>
+          <p style={{ fontSize: 22, fontWeight: 900, textTransform: 'capitalize', lineHeight: 1.2 }}>
+            {reservaFecha?.label || 'Cargando fecha...'}
+          </p>
+          <p style={{ fontSize: 13, opacity: 0.9, marginTop: 6 }}>
+            Los cupos del gimnasio se reservan con un día de anticipación, y solo puedes tomar
+            <strong> un bloque por día</strong>.
+          </p>
+        </div>
       </div>
 
       {/* Estadísticas rápidas */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 16, marginBottom: 28 }}>
-        <StatCard icon="🕐" label="Horarios hoy" value="6" />
         <StatCard icon="✅" label="Cupos disponibles" value={totalAvailable} />
-        <StatCard icon="📌" label="Mis reservas" value={reservations.length} />
-      </div>
-
-      {/* Banner de advertencia RF08 */}
-      <div style={{
-        backgroundColor: '#FFFBEB', border: '1.5px solid #FCD34D',
-        borderRadius: 16, padding: '16px 22px', marginBottom: 32,
-        display: 'flex', gap: 14, alignItems: 'flex-start',
-      }}>
-        <span style={{ fontSize: 22, flexShrink: 0, marginTop: 1 }}>⚠️</span>
-        <div>
-          <p style={{ fontWeight: 700, color: '#92400e', fontSize: 15, marginBottom: 4 }}>
-            Política de asistencia — léela antes de reservar
-          </p>
-          <p style={{ color: '#78350f', fontSize: 13, lineHeight: 1.7, margin: 0 }}>
-            Si realizas una reserva y no puedes asistir, <strong>tienes la obligación de cancelarla</strong> para
-            liberar el cupo y permitir el ingreso de otros compañeros. El incumplimiento repetido puede
-            generar restricciones en el uso del sistema.
-          </p>
-        </div>
+        <StatCard icon="📌" label="Mi reserva de mañana" value={`${reservations.length}/1`} />
+        <StatCard
+          icon="🚫"
+          label={`Cancelaciones (límite ${user?.cancelacion_limite ?? 5})`}
+          value={user?.cancel_count ?? 0}
+          highlight={(user?.cancelaciones_restantes ?? 99) <= 2}
+        />
       </div>
 
       {/* Título de sección */}
@@ -228,6 +254,7 @@ export default function Dashboard({ slots, user, reservations, onReserve, onJoin
             key={slot.id}
             slot={slot}
             isReserved={reservations.some(r => r.slotId === slot.id)}
+            yaReservoElDia={yaReservoElDia}
             onReserve={setPendingSlot}
             onJoinWaitlist={onJoinWaitlist}
           />
@@ -237,6 +264,7 @@ export default function Dashboard({ slots, user, reservations, onReserve, onJoin
       {pendingSlot && (
         <ReserveModal
           slot={pendingSlot}
+          fechaLabel={reservaFecha?.label}
           onConfirm={handleConfirm}
           onClose={() => setPendingSlot(null)}
         />
@@ -245,16 +273,17 @@ export default function Dashboard({ slots, user, reservations, onReserve, onJoin
   );
 }
 
-function StatCard({ icon, label, value }) {
+function StatCard({ icon, label, value, highlight }) {
   return (
     <div style={{
       backgroundColor: 'white', borderRadius: 16, padding: '20px 24px',
       boxShadow: '0 2px 12px rgba(0,0,0,0.07)',
+      border: highlight ? '1.5px solid #F59E0B' : '1.5px solid transparent',
       display: 'flex', alignItems: 'center', gap: 16,
     }}>
       <div style={{ fontSize: 32 }}>{icon}</div>
       <div>
-        <p style={{ fontSize: 26, fontWeight: 900, color: '#1A1A1A', lineHeight: 1 }}>{value}</p>
+        <p style={{ fontSize: 26, fontWeight: 900, color: highlight ? '#B45309' : '#1A1A1A', lineHeight: 1 }}>{value}</p>
         <p style={{ fontSize: 12, color: '#999', marginTop: 4 }}>{label}</p>
       </div>
     </div>

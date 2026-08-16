@@ -8,11 +8,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['logo-udem.png', 'push-handler.js'],
-      workbox: {
-        // Añade el manejo de notificaciones push al service worker generado.
-        importScripts: ['push-handler.js'],
-      },
+      includeAssets: ['logo-udem.png'],
       manifest: {
         name: 'Gimnasio UdeM — Reservas',
         short_name: 'Gym UdeM',

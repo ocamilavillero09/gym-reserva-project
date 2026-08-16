@@ -2,11 +2,11 @@
 Funcionalidades complementarias del documento de análisis (RF11–RF18):
 
   RF11  Historial de entrenamiento          (reservation_history)
-  RF12  Lista de espera                      (waitlist + notify_next_in_waitlist)
+  RF12  Lista de espera                      (waitlist + pop_next_in_waitlist)
   RF13  Perfil de usuario y metas            (user_profile)
   RF15  Calificación del servicio            (ratings)
   RF16  Dashboard de aforo proyectado        (occupancy_report)
-  RF17  Reporte de inasistencias / asistencia(no_show_report, complete_reservation)
+  RF17  Reporte POR ESTUDIANTE               (students_report, complete_reservation)
   RF18  Mantenimiento de máquinas            (machines, machine_detail)
 """
 from datetime import datetime
@@ -14,12 +14,14 @@ from bson import ObjectId
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 
-from .db import get_db, seed_machines
-from .notifications import send_waitlist_available
+from .db import (
+    get_db, seed_machines, cancelaciones_restantes, alerta_cancelaciones,
+    CANCELACION_LIMITE, NO_SHOW_LIMITE,
+)
 
 
 def _is_staff(email: str) -> bool:
-    """True si el correo corresponde a un ENTRENADOR o ADMIN."""
+    """True si el correo corresponde a un ENTRENADOR (profesor) o ADMIN."""
     u = get_db().users.find_one({'email': (email or '').strip().lower()})
     return bool(u and u.get('role') in ('ENTRENADOR', 'ADMIN'))
 
@@ -44,9 +46,9 @@ def reservation_history(request):
 # ── RF17 — MARCAR ASISTENCIA (COMPLETADA) ───────────────────────────────────
 @api_view(['POST'])
 def complete_reservation(request, reservation_id):
-    """El entrenador confirma que el estudiante asistió: ACTIVA -> COMPLETADA."""
+    """El profesor confirma que el estudiante asistió: ACTIVA -> COMPLETADA."""
     if not _is_staff(request.data.get('actor_email')):
-        return Response({'error': 'Solo entrenador/admin.'}, status=403)
+        return Response({'error': 'Solo profesor/admin.'}, status=403)
     db = get_db()
     try:
         oid = ObjectId(reservation_id)
@@ -88,13 +90,13 @@ def waitlist(request, slot_id):
     return Response({'message': 'Añadido a la lista de espera.', 'posicion': pos}, status=201)
 
 
-def notify_next_in_waitlist(slot_id: int):
-    """Al liberarse un cupo, avisa (y saca) al primero en la lista de espera."""
-    db = get_db()
-    nxt = db.waitlist.find_one_and_delete({'slotId': slot_id}, sort=[('created_at', 1)])
-    if nxt:
-        slot = db.slots.find_one({'slotId': slot_id})
-        send_waitlist_available(nxt['email'], (slot or {}).get('hour', ''))
+def pop_next_in_waitlist(slot_id: int):
+    """Al liberarse un cupo, saca al primero de la lista de espera.
+
+    El aviso ya no se envía por correo ni push: el estudiante ve el cupo
+    liberado directamente en la pantalla de disponibilidad.
+    """
+    return get_db().waitlist.find_one_and_delete({'slotId': slot_id}, sort=[('created_at', 1)])
 
 
 # ── RF13 — PERFIL DE USUARIO Y METAS ────────────────────────────────────────
@@ -123,6 +125,11 @@ def user_profile(request):
     return Response({
         'name': user['name'], 'email': user['email'], 'role': user.get('role'),
         'estado': user.get('estado'), 'no_show_count': user.get('no_show_count', 0),
+        # RN10 — el estudiante ve cuántas veces ha cancelado y cuánto le queda.
+        'cancel_count': user.get('cancel_count', 0),
+        'cancelaciones_restantes': cancelaciones_restantes(user),
+        'cancelacion_limite': CANCELACION_LIMITE,
+        'alerta': alerta_cancelaciones(user),
         'peso': user.get('peso'), 'altura': user.get('altura'), 'meta': user.get('meta'),
     })
 
@@ -155,7 +162,7 @@ def ratings(request):
     return Response({'message': '¡Gracias por tu calificación!'}, status=201)
 
 
-# ── RF16 — DASHBOARD DE AFORO PROYECTADO (entrenador) ───────────────────────
+# ── RF16 — DASHBOARD DE AFORO PROYECTADO (profesor / admin) ─────────────────
 @api_view(['GET'])
 def occupancy_report(request):
     db = get_db()
@@ -171,17 +178,42 @@ def occupancy_report(request):
     return Response(data)
 
 
-# ── RF17 — REPORTE DE INASISTENCIAS ─────────────────────────────────────────
-@api_view(['GET'])
-def no_show_report(request):
+# ── RF17 — REPORTE POR ESTUDIANTE ───────────────────────────────────────────
+def build_student_rows():
+    """Una fila por ESTUDIANTE con su actividad y sus contadores.
+
+    El reporte del sistema es por persona, no por bloque horario: para cada
+    estudiante se muestran sus reservas activas, asistencias, cancelaciones e
+    inasistencias, además de su estado (ACTIVO / PENALIZADO).
+    """
     db = get_db()
     rows = []
-    for u in db.users.find({'no_show_count': {'$gt': 0}}).sort('no_show_count', -1):
+    for u in db.users.find({'role': 'ESTUDIANTE'}).sort('name', 1):
+        email = u['email']
+        canceladas = db.reservations.count_documents({'email': email, 'estado': 'CANCELADA'})
         rows.append({
-            'email': u['email'], 'name': u.get('name'),
-            'no_show_count': u.get('no_show_count', 0), 'estado': u.get('estado'),
+            'name': u.get('name'),
+            'email': email,
+            'estado': u.get('estado', 'ACTIVO'),
+            'activas': db.reservations.count_documents({'email': email, 'estado': 'ACTIVA'}),
+            'completadas': db.reservations.count_documents({'email': email, 'estado': 'COMPLETADA'}),
+            'canceladas': canceladas,
+            'cancel_count': u.get('cancel_count', 0),
+            'cancelaciones_restantes': cancelaciones_restantes(u),
+            'no_show': db.reservations.count_documents({'email': email, 'estado': 'NO_SHOW'}),
+            'no_show_count': u.get('no_show_count', 0),
+            'en_alerta': alerta_cancelaciones(u) is not None,
         })
-    return Response(rows)
+    return rows
+
+
+@api_view(['GET'])
+def students_report(request):
+    return Response({
+        'cancelacion_limite': CANCELACION_LIMITE,
+        'no_show_limite': NO_SHOW_LIMITE,
+        'estudiantes': build_student_rows(),
+    })
 
 
 # ── RF18 — MANTENIMIENTO DE MÁQUINAS ────────────────────────────────────────
@@ -196,7 +228,7 @@ def machines(request):
         return Response(docs)
 
     if not _is_staff(request.data.get('actor_email')):
-        return Response({'error': 'Solo entrenador/admin.'}, status=403)
+        return Response({'error': 'Solo profesor/admin.'}, status=403)
     name = request.data.get('name', '').strip()
     if not name:
         return Response({'error': 'name requerido.'}, status=400)
@@ -208,7 +240,7 @@ def machines(request):
 @api_view(['PATCH'])
 def machine_detail(request, machine_id):
     if not _is_staff(request.data.get('actor_email')):
-        return Response({'error': 'Solo entrenador/admin.'}, status=403)
+        return Response({'error': 'Solo profesor/admin.'}, status=403)
     db = get_db()
     estado = request.data.get('estado')
     if estado not in ('DISPONIBLE', 'FUERA_DE_SERVICIO'):

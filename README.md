@@ -163,37 +163,60 @@ docker-compose -f docker-compose-hub.yml up
 Sigue estos pasos para verificar que frontend, backend y base de datos se comunican correctamente:
 
 1. **Abrir el frontend** en http://localhost:5173/index.html
-2. **Registrarse** con un correo institucional (`@udem.edu.co` o `@soyudemedellin.edu.co`)
+2. **Registrarse**. El **dominio del correo define el rol**:
+
+   | Dominio | Rol |
+   |---|---|
+   | `@soyudemedellin.edu.co` | Estudiante |
+   | `@udem.edu.co` | Profesor |
+   | `@udemedellin.edu.co` | Administrador |
+
 3. **Iniciar sesión** con el correo registrado
-4. **Ver horarios disponibles** en el Dashboard (carga desde MongoDB vía backend)
-5. **Crear una reserva** — el cupo disponible se decrementa automáticamente
-6. **Ver "Mis Reservas"** — lista las reservas activas guardadas en MongoDB
-7. **Cancelar una reserva** — el cupo se libera inmediatamente
-8. **Verificar en Swagger UI** (`http://localhost:8000/swagger/`) que todos los endpoints responden con los códigos esperados
+4. **Ver horarios disponibles** en el Dashboard — la app indica que la reserva es
+   **para el día siguiente** y muestra la fecha exacta
+5. **Crear una reserva** — el cupo se decrementa; solo se permite **una reserva por día**
+6. **Recargar la página (F5)** — la sesión se mantiene abierta
+7. **Ver "Mis Reservas"** y **cancelar** — el cupo se libera al instante y el contador de
+   cancelaciones sube (a las 3 de 5 aparece la alerta de penalización)
+8. **Entrar como profesor o administrador** — solo se ve el **aforo**, sin interfaz de reserva
+9. **Como administrador**, crear otros usuarios (incluidos administradores) en "Usuarios"
+10. **Verificar en Swagger UI** (`http://localhost:8000/swagger/`) que todos los endpoints responden con los códigos esperados
 
 ### Verificación rápida con curl
 
 ```bash
-# 1. Registrar usuario
+# 1. Registrar estudiante (el rol lo da el dominio del correo)
 curl -X POST http://localhost:8000/api/auth/register/ \
   -H "Content-Type: application/json" \
-  -d '{"name":"Test","email":"test@udem.edu.co","password":"test123"}'
+  -d '{"name":"Test","email":"test@soyudemedellin.edu.co","password":"test123"}'
 
 # 2. Iniciar sesión
 curl -X POST http://localhost:8000/api/auth/login/ \
   -H "Content-Type: application/json" \
-  -d '{"email":"test@udem.edu.co","password":"test123"}'
+  -d '{"email":"test@soyudemedellin.edu.co","password":"test123"}'
 
-# 3. Consultar horarios
+# 3. Consultar horarios (incluye la fecha del día siguiente)
 curl http://localhost:8000/api/slots/
 
-# 4. Crear reserva
+# 4. Crear reserva (queda fechada para mañana)
 curl -X POST http://localhost:8000/api/reservations/ \
   -H "Content-Type: application/json" \
-  -d '{"email":"test@udem.edu.co","slotId":1}'
+  -d '{"email":"test@soyudemedellin.edu.co","slotId":1}'
 
 # 5. Ver reservas del usuario
-curl "http://localhost:8000/api/reservations/?email=test@udem.edu.co"
+curl "http://localhost:8000/api/reservations/?email=test@soyudemedellin.edu.co"
+
+# 6. Rehidratar la sesión (lo que hace el frontend al recargar)
+curl "http://localhost:8000/api/auth/session/?email=test@soyudemedellin.edu.co"
+
+# 7. Un ADMIN crea otro administrador
+curl -X POST http://localhost:8000/api/admin/users/ \
+  -H "Content-Type: application/json" \
+  -d '{"actor_email":"jefe@udemedellin.edu.co","name":"Nueva Admin",
+       "email":"nueva@udemedellin.edu.co","password":"secreto123"}'
+
+# 8. Reporte por estudiante
+curl http://localhost:8000/api/reports/students/
 ```
 
 ---

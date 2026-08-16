@@ -8,8 +8,9 @@ data:
   MONGO_URI: "mongodb://mongodb:27017"
   MONGO_DB: "gym_udem"
   DEBUG: "False"
-  # Sin EMAIL_HOST, las confirmaciones de reserva se imprimen en los logs
-  # (visibles en Grafana/Loki). Para SMTP real, añadir EMAIL_HOST aquí + Secret.
+  # El sistema no envía notificaciones por correo ni push: los avisos al usuario
+  # se muestran dentro de la aplicación. La actividad queda en los logs
+  # (visibles en Grafana/Loki).
 ---
 apiVersion: apps/v1
 kind: Deployment

@@ -72,22 +72,9 @@ MONGO_URI = os.getenv('MONGO_URI', 'mongodb://localhost:27017')
 MONGO_DB   = os.getenv('MONGO_DB', 'gym_udem')
 
 # ──────────────────────────────────────────
-# Correo (confirmación de reservas)
-# Por defecto usa el backend de consola: el correo se imprime en los logs del
-# contenedor, lo que permite verlo en Grafana/Loki sin un SMTP real. Si se
-# define EMAIL_HOST se cambia a SMTP real automáticamente.
-# ──────────────────────────────────────────
-EMAIL_HOST = os.getenv('EMAIL_HOST', '')
-if EMAIL_HOST:
-    EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-    EMAIL_PORT = int(os.getenv('EMAIL_PORT', '587'))
-    EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'True') == 'True'
-    EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '')
-    EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
-else:
-    EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
-DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'gimnasio@udem.edu.co')
-
+# El sistema no envía notificaciones por correo ni push: los avisos (reserva
+# confirmada, cancelación, alerta de penalización) se muestran dentro de la
+# propia aplicación. Por eso no hay configuración de SMTP.
 # ──────────────────────────────────────────
 # Logging: formato estructurado a stdout para que Promtail/Loki lo recolecte.
 # ──────────────────────────────────────────
