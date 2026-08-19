@@ -8,14 +8,15 @@ const card = { backgroundColor: 'white', borderRadius: 18, padding: 26, boxShado
 // Los tres dominios institucionales y el rol que otorga cada uno (RN01).
 const DOMINIOS = [
   { dominio: '@soyudemedellin.edu.co', rol: 'ESTUDIANTE',  etiqueta: 'Estudiante' },
-  { dominio: '@udem.edu.co',           rol: 'ENTRENADOR',  etiqueta: 'Profesor' },
+  { dominio: '@udem.edu.co',           rol: 'ENTRENADOR',  etiqueta: 'Entrenador' },
   { dominio: '@udemedellin.edu.co',    rol: 'ADMIN',       etiqueta: 'Administrador' },
 ];
 
 const ROLE_BADGE = {
   ESTUDIANTE: { bg: '#DBEAFE', fg: '#1D4ED8', label: 'Estudiante' },
-  ENTRENADOR: { bg: '#DCFCE7', fg: '#15803D', label: 'Profesor' },
+  ENTRENADOR: { bg: '#DCFCE7', fg: '#15803D', label: 'Entrenador' },
   ADMIN:      { bg: '#FEE2E2', fg: '#991B1B', label: 'Administrador' },
+  SIN_ROL:    { bg: '#E5E7EB', fg: '#4B5563', label: 'Rol retirado' },
 };
 
 const rolDeCorreo = (email) =>
@@ -23,14 +24,17 @@ const rolDeCorreo = (email) =>
 
 /**
  * Panel del ADMINISTRADOR — gestión de usuarios.
- * Es la única vía para crear NUEVOS ADMINISTRADORES: el rol se deduce del
- * dominio del correo, así que basta con usar un correo @udemedellin.edu.co.
+ *
+ *   RF21 / HU21 — El ADMINISTRADOR PRINCIPAL crea cuentas con rol de
+ *                 administrador (el rol se deduce del dominio del correo).
+ *   RF22 / HU22 — El administrador principal gestiona esas cuentas y puede
+ *                 RETIRARLES el rol de administrador.
  */
 export default function AdminPanel({ user, showToast }) {
   const [users, setUsers] = useState([]);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [documento, setDocumento] = useState('');
   const [enviando, setEnviando] = useState(false);
 
   const cargar = useCallback(() => {
@@ -47,10 +51,10 @@ export default function AdminPanel({ user, showToast }) {
         actor_email: user.email,
         name: name.trim(),
         email: email.trim().toLowerCase(),
-        password,
+        documento: documento.trim(),
       });
       showToast(r.message, 'success');
-      setName(''); setEmail(''); setPassword('');
+      setName(''); setEmail(''); setDocumento('');
       cargar();
     } catch (err) {
       showToast(err.message, 'error');
@@ -59,22 +63,47 @@ export default function AdminPanel({ user, showToast }) {
     }
   };
 
+  // RF22 — Retirar o restaurar el rol de administrador de otra cuenta.
+  const cambiarRol = async (objetivo, accion) => {
+    const verbo = accion === 'retirar' ? 'retirar el rol de administrador a' : 'restaurar el rol de administrador a';
+    if (!window.confirm(`¿Seguro que deseas ${verbo} ${objetivo.name}?`)) return;
+    try {
+      const r = await adminApi.setAdminRole(objetivo.email, accion, user.email);
+      showToast(r.message, accion === 'retirar' ? 'warning' : 'success');
+      cargar();
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  };
+
   const rolDetectado = rolDeCorreo(email);
   const porRol = (rol) => users.filter((u) => u.role === rol).length;
+  // Solo el administrador principal gestiona las cuentas de administrador.
+  const esPrincipal = user.es_principal ?? false;
 
   return (
     <div style={{ maxWidth: 820, margin: '0 auto', padding: '36px 24px', animation: 'fadeUp 0.4s ease' }}>
       <h2 style={{ fontSize: 30, fontWeight: 900, marginBottom: 4 }}>Gestión de usuarios</h2>
       <p style={{ color: '#999', fontSize: 15, marginBottom: 28 }}>
-        Panel del administrador · {user.email}
+        {esPrincipal ? 'Administrador principal' : 'Administrador'} · {user.email}
       </p>
+
+      {!esPrincipal && (
+        <div style={{ background: '#FFF7ED', border: '1.5px solid #F59E0B', borderRadius: 12, padding: '14px 16px', marginBottom: 20 }}>
+          <p style={{ fontSize: 13, color: '#78350F', margin: 0, lineHeight: 1.6 }}>
+            ⚠️ Solo el <strong>administrador principal</strong> puede crear cuentas de administrador
+            y retirarles el rol. Desde aquí puedes consultar los usuarios y crear estudiantes o entrenadores.
+          </p>
+        </div>
+      )}
 
       {/* Crear usuario (incluye nuevos administradores) */}
       <div style={card}>
         <h3 style={{ fontSize: 18, fontWeight: 800, marginBottom: 6 }}>➕ Crear usuario</h3>
         <p style={{ color: '#777', fontSize: 13, marginBottom: 18, lineHeight: 1.6 }}>
           El rol se asigna automáticamente según el dominio del correo. Para crear otro
-          <strong> administrador</strong>, usa un correo <strong>@udemedellin.edu.co</strong>.
+          <strong> administrador</strong> (RF21), usa un correo <strong>@udemedellin.edu.co</strong>.
+          El documento de identidad será su contraseña de ingreso.
         </p>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px,1fr))', gap: 10, marginBottom: 20 }}>
@@ -103,11 +132,12 @@ export default function AdminPanel({ user, showToast }) {
             required
           />
           <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="Contraseña (mínimo 6 caracteres)"
+            type="text"
+            value={documento}
+            onChange={(e) => setDocumento(e.target.value)}
+            placeholder="Documento de identidad (mínimo 6 caracteres)"
             style={inputStyle}
+            inputMode="numeric"
             required
           />
 
@@ -144,8 +174,15 @@ export default function AdminPanel({ user, showToast }) {
           return (
             <div key={u.email} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: '1px solid #F0F0F0' }}>
               <div style={{ minWidth: 0 }}>
-                <p style={{ fontWeight: 700, fontSize: 14 }}>{u.name}</p>
-                <p style={{ fontSize: 12, color: '#999', overflow: 'hidden', textOverflow: 'ellipsis' }}>{u.email}</p>
+                <p style={{ fontWeight: 700, fontSize: 14 }}>
+                  {u.name}
+                  {u.es_principal && (
+                    <span style={{ marginLeft: 8, fontSize: 10, fontWeight: 800, color: RED }}>★ PRINCIPAL</span>
+                  )}
+                </p>
+                <p style={{ fontSize: 12, color: '#999', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {u.email} · doc. {u.documento || '—'}
+                </p>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
                 {u.estado === 'PENALIZADO' && (
@@ -154,6 +191,23 @@ export default function AdminPanel({ user, showToast }) {
                 <span style={{ background: b.bg, color: b.fg, fontSize: 11, fontWeight: 800, padding: '4px 12px', borderRadius: 20 }}>
                   {b.label}
                 </span>
+                {/* RF22 — Retirar o restaurar el rol de administrador */}
+                {esPrincipal && !u.es_principal && u.role === 'ADMIN' && (
+                  <button onClick={() => cambiarRol(u, 'retirar')} style={{
+                    padding: '6px 12px', border: '1.5px solid #fca5a5', borderRadius: 8,
+                    background: 'white', color: RED, fontSize: 11, fontWeight: 800, cursor: 'pointer',
+                  }}>
+                    Retirar rol
+                  </button>
+                )}
+                {esPrincipal && u.role === 'SIN_ROL' && (
+                  <button onClick={() => cambiarRol(u, 'restaurar')} style={{
+                    padding: '6px 12px', border: '1.5px solid #86efac', borderRadius: 8,
+                    background: 'white', color: '#15803d', fontSize: 11, fontWeight: 800, cursor: 'pointer',
+                  }}>
+                    Restaurar
+                  </button>
+                )}
               </div>
             </div>
           );

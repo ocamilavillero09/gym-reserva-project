@@ -163,60 +163,144 @@ docker-compose -f docker-compose-hub.yml up
 Sigue estos pasos para verificar que frontend, backend y base de datos se comunican correctamente:
 
 1. **Abrir el frontend** en http://localhost:5173/index.html
-2. **Registrarse**. El **dominio del correo define el rol**:
+2. **Registrarse** con **nombre, correo institucional y documento de identidad** (RF01).
+   El **dominio del correo define el rol** (RF03):
 
    | Dominio | Rol |
    |---|---|
    | `@soyudemedellin.edu.co` | Estudiante |
-   | `@udem.edu.co` | Profesor |
+   | `@udem.edu.co` | Entrenador |
    | `@udemedellin.edu.co` | Administrador |
 
-3. **Iniciar sesión** con el correo registrado
-4. **Ver horarios disponibles** en el Dashboard — la app indica que la reserva es
-   **para el día siguiente** y muestra la fecha exacta
-5. **Crear una reserva** — el cupo se decrementa; solo se permite **una reserva por día**
-6. **Recargar la página (F5)** — la sesión se mantiene abierta
-7. **Ver "Mis Reservas"** y **cancelar** — el cupo se libera al instante y el contador de
-   cancelaciones sube (a las 3 de 5 aparece la alerta de penalización)
-8. **Entrar como profesor o administrador** — solo se ve el **aforo**, sin interfaz de reserva
-9. **Como administrador**, crear otros usuarios (incluidos administradores) en "Usuarios"
-10. **Verificar en Swagger UI** (`http://localhost:8000/swagger/`) que todos los endpoints responden con los códigos esperados
+3. **Iniciar sesión** con el correo y el **documento de identidad como contraseña** (RF02)
+4. **Perfil** — el estudiante gestiona edad, peso, altura y objetivo (RF04); el entrenador y
+   el administrador consultan su nombre, documento y rol (RF05)
+5. **Ver bloques horarios y cupos** en el Dashboard — la reserva es **para el día siguiente**
+   y se muestra la fecha exacta (RF06/RF07/RF08)
+6. **Crear una reserva** — llega la notificación de confirmación (RF23); si intentas una
+   segunda para el mismo día, el sistema lo impide y avisa (RF09/RF24)
+7. **Recargar la página (F5)** — la sesión se mantiene abierta
+8. **"Mis Reservas" → cancelar** — el cupo se libera al instante y llega la notificación
+   de cancelación (RF10/RF25)
+9. **Entrar como entrenador o administrador** — se ve el **panel**, sin interfaz de reserva (RF12):
+   - Buscar al estudiante **por su documento de identidad** y **registrar su asistencia** (RF11/RF13)
+   - Ver los **estudiantes sin asistencia registrada** de la jornada (RF14)
+   - **Procesar de forma general las inasistencias**: se penaliza a quien llegue a
+     **5 inasistencias** (RF15/RF16)
+   - Consultar el **reporte general diario** e **imprimirlo en PDF** (RF19/RF20)
+10. **Como estudiante**, revisar el **historial** (RF17) y el **reporte personal** de
+    inasistencias y penalizaciones en el Perfil (RF18)
+11. **Como administrador principal** (el primer ADMIN registrado), crear otras cuentas de
+    administrador y **retirarles el rol** en "Usuarios" (RF21/RF22)
+12. **Verificar en Swagger UI** (`http://localhost:8000/swagger/`) que todos los endpoints
+    responden con los códigos esperados
+
+### Trazabilidad: requisito → endpoint
+
+| Requisito | Endpoint |
+|---|---|
+| RF01 Registro con nombre, correo y documento | `POST /api/auth/register/` |
+| RF02 Login con documento como contraseña | `POST /api/auth/login/` |
+| RF03 Rol automático según el dominio | `POST /api/auth/register/` (campo `role` de la respuesta) |
+| RF04 Perfil del estudiante (edad, peso, altura, objetivo) | `GET/PUT /api/users/profile/` |
+| RF05 Perfil de entrenador/administrador | `GET /api/users/profile/` |
+| RF06 Bloques horarios disponibles | `GET /api/slots/` |
+| RF07 Cupos ocupados y disponibles | `GET /api/slots/` · `GET /api/reports/occupancy/` |
+| RF08 Reserva para el día siguiente | `POST /api/reservations/` |
+| RF09 Una sola reserva por día | `POST /api/reservations/` (409) |
+| RF10 Consultar y cancelar la reserva | `GET /api/reservations/` · `DELETE /api/reservations/<id>/` |
+| RF11 Buscar la reserva por documento | `GET /api/students/lookup/?documento=&actor_email=` |
+| RF12 Staff visualiza sin reservar | `GET /api/reports/occupancy/` · `POST /api/reservations/` (403) |
+| RF13 Registrar asistencia | `POST /api/attendance/register/` |
+| RF14 Estudiantes sin asistencia registrada | `GET /api/attendance/pending/?actor_email=` |
+| RF15 Procesar inasistencias en general | `POST /api/attendance/process/` |
+| RF16 Penalización a las 5 inasistencias | `POST /api/attendance/process/` (`total_penalizados`) |
+| RF17 Historial del estudiante | `GET /api/reservations/history/?email=` |
+| RF18 Reporte personal | `GET /api/reports/personal/?email=` |
+| RF19 Reporte general diario | `GET /api/reports/daily/?actor_email=` |
+| RF20 Reporte general diario en PDF | `GET /api/reports/daily.pdf?actor_email=` |
+| RF21 Crear cuentas de administrador | `POST /api/admin/users/` (solo el principal) |
+| RF22 Retirar el rol de administrador | `PATCH /api/admin/users/<correo>/` con `accion: retirar` |
+| RF23/RF24/RF25 Notificaciones | campo `notificacion` de `POST /api/reservations/` y `DELETE /api/reservations/<id>/` |
 
 ### Verificación rápida con curl
 
 ```bash
-# 1. Registrar estudiante (el rol lo da el dominio del correo)
-curl -X POST http://localhost:8000/api/auth/register/ \
-  -H "Content-Type: application/json" \
-  -d '{"name":"Test","email":"test@soyudemedellin.edu.co","password":"test123"}'
+EST=test@soyudemedellin.edu.co;  DOC_EST=1001234567
+COACH=coach@udem.edu.co;         DOC_COACH=7009998881
+JEFA=jefa@udemedellin.edu.co;    DOC_JEFA=3005554442
 
-# 2. Iniciar sesión
-curl -X POST http://localhost:8000/api/auth/login/ \
-  -H "Content-Type: application/json" \
-  -d '{"email":"test@soyudemedellin.edu.co","password":"test123"}'
+# RF01 — Registro con nombre, correo institucional y documento de identidad
+curl -X POST http://localhost:8000/api/auth/register/ -H "Content-Type: application/json" \
+  -d "{\"name\":\"Test\",\"email\":\"$EST\",\"documento\":\"$DOC_EST\"}"
+curl -X POST http://localhost:8000/api/auth/register/ -H "Content-Type: application/json" \
+  -d "{\"name\":\"Coach\",\"email\":\"$COACH\",\"documento\":\"$DOC_COACH\"}"
+curl -X POST http://localhost:8000/api/auth/register/ -H "Content-Type: application/json" \
+  -d "{\"name\":\"Jefa\",\"email\":\"$JEFA\",\"documento\":\"$DOC_JEFA\"}"   # primer ADMIN = principal
 
-# 3. Consultar horarios (incluye la fecha del día siguiente)
+# RF02 — Login con el documento como contraseña
+curl -X POST http://localhost:8000/api/auth/login/ -H "Content-Type: application/json" \
+  -d "{\"email\":\"$EST\",\"documento\":\"$DOC_EST\"}"
+
+# RF04 — Edad, peso, altura y objetivo de entrenamiento
+curl -X PUT http://localhost:8000/api/users/profile/ -H "Content-Type: application/json" \
+  -d "{\"email\":\"$EST\",\"edad\":21,\"peso\":72,\"altura\":178,\"meta\":\"Ganar resistencia\"}"
+
+# RF06/RF07 — Bloques horarios y cupos (la fecha es la de mañana)
 curl http://localhost:8000/api/slots/
+FECHA=$(curl -s http://localhost:8000/api/slots/ | python3 -c 'import json,sys;print(json.load(sys.stdin)["fecha"])')
 
-# 4. Crear reserva (queda fechada para mañana)
-curl -X POST http://localhost:8000/api/reservations/ \
-  -H "Content-Type: application/json" \
-  -d '{"email":"test@soyudemedellin.edu.co","slotId":1}'
+# RF08/RF23 — Reserva del día siguiente y su notificación
+curl -X POST http://localhost:8000/api/reservations/ -H "Content-Type: application/json" \
+  -d "{\"email\":\"$EST\",\"slotId\":1}"
 
-# 5. Ver reservas del usuario
-curl "http://localhost:8000/api/reservations/?email=test@soyudemedellin.edu.co"
+# RF09/RF24 — Segunda reserva del mismo día: rechazada y notificada
+curl -X POST http://localhost:8000/api/reservations/ -H "Content-Type: application/json" \
+  -d "{\"email\":\"$EST\",\"slotId\":2}"
 
-# 6. Rehidratar la sesión (lo que hace el frontend al recargar)
-curl "http://localhost:8000/api/auth/session/?email=test@soyudemedellin.edu.co"
+# RF11 — El entrenador busca al estudiante por su documento
+curl "http://localhost:8000/api/students/lookup/?documento=$DOC_EST&actor_email=$COACH"
 
-# 7. Un ADMIN crea otro administrador
-curl -X POST http://localhost:8000/api/admin/users/ \
-  -H "Content-Type: application/json" \
-  -d '{"actor_email":"jefe@udemedellin.edu.co","name":"Nueva Admin",
-       "email":"nueva@udemedellin.edu.co","password":"secreto123"}'
+# RF14 — Estudiantes con reserva y sin asistencia registrada
+curl "http://localhost:8000/api/attendance/pending/?actor_email=$COACH&fecha=$FECHA"
 
-# 8. Reporte por estudiante
-curl http://localhost:8000/api/reports/students/
+# RF13 — Registrar la asistencia
+curl -X POST http://localhost:8000/api/attendance/register/ -H "Content-Type: application/json" \
+  -d "{\"actor_email\":\"$COACH\",\"documento\":\"$DOC_EST\",\"fecha\":\"$FECHA\"}"
+
+# RF15/RF16 — Procesar las inasistencias de la jornada (penaliza a las 5)
+curl -X POST http://localhost:8000/api/attendance/process/ -H "Content-Type: application/json" \
+  -d "{\"actor_email\":\"$COACH\",\"fecha\":\"$FECHA\"}"
+
+# RF17 — Historial · RF18 — Reporte personal del estudiante
+curl "http://localhost:8000/api/reservations/history/?email=$EST"
+curl "http://localhost:8000/api/reports/personal/?email=$EST"
+
+# RF19/RF20 — Reporte general diario y su PDF
+curl "http://localhost:8000/api/reports/daily/?actor_email=$COACH&fecha=$FECHA"
+curl -o reporte_diario.pdf "http://localhost:8000/api/reports/daily.pdf?actor_email=$COACH&fecha=$FECHA"
+
+# RF21 — El administrador principal crea otra cuenta de administrador
+curl -X POST http://localhost:8000/api/admin/users/ -H "Content-Type: application/json" \
+  -d "{\"actor_email\":\"$JEFA\",\"name\":\"Nueva Admin\",
+       \"email\":\"nueva@udemedellin.edu.co\",\"documento\":\"3001112223\"}"
+
+# RF22 — Retirarle el rol de administrador
+curl -X PATCH http://localhost:8000/api/admin/users/nueva@udemedellin.edu.co/ \
+  -H "Content-Type: application/json" -d "{\"actor_email\":\"$JEFA\",\"accion\":\"retirar\"}"
+```
+
+### Pruebas automatizadas
+
+```bash
+# Backend: 98 pruebas (reglas de negocio y RF01–RF25)
+cd backend && python manage.py test api
+
+# Frontend: pruebas unitarias de componentes y del cliente HTTP
+cd frontend && npm test
+
+# End-to-end con el stack levantado (docker compose up -d)
+cd frontend && npx playwright test
 ```
 
 ---

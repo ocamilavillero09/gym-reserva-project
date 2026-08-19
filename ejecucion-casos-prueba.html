@@ -1,0 +1,1931 @@
+<title>Ejecución de Casos de Reserva</title>
+
+<style>
+  :root {
+    --ground:      #F7F5F4;
+    --surface:     #FFFFFF;
+    --surface-alt: #FBF9F9;
+    --ink:         #1A1513;
+    --ink-soft:    #5A4F4B;
+    --ink-faint:   #8B807B;
+    --line:        #E6DEDC;
+    --line-soft:   #F0EAE9;
+    --accent:      #CC0000;
+    --accent-soft: #FBEAE9;
+    --accent-line: #F0C9C6;
+    --alto-fg:     #A31C12;
+    --alto-bg:     #FBE8E5;
+    --medio-fg:    #8A5200;
+    --medio-bg:    #FBF0DC;
+    --ok-fg:       #1F6248;
+    --ok-bg:       #E3F1EA;
+    --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:      #15100F;
+      --surface:     #1E1817;
+      --surface-alt: #241D1C;
+      --ink:         #F2EAE8;
+      --ink-soft:    #BCADA9;
+      --ink-faint:   #8B7D79;
+      --line:        #372D2B;
+      --line-soft:   #2A2221;
+      --accent:      #FF6152;
+      --accent-soft: #38201D;
+      --accent-line: #5A2B26;
+      --alto-fg:     #FF8A7A;
+      --alto-bg:     #3B1E1A;
+      --medio-fg:    #E5A93F;
+      --medio-bg:    #362713;
+      --ok-fg:       #7FD1AE;
+      --ok-bg:       #163025;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ground:      #15100F;
+    --surface:     #1E1817;
+    --surface-alt: #241D1C;
+    --ink:         #F2EAE8;
+    --ink-soft:    #BCADA9;
+    --ink-faint:   #8B7D79;
+    --line:        #372D2B;
+    --line-soft:   #2A2221;
+    --accent:      #FF6152;
+    --accent-soft: #38201D;
+    --accent-line: #5A2B26;
+    --alto-fg:     #FF8A7A;
+    --alto-bg:     #3B1E1A;
+    --medio-fg:    #E5A93F;
+    --medio-bg:    #362713;
+    --ok-fg:       #7FD1AE;
+    --ok-bg:       #163025;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--font-sans);
+    font-size: 16px;
+    line-height: 1.62;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .page {
+    max-width: 1120px;
+    margin: 0 auto;
+    padding: 56px 28px 96px;
+    display: flex;
+    flex-direction: column;
+    gap: 52px;
+  }
+
+  .masthead { display: flex; flex-direction: column; gap: 14px; }
+
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: var(--accent);
+    margin: 0;
+  }
+
+  h1 {
+    margin: 0;
+    font-size: clamp(1.9rem, 4vw, 2.5rem);
+    font-weight: 700;
+    letter-spacing: -0.022em;
+    line-height: 1.15;
+    text-wrap: balance;
+  }
+
+  .standfirst { margin: 0; max-width: 64ch; color: var(--ink-soft); font-size: 1.02rem; }
+
+  .meta-row {
+    display: flex; flex-wrap: wrap; gap: 10px 26px;
+    padding-top: 12px; border-top: 1px solid var(--line);
+    font-family: var(--font-mono); font-size: 0.76rem;
+    color: var(--ink-faint); text-transform: uppercase; letter-spacing: 0.07em;
+  }
+  .meta-row b { color: var(--ink); font-weight: 600; }
+
+  section { display: flex; flex-direction: column; gap: 18px; }
+
+  .section-head { display: flex; flex-direction: column; gap: 6px; }
+  .section-head h2 { margin: 0; font-size: 1.35rem; font-weight: 650; letter-spacing: -0.012em; }
+  .section-head p { margin: 0; max-width: 70ch; color: var(--ink-soft); font-size: 0.94rem; }
+
+  table { border-collapse: collapse; width: 100%; }
+  .table-wrap { overflow-x: auto; }
+
+  /* ---------- Bloque de preparación ---------- */
+  .setup {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 22px 24px;
+    display: flex; flex-direction: column; gap: 16px;
+  }
+  .setup h3 { margin: 0; font-size: 1rem; font-weight: 650; }
+  .setup p { margin: 0; color: var(--ink-soft); font-size: 0.92rem; }
+
+  pre {
+    margin: 0;
+    background: var(--surface-alt);
+    border: 1px solid var(--line-soft);
+    border-radius: 8px;
+    padding: 13px 15px;
+    overflow-x: auto;
+    font-family: var(--font-mono);
+    font-size: 0.79rem;
+    line-height: 1.7;
+    color: var(--ink);
+  }
+
+  code {
+    font-family: var(--font-mono);
+    font-size: 0.84em;
+    background: var(--surface-alt);
+    border: 1px solid var(--line-soft);
+    border-radius: 4px;
+    padding: 1px 5px;
+    color: var(--ink);
+    word-break: break-word;
+  }
+  pre code { background: none; border: none; padding: 0; font-size: 1em; }
+
+  /* ---------- Grupos por escenario ---------- */
+  .group { display: flex; flex-direction: column; gap: 16px; }
+
+  .group-label {
+    display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;
+    padding-bottom: 8px; border-bottom: 2px solid var(--accent);
+  }
+  .group-label h3 { margin: 0; font-size: 1.05rem; font-weight: 650; letter-spacing: -0.008em; }
+  .group-label .esc {
+    font-family: var(--font-mono); font-size: 0.75rem; font-weight: 700;
+    color: var(--surface); background: var(--accent); padding: 2px 9px; border-radius: 5px;
+  }
+  .group-label .cuenta { font-family: var(--font-mono); font-size: 0.72rem; color: var(--ink-faint); }
+
+  .precond {
+    background: var(--accent-soft);
+    border: 1px solid var(--accent-line);
+    border-radius: 8px;
+    padding: 12px 15px;
+    font-size: 0.88rem;
+    color: var(--ink-soft);
+  }
+  .precond b { color: var(--ink); }
+
+  /* ---------- Caso ---------- */
+  .caso {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 20px 22px;
+    display: flex; flex-direction: column; gap: 15px;
+  }
+
+  .caso-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 9px 13px; }
+
+  .caso-id {
+    font-family: var(--font-mono); font-size: 0.76rem; font-weight: 700;
+    color: var(--accent); background: var(--accent-soft);
+    border: 1px solid var(--accent-line);
+    padding: 2px 8px; border-radius: 5px;
+  }
+
+  .caso-head h4 {
+    margin: 0; font-size: 1.02rem; font-weight: 650;
+    letter-spacing: -0.01em; flex: 1 1 300px;
+  }
+
+  .chip {
+    display: inline-block; padding: 2px 9px; border-radius: 20px;
+    font-family: var(--font-mono); font-size: 0.66rem; font-weight: 600;
+    letter-spacing: 0.05em; text-transform: uppercase; white-space: nowrap;
+  }
+  .chip-alto  { background: var(--alto-bg);  color: var(--alto-fg); }
+  .chip-medio { background: var(--medio-bg); color: var(--medio-fg); }
+  .chip-ok    { background: var(--ok-bg);    color: var(--ok-fg); }
+
+  /* Cabecera del caso (plantilla de entrega) */
+  table.ficha { font-size: 0.87rem; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  table.ficha th {
+    width: 210px; background: var(--surface-alt);
+    border-right: 1px solid var(--line); border-bottom: 1px solid var(--line-soft);
+    padding: 9px 13px; text-align: left; vertical-align: top;
+    font-family: var(--font-mono); font-size: 0.67rem; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-soft);
+  }
+  table.ficha td {
+    padding: 9px 14px; border-bottom: 1px solid var(--line-soft);
+    vertical-align: top; color: var(--ink);
+  }
+  table.ficha tr:last-child th, table.ficha tr:last-child td { border-bottom: none; }
+
+  /* Tabla de pasos */
+  table.pasos { font-size: 0.83rem; min-width: 760px; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  table.pasos thead th {
+    background: var(--surface-alt); border-bottom: 1.5px solid var(--line);
+    padding: 9px 12px; text-align: left; vertical-align: bottom;
+    font-family: var(--font-mono); font-size: 0.66rem; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-soft);
+    white-space: nowrap;
+  }
+  table.pasos td {
+    padding: 10px 12px; border-bottom: 1px solid var(--line-soft);
+    vertical-align: top; color: var(--ink-soft);
+  }
+  table.pasos tr:last-child td { border-bottom: none; }
+  table.pasos td.paso { font-family: var(--font-mono); font-weight: 600; color: var(--ink); white-space: nowrap; }
+  table.pasos td.esperado { color: var(--ink); }
+  table.pasos .c-paso { width: 66px; }
+  table.pasos .c-accion { min-width: 190px; }
+  table.pasos .c-datos { min-width: 150px; }
+  table.pasos .c-esperado { min-width: 230px; }
+  table.pasos .c-evid { min-width: 150px; }
+
+  .note {
+    font-size: 0.87rem; color: var(--ink-soft);
+    background: var(--accent-soft); border: 1px solid var(--accent-line);
+    border-radius: 8px; padding: 12px 15px;
+  }
+  .note b { color: var(--ink); }
+
+  .footnote {
+    border-top: 1px solid var(--line); padding-top: 20px;
+    color: var(--ink-soft); font-size: 0.9rem;
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .footnote h2 { margin: 0 0 2px; font-size: 1.05rem; color: var(--ink); font-weight: 650; }
+  .footnote ul { margin: 0; padding-left: 19px; display: flex; flex-direction: column; gap: 7px; }
+
+  @media (max-width: 680px) {
+    .page { padding: 40px 18px 64px; gap: 40px; }
+    table.ficha th, table.ficha td { display: block; width: auto; border-right: none; }
+    table.ficha th { border-bottom: none; }
+  }
+</style>
+
+<div class="page">
+
+  <header class="masthead">
+    <p class="eyebrow">Guía de ejecución · Módulo de reservas</p>
+    <h1>Cómo ejecutar los 36 casos de prueba</h1>
+    <p class="standfirst">
+      Procedimiento paso a paso de cada caso CP-001 a CP-036, con los datos de entrada, el resultado
+      esperado y qué capturar como evidencia. Complementa la matriz de diseño: aquí está el «cómo».
+    </p>
+    <div class="meta-row">
+      <span>Responsable <b>Camila Villero</b></span>
+      <span>Casos <b>36</b></span>
+      <span>Escenarios <b>Esc19 – Esc30</b></span>
+      <span>Entorno <b>Local</b></span>
+    </div>
+  </header>
+
+  <section>
+    <div class="section-head">
+      <h2>Preparación del entorno</h2>
+      <p>
+        Haz esto una sola vez antes de empezar. Todos los casos asumen este punto de partida.
+      </p>
+    </div>
+
+    <div class="setup">
+      <h3>1. Levantar el sistema</h3>
+      <p>Desde la raíz del proyecto. Deja los tres servicios corriendo durante toda la sesión de pruebas.</p>
+      <pre><code>docker compose up --build</code></pre>
+      <p>
+        Aplicación: <code>http://localhost:5173</code> · API y Swagger:
+        <code>http://localhost:8000/swagger/</code> · MongoDB: puerto <code>27017</code>.
+      </p>
+    </div>
+
+    <div class="setup">
+      <h3>2. Crear los usuarios de prueba</h3>
+      <p>
+        Regístralos desde la aplicación. El rol se asigna solo, según el dominio del correo. Usa la
+        misma contraseña <code>secreto123</code> en los cuatro.
+      </p>
+      <div class="table-wrap">
+        <table class="pasos">
+          <thead>
+            <tr><th>Alias</th><th>Correo</th><th>Rol que otorga</th><th>Se usa en</th></tr>
+          </thead>
+          <tbody>
+            <tr><td class="paso">Estudiante A</td><td><code>ana.gomez@soyudemedellin.edu.co</code></td><td>Estudiante</td><td>La mayoría de los casos</td></tr>
+            <tr><td class="paso">Estudiante B</td><td><code>juan.perez@soyudemedellin.edu.co</code></td><td>Estudiante</td><td>Esc22 y Esc29</td></tr>
+            <tr><td class="paso">Profesor</td><td><code>coach@udem.edu.co</code></td><td>Profesor</td><td>Esc26</td></tr>
+            <tr><td class="paso">Administrador</td><td><code>jefe@udemedellin.edu.co</code></td><td>Administrador</td><td>Esc26</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="setup">
+      <h3>3. Comandos para preparar y restaurar datos</h3>
+      <p>
+        Varios casos necesitan un estado que no se puede producir desde la interfaz, como dejar un
+        bloque sin cupos. Se preparan con estos comandos contra MongoDB.
+      </p>
+      <pre><code># Dejar el bloque 1 sin cupos (Esc23, Esc29)
+docker compose exec database mongosh gym_udem --eval \
+  'db.slots.updateOne({slotId:1},{$set:{available:0}})'
+
+# Dejar el bloque 1 con un solo cupo (Esc22)
+docker compose exec database mongosh gym_udem --eval \
+  'db.slots.updateOne({slotId:1},{$set:{available:1}})'
+
+# Penalizar una cuenta por siete días (Esc27)
+docker compose exec database mongosh gym_udem --eval \
+  'db.users.updateOne({email:"ana.gomez@soyudemedellin.edu.co"},
+   {$set:{estado:"PENALIZADO",penalizado_hasta:new Date(Date.now()+7*86400000)}})'
+
+# RESTAURAR el punto de partida entre escenarios
+docker compose exec database mongosh gym_udem --eval \
+  'db.slots.updateMany({},{$set:{available:20}});
+   db.reservations.deleteMany({});
+   db.waitlist.deleteMany({});
+   db.users.updateMany({},{$set:{estado:"ACTIVO",cancel_count:0,no_show_count:0,penalizado_hasta:null}})'</code></pre>
+      <p>
+        <b>Ejecuta el comando de restauración antes de cada escenario.</b> Si no, los contadores de
+        cancelaciones que deja un escenario alteran el resultado del siguiente.
+      </p>
+    </div>
+
+    <div class="setup">
+      <h3>4. De dónde sacar la evidencia</h3>
+      <div class="table-wrap">
+        <table class="pasos">
+          <thead>
+            <tr><th>Tipo de caso</th><th>Dónde capturar</th><th>Qué debe verse</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="paso">Interfaz</td>
+              <td>Navegador en <code>localhost:5173</code></td>
+              <td>La pantalla completa con el mensaje, la tarjeta o el contador relevante</td>
+            </tr>
+            <tr>
+              <td class="paso">API</td>
+              <td>Swagger UI en <code>localhost:8000/swagger/</code></td>
+              <td>El bloque «Server response»: código de estado y cuerpo de la respuesta</td>
+            </tr>
+            <tr>
+              <td class="paso">Base de datos</td>
+              <td>Salida de <code>mongosh</code> en la terminal</td>
+              <td>El documento consultado con el campo que se está verificando</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <p class="note">
+      <b>Campos que se repiten en los 36 casos.</b> Para no repetirlos en cada ficha:
+      <b>Nombre del proyecto</b> = Gestión de reservas del gimnasio ·
+      <b>Responsable</b> = Camila Villero ·
+      <b>Entorno probado</b> = Local ·
+      <b>Versión del sistema probada</b> = 0.2 (rama <code>ajustes-reservas-y-roles</code>) ·
+      <b>Estado</b> y <b>Resultado obtenido</b> los llenas al ejecutar.
+    </p>
+  </section>
+
+  <!-- ==================== Esc19 ==================== -->
+  <section>
+    <div class="group">
+      <div class="group-label">
+        <span class="esc">Esc19</span>
+        <h3>La reserva se crea fechada para el día siguiente</h3>
+        <span class="cuenta">CP-001 – CP-004</span>
+      </div>
+
+      <p class="precond">
+        <b>Precondición del escenario:</b> ejecuta el comando de restauración. Inicia sesión como
+        Estudiante A. Todos los bloques con 20 de 20 cupos y sin reservas activas.
+      </p>
+
+      <article class="caso">
+        <div class="caso-head">
+          <span class="caso-id">CP-001</span>
+          <h4>Registro de la reserva con descuento de cupo</h4>
+          <span class="chip chip-alto">Alto</span>
+        </div>
+        <table class="ficha">
+          <tbody>
+            <tr><th>Escenario asociado</th><td>Esc19</td></tr>
+            <tr><th>Requisito asociado</th><td>RF06 / RN03 — Registrar la reserva descontando un cupo del bloque seleccionado</td></tr>
+            <tr><th>Descripción</th><td>Verificar que al reservar un bloque con cupos disponibles la reserva queda activa y el cupo se descuenta.</td></tr>
+            <tr><th>Objetivo</th><td>Comprobar que el flujo principal de reserva funciona y que la disponibilidad se actualiza en la misma operación.</td></tr>
+            <tr><th>Criterio de éxito</th><td>La reserva se crea con estado ACTIVA y el bloque pasa de 20 a 19 cupos.</td></tr>
+            <tr><th>Nivel de prueba</th><td>Integración</td></tr>
+            <tr><th>Riesgo asociado</th><td>Alto</td></tr>
+            <tr><th>Caso de Prueba</th><td>Realizar una reserva y verificar el descuento del cupo.</td></tr>
+            <tr><th>Procedimiento Caso de Prueba</th><td>Reservar el bloque de las 06:00 desde la aplicación y comprobar el contador de cupos antes y después.</td></tr>
+          </tbody>
+        </table>
+        <div class="table-wrap">
+          <table class="pasos">
+            <thead>
+              <tr>
+                <th class="c-paso">Paso</th><th class="c-accion">Acción</th><th class="c-datos">Datos</th>
+                <th class="c-esperado">Resultado esperado</th><th class="c-evid">Evidencia</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td class="paso">Paso 1</td><td>Iniciar sesión como estudiante.</td><td>Estudiante A · <code>secreto123</code></td><td class="esperado">Se abre el Dashboard con el saludo al estudiante.</td><td>Pantalla del Dashboard</td></tr>
+              <tr><td class="paso">Paso 2</td><td>Anotar los cupos del bloque de las 06:00 antes de reservar.</td><td>Bloque 06:00</td><td class="esperado">La tarjeta muestra 20 / 20 cupos.</td><td>Tarjeta del bloque</td></tr>
+              <tr><td class="paso">Paso 3</td><td>Pulsar «Reservar cupo» y confirmar en el modal.</td><td>Bloque 06:00</td><td class="esperado">Aviso de reserva confirmada y la tarjeta pasa a «Ya reservado».</td><td>Aviso y tarjeta</td></tr>
+              <tr><td class="paso">Paso 4</td><td>Verificar el contador del mismo bloque.</td><td>—</td><td class="esperado">La tarjeta muestra 19 / 20 cupos.</td><td>Tarjeta actualizada</td></tr>
+              <tr><td class="paso">Paso 5</td><td>Abrir «Mis reservas».</td><td>—</td><td class="esperado">Aparece una reserva de las 06:00 con estado «Activa».</td><td>Listado de reservas</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </article>
+
+      <article class="caso">
+        <div class="caso-head">
+          <span class="caso-id">CP-002</span>
+          <h4>Formato de la fecha en español</h4>
+          <span class="chip chip-medio">Medio</span>
+        </div>
+        <table class="ficha">
+          <tbody>
+            <tr><th>Escenario asociado</th><td>Esc19</td></tr>
+            <tr><th>Requisito asociado</th><td>RF06 / RN03 — La fecha de la reserva debe mostrarse de forma legible</td></tr>
+            <tr><th>Descripción</th><td>Verificar que la etiqueta de fecha se genera en español sin depender del idioma del servidor.</td></tr>
+            <tr><th>Objetivo</th><td>Comprobar que la fecha no aparece en inglés en el contenedor, que es donde falla el formato del sistema operativo.</td></tr>
+            <tr><th>Criterio de éxito</th><td>La función devuelve «martes 18 de agosto de 2026» para esa fecha, con día y mes en español.</td></tr>
+            <tr><th>Nivel de prueba</th><td>Unitario</td></tr>
+            <tr><th>Riesgo asociado</th><td>Medio</td></tr>
+            <tr><th>Caso de Prueba</th><td>Verificar el formateo de una fecha conocida.</td></tr>
+            <tr><th>Procedimiento Caso de Prueba</th><td>Ejecutar la prueba unitaria del formateador de fechas en el backend.</td></tr>
+          </tbody>
+        </table>
+        <div class="table-wrap">
+          <table class="pasos">
+            <thead>
+              <tr>
+                <th class="c-paso">Paso</th><th class="c-accion">Acción</th><th class="c-datos">Datos</th>
+                <th class="c-esperado">Resultado esperado</th><th class="c-evid">Evidencia</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td class="paso">Paso 1</td><td>Ejecutar la prueba unitaria del formateador dentro del contenedor del backend.</td><td><code>docker compose exec backend python manage.py test api.tests.SlotsTests.test_formato_fecha_en_espanol</code></td><td class="esperado">La prueba pasa con resultado OK.</td><td>Salida de la terminal</td></tr>
+              <tr><td class="paso">Paso 2</td><td>Confirmar en la aplicación que la fecha mostrada está en español.</td><td>Dashboard</td><td class="esperado">El banner muestra el día y el mes en español, no en inglés.</td><td>Banner del Dashboard</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </article>
+
+      <article class="caso">
+        <div class="caso-head">
+          <span class="caso-id">CP-003</span>
+          <h4>Fecha efectiva de la reserva</h4>
+          <span class="chip chip-alto">Alto</span>
+        </div>
+        <table class="ficha">
+          <tbody>
+            <tr><th>Escenario asociado</th><td>Esc19</td></tr>
+            <tr><th>Requisito asociado</th><td>RF06 / RN03 — La reserva debe quedar fechada para el día siguiente</td></tr>
+            <tr><th>Descripción</th><td>Verificar que la reserva creada corresponde al día siguiente y no al día en curso.</td></tr>
+            <tr><th>Objetivo</th><td>Comprobar que la fecha almacenada es la de mañana según la zona horaria de Bogotá, que es la regla del negocio.</td></tr>
+            <tr><th>Criterio de éxito</th><td>El campo de fecha de la reserva es igual a la fecha de mañana en formato AAAA-MM-DD.</td></tr>
+            <tr><th>Nivel de prueba</th><td>Integración</td></tr>
+            <tr><th>Riesgo asociado</th><td>Alto</td></tr>
+            <tr><th>Caso de Prueba</th><td>Crear una reserva y verificar la fecha con la que queda registrada.</td></tr>
+            <tr><th>Procedimiento Caso de Prueba</th><td>Consultar la respuesta de la API al reservar y contrastar la fecha con la del día siguiente.</td></tr>
+          </tbody>
+        </table>
+        <div class="table-wrap">
+          <table class="pasos">
+            <thead>
+              <tr>
+                <th class="c-paso">Paso</th><th class="c-accion">Acción</th><th class="c-datos">Datos</th>
+                <th class="c-esperado">Resultado esperado</th><th class="c-evid">Evidencia</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td class="paso">Paso 1</td><td>Consultar la disponibilidad en Swagger.</td><td><code>GET /api/slots/</code></td><td class="esperado">Responde 200 con los campos de fecha del día siguiente y la lista de bloques.</td><td>Respuesta en Swagger</td></tr>
+              <tr><td class="paso">Paso 2</td><td>Anotar la fecha devuelta y compararla con la fecha de mañana en el calendario.</td><td>—</td><td class="esperado">Coinciden: la fecha es la de mañana, no la de hoy.</td><td>Comparación anotada</td></tr>
+              <tr><td class="paso">Paso 3</td><td>Crear una reserva desde Swagger.</td><td><code>POST /api/reservations/</code> · Estudiante A · bloque 1</td><td class="esperado">Responde 201 y el cuerpo trae la misma fecha del paso 1 y la etiqueta en español.</td><td>Respuesta en Swagger</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </article>
+
+      <article class="caso">
+        <div class="caso-head">
+          <span class="caso-id">CP-004</span>
+          <h4>Comprensión de la fecha por el estudiante</h4>
+          <span class="chip chip-medio">Medio</span>
+        </div>
+        <table class="ficha">
+          <tbody>
+            <tr><th>Escenario asociado</th><td>Esc19</td></tr>
+            <tr><th>Requisito asociado</th><td>RF06 / RN03 — El estudiante debe saber para qué día está reservando</td></tr>
+            <tr><th>Descripción</th><td>Verificar que un estudiante sin instrucción previa identifica que su reserva es para el día siguiente.</td></tr>
+            <tr><th>Objetivo</th><td>Comprobar que la interfaz comunica la regla por sí sola, que es el problema que originó este cambio.</td></tr>
+            <tr><th>Criterio de éxito</th><td>El participante indica correctamente la fecha de su reserva sin que nadie se lo explique.</td></tr>
+            <tr><th>Nivel de prueba</th><td>Aceptación</td></tr>
+            <tr><th>Riesgo asociado</th><td>Medio</td></tr>
+            <tr><th>Caso de Prueba</th><td>Observar a un estudiante reservando por primera vez.</td></tr>
+            <tr><th>Procedimiento Caso de Prueba</th><td>Pedir a una persona ajena al proyecto que reserve un cupo y preguntarle después para qué día quedó.</td></tr>
+          </tbody>
+        </table>
+        <div class="table-wrap">
+          <table class="pasos">
+            <thead>
+              <tr>
+                <th class="c-paso">Paso</th><th class="c-accion">Acción</th><th class="c-datos">Datos</th>
+                <th class="c-esperado">Resultado esperado</th><th class="c-evid">Evidencia</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td class="paso">Paso 1</td><td>Entregar la aplicación a un participante ajeno al proyecto, sin explicarle nada.</td><td>Cuenta de estudiante nueva</td><td class="esperado">El participante llega al Dashboard por su cuenta.</td><td>Registro de la sesión</td></tr>
+              <tr><td class="paso">Paso 2</td><td>Pedirle que reserve un cupo del gimnasio.</td><td>Cualquier bloque</td><td class="esperado">Completa la reserva sin ayuda.</td><td>Pantallas del recorrido</td></tr>
+              <tr><td class="paso">Paso 3</td><td>Preguntarle para qué día quedó su reserva.</td><td>—</td><td class="esperado">Responde la fecha de mañana, no la de hoy.</td><td>Respuesta transcrita</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="note">
+          Este es el único caso que <b>no se puede automatizar</b>: el resultado depende de lo que
+          entiende una persona, no de un texto en pantalla. Deja constancia de a quién se lo aplicaste.
+        </p>
+      </article>
+    </div>
+  </section>
+
+  <!-- ==================== Esc20 ==================== -->
+  <section>
+    <div class="group">
+      <div class="group-label">
+        <span class="esc">Esc20</span>
+        <h3>Un segundo bloque del mismo día se rechaza</h3>
+        <span class="cuenta">CP-005 – CP-007</span>
+      </div>
+
+      <p class="precond">
+        <b>Precondición del escenario:</b> restaura los datos y deja al Estudiante A con
+        <b>una reserva activa en el bloque de las 06:00</b> para mañana.
+      </p>
+
+      <article class="caso">
+        <div class="caso-head">
+          <span class="caso-id">CP-005</span>
+          <h4>Segundo bloque distinto en la misma fecha</h4>
+          <span class="chip chip-alto">Alto</span>
+        </div>
+        <table class="ficha">
+          <tbody>
+            <tr><th>Escenario asociado</th><td>Esc20</td></tr>
+            <tr><th>Requisito asociado</th><td>RF09 / RN05 — Máximo una reserva activa por estudiante y por día</td></tr>
+            <tr><th>Descripción</th><td>Verificar que con una reserva vigente el estudiante no puede reservar otro bloque de la misma fecha.</td></tr>
+            <tr><th>Objetivo</th><td>Comprobar que la restricción se aplica sobre la fecha y no solo sobre el bloque, para que nadie ocupe varios cupos del mismo día.</td></tr>
+            <tr><th>Criterio de éxito</th><td>La segunda reserva se rechaza y el bloque solicitado conserva todos sus cupos.</td></tr>
+            <tr><th>Nivel de prueba</th><td>Sistema</td></tr>
+            <tr><th>Riesgo asociado</th><td>Alto</td></tr>
+            <tr><th>Caso de Prueba</th><td>Intentar reservar un segundo bloque teniendo una reserva vigente.</td></tr>
+            <tr><th>Procedimiento Caso de Prueba</th><td>Con la reserva de las 06:00 activa, intentar reservar el bloque de las 08:00 y verificar el rechazo y los cupos.</td></tr>
+          </tbody>
+        </table>
+        <div class="table-wrap">
+          <table class="pasos">
+            <thead>
+              <tr>
+                <th class="c-paso">Paso</th><th class="c-accion">Acción</th><th class="c-datos">Datos</th>
+                <th class="c-esperado">Resultado esperado</th><th class="c-evid">Evidencia</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td class="paso">Paso 1</td><td>Anotar los cupos del bloque de las 08:00.</td><td>Bloque 08:00</td><td class="esperado">Muestra 20 / 20 cupos.</td><td>Tarjeta del bloque</td></tr>
+              <tr><td class="paso">Paso 2</td><td>Intentar reservar el bloque de las 08:00 desde Swagger.</td><td><code>POST /api/reservations/</code> · Estudiante A · bloque 2</td><td class="esperado">Responde 409 con el mensaje de que solo se permite una reserva por día.</td><td>Respuesta en Swagger</td></tr>
+              <tr><td class="paso">Paso 3</td><td>Verificar de nuevo los cupos del bloque de las 08:00.</td><td>—</td><td class="esperado">Sigue en 20 / 20: el rechazo no descontó cupo.</td><td>Tarjeta del bloque</td></tr>
+              <tr><td class="paso">Paso 4</td><td>Abrir «Mis reservas».</td><td>—</td><td class="esperado">Sigue existiendo una sola reserva, la de las 06:00.</td><td>Listado de reservas</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </article>
+
+      <article class="caso">
+        <div class="caso-head">
+          <span class="caso-id">CP-006</span>
+          <h4>Repetición del mismo bloque</h4>
+          <span class="chip chip-medio">Medio</span>
+        </div>
+        <table class="ficha">
+          <tbody>
+            <tr><th>Escenario asociado</th><td>Esc20</td></tr>
+            <tr><th>Requisito asociado</th><td>RF09 / RN05 — Máximo una reserva activa por estudiante y por día</td></tr>
+            <tr><th>Descripción</th><td>Verificar que el estudiante no puede reservar dos veces el mismo bloque.</td></tr>
+            <tr><th>Objetivo</th><td>Comprobar que una petición repetida no genera una segunda reserva ni un doble descuento de cupo.</td></tr>
+            <tr><th>Criterio de éxito</th><td>La petición repetida se rechaza y el bloque queda con un solo cupo descontado.</td></tr>
+            <tr><th>Nivel de prueba</th><td>Integración</td></tr>
+            <tr><th>Riesgo asociado</th><td>Medio</td></tr>
+            <tr><th>Caso de Prueba</th><td>Repetir la reserva del bloque ya reservado.</td></tr>
+            <tr><th>Procedimiento Caso de Prueba</th><td>Enviar dos veces la misma solicitud de reserva y verificar el rechazo de la segunda.</td></tr>
+          </tbody>
+        </table>
+        <div class="table-wrap">
+          <table class="pasos">
+            <thead>
+              <tr>
+                <th class="c-paso">Paso</th><th class="c-accion">Acción</th><th class="c-datos">Datos</th>
+                <th class="c-esperado">Resultado esperado</th><th class="c-evid">Evidencia</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td class="paso">Paso 1</td><td>Reservar de nuevo el bloque de las 06:00 desde Swagger.</td><td><code>POST /api/reservations/</code> · Estudiante A · bloque 1</td><td class="esperado">Responde 409 sin crear una segunda reserva.</td><td>Respuesta en Swagger</td></tr>
+              <tr><td class="paso">Paso 2</td><td>Consultar los cupos del bloque de las 06:00.</td><td><code>GET /api/slots/</code></td><td class="esperado">Muestra 19 cupos: solo se descontó una vez.</td><td>Respuesta en Swagger</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </article>
+
+      <article class="caso">
+        <div class="caso-head">
+          <span class="caso-id">CP-007</span>
+          <h4>Bloqueo reflejado en la interfaz</h4>
+          <span class="chip chip-medio">Medio</span>
+        </div>
+        <table class="ficha">
+          <tbody>
+            <tr><th>Escenario asociado</th><td>Esc20</td></tr>
+            <tr><th>Requisito asociado</th><td>RF09 / RN05 — La restricción debe ser visible para el estudiante</td></tr>
+            <tr><th>Descripción</th><td>Verificar que la interfaz avisa por qué no puede reservar otro bloque, en vez de dejarlo intentar y fallar.</td></tr>
+            <tr><th>Objetivo</th><td>Comprobar que el estudiante entiende la restricción antes de intentar la acción.</td></tr>
+            <tr><th>Criterio de éxito</th><td>Las tarjetas de los demás bloques muestran «Ya reservaste este día» y su botón queda deshabilitado.</td></tr>
+            <tr><th>Nivel de prueba</th><td>Sistema</td></tr>
+            <tr><th>Riesgo asociado</th><td>Medio</td></tr>
+            <tr><th>Caso de Prueba</th><td>Revisar el estado de las tarjetas con una reserva vigente.</td></tr>
+            <tr><th>Procedimiento Caso de Prueba</th><td>Con la reserva activa, observar el Dashboard y comprobar el texto y el estado de los botones.</td></tr>
+          </tbody>
+        </table>
+        <div class="table-wrap">
+          <table class="pasos">
+            <thead>
+              <tr>
+                <th class="c-paso">Paso</th><th class="c-accion">Acción</th><th class="c-datos">Datos</th>
+                <th class="c-esperado">Resultado esperado</th><th class="c-evid">Evidencia</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td class="paso">Paso 1</td><td>Abrir el Dashboard con la reserva de las 06:00 activa.</td><td>Estudiante A</td><td class="esperado">La tarjeta de las 06:00 muestra «Ya reservado».</td><td>Dashboard completo</td></tr>
+              <tr><td class="paso">Paso 2</td><td>Observar las tarjetas de los demás bloques.</td><td>—</td><td class="esperado">Muestran «Ya reservaste este día» y se ven atenuadas.</td><td>Tarjetas de los otros bloques</td></tr>
+              <tr><td class="paso">Paso 3</td><td>Intentar pulsar el botón de uno de esos bloques.</td><td>Bloque 12:00</td><td class="esperado">El botón está deshabilitado y no ocurre nada.</td><td>Pantalla tras el intento</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </article>
+    </div>
+  </section>
+
+  <!-- ==================== Esc21 ==================== -->
+  <section>
+    <div class="group">
+      <div class="group-label">
+        <span class="esc">Esc21</span>
+        <h3>Cancelar rehabilita la reserva del día</h3>
+        <span class="cuenta">CP-008</span>
+      </div>
+
+      <p class="precond">
+        <b>Precondición del escenario:</b> Estudiante A con una reserva activa en el bloque de las
+        06:00 para mañana.
+      </p>
+
+      <article class="caso">
+        <div class="caso-head">
+          <span class="caso-id">CP-008</span>
+          <h4>Nueva reserva tras cancelar en la misma fecha</h4>
+          <span class="chip chip-medio">Medio</span>
+        </div>
+        <table class="ficha">
+          <tbody>
+            <tr><th>Escenario asociado</th><td>Esc21</td></tr>
+            <tr><th>Requisito asociado</th><td>RF07 / RN05 — Cancelar debe volver a habilitar la reserva del día</td></tr>
+            <tr><th>Descripción</th><td>Verificar que tras cancelar, el estudiante puede reservar otro bloque de la misma fecha.</td></tr>
+            <tr><th>Objetivo</th><td>Comprobar que el bloqueo por día es temporal y permite corregir el horario sin quedar impedido el resto del día.</td></tr>
+            <tr><th>Criterio de éxito</th><td>La cancelación libera el cupo y la nueva reserva se acepta, quedando una sola reserva activa.</td></tr>
+            <tr><th>Nivel de prueba</th><td>Sistema</td></tr>
+            <tr><th>Riesgo asociado</th><td>Medio</td></tr>
+            <tr><th>Caso de Prueba</th><td>Cancelar la reserva vigente y reservar otro horario del mismo día.</td></tr>
+            <tr><th>Procedimiento Caso de Prueba</th><td>Cancelar la reserva de las 06:00 y a continuación reservar la de las 10:00, verificando los cupos de ambos bloques.</td></tr>
+          </tbody>
+        </table>
+        <div class="table-wrap">
+          <table class="pasos">
+            <thead>
+              <tr>
+                <th class="c-paso">Paso</th><th class="c-accion">Acción</th><th class="c-datos">Datos</th>
+                <th class="c-esperado">Resultado esperado</th><th class="c-evid">Evidencia</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td class="paso">Paso 1</td><td>Abrir «Mis reservas» y cancelar la reserva de las 06:00.</td><td>Reserva vigente</td><td class="esperado">Aviso de reserva cancelada y el listado queda vacío.</td><td>Aviso y listado vacío</td></tr>
+              <tr><td class="paso">Paso 2</td><td>Volver al Dashboard y revisar las tarjetas.</td><td>—</td><td class="esperado">El bloque de las 06:00 vuelve a 20 / 20 y los demás dejan de mostrar «Ya reservaste este día».</td><td>Dashboard</td></tr>
+              <tr><td class="paso">Paso 3</td><td>Reservar el bloque de las 10:00.</td><td>Bloque 10:00</td><td class="esperado">La reserva se acepta y la tarjeta pasa a «Ya reservado» con 19 / 20 cupos.</td><td>Tarjeta del bloque</td></tr>
+              <tr><td class="paso">Paso 4</td><td>Abrir «Mis reservas».</td><td>—</td><td class="esperado">Aparece una sola reserva, la de las 10:00.</td><td>Listado de reservas</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </article>
+    </div>
+  </section>
+
+  <!-- ==================== Esc22 ==================== -->
+  <section>
+    <div class="group">
+      <div class="group-label">
+        <span class="esc">Esc22</span>
+        <h3>Dos estudiantes compiten por el último cupo</h3>
+        <span class="cuenta">CP-009 – CP-010</span>
+      </div>
+
+      <p class="precond">
+        <b>Precondición del escenario:</b> restaura los datos y deja el bloque 1 con
+        <b>un solo cupo</b> usando el comando correspondiente. Estudiante A y Estudiante B sin
+        reservas activas.
+      </p>
+
+      <article class="caso">
+        <div class="caso-head">
+          <span class="caso-id">CP-009</span>
+          <h4>Resolución de la carrera por el último cupo</h4>
+          <span class="chip chip-alto">Alto</span>
+        </div>
+        <table class="ficha">
+          <tbody>
+            <tr><th>Escenario asociado</th><td>Esc22</td></tr>
+            <tr><th>Requisito asociado</th><td>RF06 — Impedir el sobrecupo ante solicitudes simultáneas</td></tr>
+            <tr><th>Descripción</th><td>Verificar que ante dos solicitudes simultáneas por el último cupo solo una prospera.</td></tr>
+            <tr><th>Objetivo</th><td>Comprobar que el sistema resuelve la concurrencia sin asignar el mismo cupo dos veces.</td></tr>
+            <tr><th>Criterio de éxito</th><td>Una solicitud es aceptada y la otra rechazada; queda una única reserva activa en ese bloque.</td></tr>
+            <tr><th>Nivel de prueba</th><td>Integración</td></tr>
+            <tr><th>Riesgo asociado</th><td>Alto</td></tr>
+            <tr><th>Caso de Prueba</th><td>Enviar dos reservas simultáneas sobre el último cupo.</td></tr>
+            <tr><th>Procedimiento Caso de Prueba</th><td>Lanzar en paralelo las dos peticiones con un comando de terminal y revisar los códigos de respuesta.</td></tr>
+          </tbody>
+        </table>
+        <div class="table-wrap">
+          <table class="pasos">
+            <thead>
+              <tr>
+                <th class="c-paso">Paso</th><th class="c-accion">Acción</th><th class="c-datos">Datos</th>
+                <th class="c-esperado">Resultado esperado</th><th class="c-evid">Evidencia</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td class="paso">Paso 1</td><td>Confirmar que el bloque tiene un solo cupo.</td><td><code>GET /api/slots/</code></td><td class="esperado">El bloque 1 muestra 1 cupo disponible.</td><td>Respuesta en Swagger</td></tr>
+              <tr><td class="paso">Paso 2</td><td>Lanzar las dos peticiones en paralelo desde la terminal.</td><td>Ver el comando bajo esta tabla</td><td class="esperado">Se imprimen dos códigos: uno 201 y otro 409.</td><td>Salida de la terminal</td></tr>
+              <tr><td class="paso">Paso 3</td><td>Consultar cuántas reservas activas quedaron en el bloque.</td><td><code>db.reservations.countDocuments({slotId:1,estado:"ACTIVA"})</code></td><td class="esperado">Devuelve 1, no 2.</td><td>Salida de mongosh</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <pre><code># Paso 2 — las dos peticiones al mismo tiempo (el & las lanza en paralelo)
+curl -s -o /dev/null -w "A:%{http_code}\n" -X POST http://localhost:8000/api/reservations/ \
+  -H "Content-Type: application/json" \
+  -d '{"email":"ana.gomez@soyudemedellin.edu.co","slotId":1}' &
+curl -s -o /dev/null -w "B:%{http_code}\n" -X POST http://localhost:8000/api/reservations/ \
+  -H "Content-Type: application/json" \
+  -d '{"email":"juan.perez@soyudemedellin.edu.co","slotId":1}' &
+wait</code></pre>
+      </article>
+
+      <article class="caso">
+        <div class="caso-head">
+          <span class="caso-id">CP-010</span>
+          <h4>Integridad del aforo bajo concurrencia</h4>
+          <span class="chip chip-alto">Alto</span>
+        </div>
+        <table class="ficha">
+          <tbody>
+            <tr><th>Escenario asociado</th><td>Esc22</td></tr>
+            <tr><th>Requisito asociado</th><td>RF06 — El aforo no debe quedar en valores imposibles</td></tr>
+            <tr><th>Descripción</th><td>Verificar que tras la ejecución simultánea el contador de cupos nunca queda negativo.</td></tr>
+            <tr><th>Objetivo</th><td>Comprobar que el sistema no asigna más cupos de los que el gimnasio tiene físicamente.</td></tr>
+            <tr><th>Criterio de éxito</th><td>El contador del bloque queda en cero y nunca en un valor negativo, aunque se repita la prueba.</td></tr>
+            <tr><th>Nivel de prueba</th><td>Integración</td></tr>
+            <tr><th>Riesgo asociado</th><td>Alto</td></tr>
+            <tr><th>Caso de Prueba</th><td>Verificar el contador de cupos después de la competencia por el último cupo.</td></tr>
+            <tr><th>Procedimiento Caso de Prueba</th><td>Consultar el bloque tras CP-009 y repetir el ciclo varias veces con distintas parejas.</td></tr>
+          </tbody>
+        </table>
+        <div class="table-wrap">
+          <table class="pasos">
+            <thead>
+              <tr>
+                <th class="c-paso">Paso</th><th class="c-accion">Acción</th><th class="c-datos">Datos</th>
+                <th class="c-esperado">Resultado esperado</th><th class="c-evid">Evidencia</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td class="paso">Paso 1</td><td>Consultar el contador del bloque justo después de CP-009.</td><td><code>db.slots.findOne({slotId:1})</code></td><td class="esperado">El campo de disponibilidad es 0.</td><td>Salida de mongosh</td></tr>
+              <tr><td class="paso">Paso 2</td><td>Repetir el ciclo tres veces: restaurar, dejar un cupo y relanzar las peticiones en paralelo.</td><td>Comandos de preparación</td><td class="esperado">En las tres repeticiones el contador termina en 0.</td><td>Salidas de las tres corridas</td></tr>
+              <tr><td class="paso">Paso 3</td><td>Confirmar que en ninguna corrida el valor fue negativo.</td><td>—</td><td class="esperado">Nunca aparece un número menor que cero.</td><td>Resumen de las corridas</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="note">
+          <b>Importante para la sustentación:</b> la prueba automatizada del backend usa una base de
+          datos simulada que ejecuta las peticiones en secuencia, así que valida la lógica pero
+          <b>no reproduce la concurrencia real</b>. Por eso este caso hay que ejecutarlo a mano contra
+          MongoDB, como está descrito aquí.
+        </p>
+      </article>
+    </div>
+  </section>
+
+  <!-- ==================== Esc23 ==================== -->
+  <section>
+    <div class="group">
+      <div class="group-label">
+        <span class="esc">Esc23</span>
+        <h3>Bloque con aforo completo</h3>
+        <span class="cuenta">CP-011 – CP-012</span>
+      </div>
+
+      <p class="precond">
+        <b>Precondición del escenario:</b> restaura los datos y deja el bloque 1
+        <b>sin cupos</b> con el comando correspondiente. Estudiante A sin reservas activas.
+      </p>
+
+      <article class="caso">
+        <div class="caso-head">
+          <span class="caso-id">CP-011</span>
+          <h4>Reserva sobre bloque sin cupos</h4>
+          <span class="chip chip-alto">Alto</span>
+        </div>
+        <table class="ficha">
+          <tbody>
+            <tr><th>Escenario asociado</th><td>Esc23</td></tr>
+            <tr><th>Requisito asociado</th><td>RF06 — Bloquear la reserva en bloques con aforo completo</td></tr>
+            <tr><th>Descripción</th><td>Verificar que no se puede reservar un bloque que ya alcanzó su aforo.</td></tr>
+            <tr><th>Objetivo</th><td>Comprobar que el rechazo ocurre sin dejar ningún registro en la base de datos.</td></tr>
+            <tr><th>Criterio de éxito</th><td>La reserva se rechaza, no se crea ningún registro y el contador permanece en cero.</td></tr>
+            <tr><th>Nivel de prueba</th><td>Integración</td></tr>
+            <tr><th>Riesgo asociado</th><td>Alto</td></tr>
+            <tr><th>Caso de Prueba</th><td>Intentar reservar un bloque con cero cupos.</td></tr>
+            <tr><th>Procedimiento Caso de Prueba</th><td>Enviar la reserva sobre el bloque lleno y comprobar el rechazo y la ausencia de registros.</td></tr>
+          </tbody>
+        </table>
+        <div class="table-wrap">
+          <table class="pasos">
+            <thead>
+              <tr>
+                <th class="c-paso">Paso</th><th class="c-accion">Acción</th><th class="c-datos">Datos</th>
+                <th class="c-esperado">Resultado esperado</th><th class="c-evid">Evidencia</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td class="paso">Paso 1</td><td>Confirmar que el bloque está en cero cupos.</td><td><code>GET /api/slots/</code></td><td class="esperado">El bloque 1 muestra 0 disponibles.</td><td>Respuesta en Swagger</td></tr>
+              <tr><td class="paso">Paso 2</td><td>Intentar reservarlo desde Swagger.</td><td><code>POST /api/reservations/</code> · Estudiante A · bloque 1</td><td class="esperado">Responde 409 con «No hay cupos disponibles en este horario.».</td><td>Respuesta en Swagger</td></tr>
+              <tr><td class="paso">Paso 3</td><td>Comprobar que no se creó ninguna reserva.</td><td><code>db.reservations.countDocuments({slotId:1})</code></td><td class="esperado">Devuelve 0.</td><td>Salida de mongosh</td></tr>
+              <tr><td class="paso">Paso 4</td><td>Verificar el contador del bloque.</td><td><code>db.slots.findOne({slotId:1})</code></td><td class="esperado">Sigue en 0, no bajó a un negativo.</td><td>Salida de mongosh</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </article>
+
+      <article class="caso">
+        <div class="caso-head">
+          <span class="caso-id">CP-012</span>
+          <h4>Alternativa ofrecida al estudiante</h4>
+          <span class="chip chip-medio">Medio</span>
+        </div>
+        <table class="ficha">
+          <tbody>
+            <tr><th>Escenario asociado</th><td>Esc23</td></tr>
+            <tr><th>Requisito asociado</th><td>RF06 / RF12 — Ofrecer la lista de espera cuando no hay cupos</td></tr>
+            <tr><th>Descripción</th><td>Verificar que la interfaz ofrece la lista de espera en lugar de un botón que llevaría al error.</td></tr>
+            <tr><th>Objetivo</th><td>Comprobar que el estudiante recibe una salida útil cuando el bloque está lleno.</td></tr>
+            <tr><th>Criterio de éxito</th><td>La tarjeta muestra «Sin cupos» y ofrece unirse a la lista de espera.</td></tr>
+            <tr><th>Nivel de prueba</th><td>Sistema</td></tr>
+            <tr><th>Riesgo asociado</th><td>Medio</td></tr>
+            <tr><th>Caso de Prueba</th><td>Observar la tarjeta de un bloque lleno.</td></tr>
+            <tr><th>Procedimiento Caso de Prueba</th><td>Abrir el Dashboard con el bloque sin cupos y revisar el estado y el botón de la tarjeta.</td></tr>
+          </tbody>
+        </table>
+        <div class="table-wrap">
+          <table class="pasos">
+            <thead>
+              <tr>
+                <th class="c-paso">Paso</th><th class="c-accion">Acción</th><th class="c-datos">Datos</th>
+                <th class="c-esperado">Resultado esperado</th><th class="c-evid">Evidencia</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td class="paso">Paso 1</td><td>Abrir el Dashboard como Estudiante A.</td><td>Bloque 1 sin cupos</td><td class="esperado">La tarjeta de las 06:00 muestra 0 / 20 y el estado «Sin cupos».</td><td>Tarjeta del bloque</td></tr>
+              <tr><td class="paso">Paso 2</td><td>Revisar el botón de esa tarjeta.</td><td>—</td><td class="esperado">Ofrece «Unirme a la lista de espera» en vez de «Reservar cupo».</td><td>Botón de la tarjeta</td></tr>
+              <tr><td class="paso">Paso 3</td><td>Comparar con una tarjeta que sí tenga cupos.</td><td>Bloque 08:00</td><td class="esperado">Esa sí muestra «Reservar cupo», confirmando que el cambio depende del aforo.</td><td>Ambas tarjetas juntas</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </article>
+    </div>
+  </section>
+
+  <!-- ==================== Esc24 ==================== -->
+  <section>
+    <div class="group">
+      <div class="group-label">
+        <span class="esc">Esc24</span>
+        <h3>La cancelación libera el cupo de inmediato</h3>
+        <span class="cuenta">CP-013 – CP-014</span>
+      </div>
+
+      <p class="precond">
+        <b>Precondición del escenario:</b> restaura los datos y deja al Estudiante A con una reserva
+        activa en el bloque de las 06:00, que debe quedar en 19 de 20 cupos.
+      </p>
+
+      <article class="caso">
+        <div class="caso-head">
+          <span class="caso-id">CP-013</span>
+          <h4>Liberación inmediata del cupo</h4>
+          <span class="chip chip-alto">Alto</span>
+        </div>
+        <table class="ficha">
+          <tbody>
+            <tr><th>Escenario asociado</th><td>Esc24</td></tr>
+            <tr><th>Requisito asociado</th><td>RF07 — Cancelar liberando el cupo de manera inmediata</td></tr>
+            <tr><th>Descripción</th><td>Verificar que al cancelar una reserva el cupo vuelve a estar disponible al instante.</td></tr>
+            <tr><th>Objetivo</th><td>Comprobar que la cancelación cumple su propósito: devolver el cupo para que otro estudiante lo use.</td></tr>
+            <tr><th>Criterio de éxito</th><td>La cancelación es aceptada y el bloque recupera el cupo en la misma operación, de 19 a 20.</td></tr>
+            <tr><th>Nivel de prueba</th><td>Sistema</td></tr>
+            <tr><th>Riesgo asociado</th><td>Alto</td></tr>
+            <tr><th>Caso de Prueba</th><td>Cancelar una reserva activa y verificar la devolución del cupo.</td></tr>
+            <tr><th>Procedimiento Caso de Prueba</th><td>Cancelar desde «Mis reservas» y comprobar el contador del bloque antes y después.</td></tr>
+          </tbody>
+        </table>
+        <div class="table-wrap">
+          <table class="pasos">
+            <thead>
+              <tr>
+                <th class="c-paso">Paso</th><th class="c-accion">Acción</th><th class="c-datos">Datos</th>
+                <th class="c-esperado">Resultado esperado</th><th class="c-evid">Evidencia</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td class="paso">Paso 1</td><td>Anotar los cupos del bloque antes de cancelar.</td><td>Bloque 06:00</td><td class="esperado">Muestra 19 / 20 cupos.</td><td>Tarjeta del bloque</td></tr>
+              <tr><td class="paso">Paso 2</td><td>Abrir «Mis reservas» y pulsar «Cancelar».</td><td>Reserva de las 06:00</td><td class="esperado">Aparece el modal de confirmación «¿Cancelar reserva?».</td><td>Modal de confirmación</td></tr>
+              <tr><td class="paso">Paso 3</td><td>Confirmar la cancelación.</td><td>—</td><td class="esperado">Aviso de reserva cancelada indicando que el cupo fue liberado.</td><td>Aviso en pantalla</td></tr>
+              <tr><td class="paso">Paso 4</td><td>Volver al Dashboard y revisar el bloque.</td><td>—</td><td class="esperado">Vuelve a 20 / 20 cupos sin necesidad de recargar.</td><td>Tarjeta actualizada</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </article>
+
+      <article class="caso">
+        <div class="caso-head">
+          <span class="caso-id">CP-014</span>
+          <h4>Actualización de listados e historial</h4>
+          <span class="chip chip-medio">Medio</span>
+        </div>
+        <table class="ficha">
+          <tbody>
+            <tr><th>Escenario asociado</th><td>Esc24</td></tr>
+            <tr><th>Requisito asociado</th><td>RF07 / RF11 — La reserva cancelada debe salir de las activas y quedar en el historial</td></tr>
+            <tr><th>Descripción</th><td>Verificar que la reserva cancelada desaparece del listado de activas y aparece en el historial.</td></tr>
+            <tr><th>Objetivo</th><td>Comprobar que la cancelación no borra el registro, sino que cambia su estado y queda trazable.</td></tr>
+            <tr><th>Criterio de éxito</th><td>La reserva no aparece entre las activas y sí en el historial marcada como cancelada.</td></tr>
+            <tr><th>Nivel de prueba</th><td>Integración</td></tr>
+            <tr><th>Riesgo asociado</th><td>Medio</td></tr>
+            <tr><th>Caso de Prueba</th><td>Revisar los listados después de cancelar.</td></tr>
+            <tr><th>Procedimiento Caso de Prueba</th><td>Tras la cancelación de CP-013, consultar el listado de activas y el historial del estudiante.</td></tr>
+          </tbody>
+        </table>
+        <div class="table-wrap">
+          <table class="pasos">
+            <thead>
+              <tr>
+                <th class="c-paso">Paso</th><th class="c-accion">Acción</th><th class="c-datos">Datos</th>
+                <th class="c-esperado">Resultado esperado</th><th class="c-evid">Evidencia</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td class="paso">Paso 1</td><td>Abrir «Mis reservas».</td><td>Estudiante A</td><td class="esperado">Muestra el estado vacío «Sin reservas activas».</td><td>Pantalla del listado</td></tr>
+              <tr><td class="paso">Paso 2</td><td>Abrir «Historial».</td><td>—</td><td class="esperado">Aparece la reserva de las 06:00 con la etiqueta «Cancelada».</td><td>Pantalla del historial</td></tr>
+              <tr><td class="paso">Paso 3</td><td>Confirmar por API que el registro conserva su estado.</td><td><code>GET /api/reservations/history/</code></td><td class="esperado">Devuelve la reserva con estado CANCELADA.</td><td>Respuesta en Swagger</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </article>
+    </div>
+  </section>
+
+  <!-- ==================== Esc25 ==================== -->
+  <section>
+    <div class="group">
+      <div class="group-label">
+        <span class="esc">Esc25</span>
+        <h3>Una segunda cancelación no infla el aforo</h3>
+        <span class="cuenta">CP-015 – CP-016</span>
+      </div>
+
+      <p class="precond">
+        <b>Precondición del escenario:</b> parte del final de Esc24, con la reserva ya cancelada, el
+        bloque en 20 de 20 y el estudiante con una cancelación registrada. Necesitas el identificador
+        de esa reserva: obtenlo con
+        <code>db.reservations.findOne({estado:"CANCELADA"})</code>.
+      </p>
+
+      <article class="caso">
+        <div class="caso-head">
+          <span class="caso-id">CP-015</span>
+          <h4>Cancelación repetida sobre reserva no activa</h4>
+          <span class="chip chip-alto">Alto</span>
+        </div>
+        <table class="ficha">
+          <tbody>
+            <tr><th>Escenario asociado</th><td>Esc25</td></tr>
+            <tr><th>Requisito asociado</th><td>RF07 — Una reserva cancelada no debe volver a liberar cupo</td></tr>
+            <tr><th>Descripción</th><td>Verificar que repetir la cancelación no devuelve el cupo por segunda vez.</td></tr>
+            <tr><th>Objetivo</th><td>Comprobar que el sistema no muestra más cupos de los que el gimnasio tiene realmente.</td></tr>
+            <tr><th>Criterio de éxito</th><td>La segunda cancelación se rechaza y el bloque permanece en 20, sin subir a 21.</td></tr>
+            <tr><th>Nivel de prueba</th><td>Integración</td></tr>
+            <tr><th>Riesgo asociado</th><td>Alto</td></tr>
+            <tr><th>Caso de Prueba</th><td>Cancelar dos veces la misma reserva.</td></tr>
+            <tr><th>Procedimiento Caso de Prueba</th><td>Enviar de nuevo la cancelación sobre una reserva ya cancelada y verificar el aforo.</td></tr>
+          </tbody>
+        </table>
+        <div class="table-wrap">
+          <table class="pasos">
+            <thead>
+              <tr>
+                <th class="c-paso">Paso</th><th class="c-accion">Acción</th><th class="c-datos">Datos</th>
+                <th class="c-esperado">Resultado esperado</th><th class="c-evid">Evidencia</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td class="paso">Paso 1</td><td>Anotar los cupos del bloque antes de repetir.</td><td>Bloque 06:00</td><td class="esperado">Muestra 20 / 20 cupos.</td><td>Respuesta en Swagger</td></tr>
+              <tr><td class="paso">Paso 2</td><td>Repetir la cancelación desde Swagger con el mismo identificador.</td><td><code>DELETE /api/reservations/{id}/</code></td><td class="esperado">Responde 409 con «La reserva ya no está activa.».</td><td>Respuesta en Swagger</td></tr>
+              <tr><td class="paso">Paso 3</td><td>Verificar el contador del bloque.</td><td><code>db.slots.findOne({slotId:1})</code></td><td class="esperado">Sigue en 20 y no subió a 21.</td><td>Salida de mongosh</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </article>
+
+      <article class="caso">
+        <div class="caso-head">
+          <span class="caso-id">CP-016</span>
+          <h4>Integridad del contador de cancelaciones</h4>
+          <span class="chip chip-medio">Medio</span>
+        </div>
+        <table class="ficha">
+          <tbody>
+            <tr><th>Escenario asociado</th><td>Esc25</td></tr>
+            <tr><th>Requisito asociado</th><td>RF07 / RN10 — La cancelación repetida no debe penalizar dos veces</td></tr>
+            <tr><th>Descripción</th><td>Verificar que la segunda cancelación no incrementa el contador de cancelaciones del estudiante.</td></tr>
+            <tr><th>Objetivo</th><td>Comprobar que nadie se acerca injustamente a la penalización por repetir una operación que ya falló.</td></tr>
+            <tr><th>Criterio de éxito</th><td>El contador del estudiante queda en 1 y no en 2.</td></tr>
+            <tr><th>Nivel de prueba</th><td>Integración</td></tr>
+            <tr><th>Riesgo asociado</th><td>Medio</td></tr>
+            <tr><th>Caso de Prueba</th><td>Revisar el contador de cancelaciones tras la cancelación repetida.</td></tr>
+            <tr><th>Procedimiento Caso de Prueba</th><td>Consultar el perfil del estudiante después de CP-015 y comprobar el número de cancelaciones.</td></tr>
+          </tbody>
+        </table>
+        <div class="table-wrap">
+          <table class="pasos">
+            <thead>
+              <tr>
+                <th class="c-paso">Paso</th><th class="c-accion">Acción</th><th class="c-datos">Datos</th>
+                <th class="c-esperado">Resultado esperado</th><th class="c-evid">Evidencia</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td class="paso">Paso 1</td><td>Consultar el perfil del estudiante por API.</td><td><code>GET /api/users/profile/</code> · Estudiante A</td><td class="esperado">El contador de cancelaciones es 1.</td><td>Respuesta en Swagger</td></tr>
+              <tr><td class="paso">Paso 2</td><td>Abrir «Mi perfil» en la aplicación.</td><td>Estudiante A</td><td class="esperado">«Veces que he cancelado» muestra 1 de 5.</td><td>Pantalla del perfil</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </article>
+    </div>
+  </section>
+
+  <!-- ==================== Esc26 ==================== -->
+  <section>
+    <div class="group">
+      <div class="group-label">
+        <span class="esc">Esc26</span>
+        <h3>Profesor y administrador no pueden reservar</h3>
+        <span class="cuenta">CP-017 – CP-019</span>
+      </div>
+
+      <p class="precond">
+        <b>Precondición del escenario:</b> restaura los datos. Profesor y Administrador registrados.
+        Bloques con cupos disponibles.
+      </p>
+
+      <article class="caso">
+        <div class="caso-head">
+          <span class="caso-id">CP-017</span>
+          <h4>Reserva solicitada por un profesor</h4>
+          <span class="chip chip-alto">Alto</span>
+        </div>
+        <table class="ficha">
+          <tbody>
+            <tr><th>Escenario asociado</th><td>Esc26</td></tr>
+            <tr><th>Requisito asociado</th><td>RN02 — Solo el perfil de estudiante puede crear reservas</td></tr>
+            <tr><th>Descripción</th><td>Verificar que un profesor no puede crear una reserva aunque invoque la API directamente.</td></tr>
+            <tr><th>Objetivo</th><td>Comprobar que la restricción está aplicada en el servidor y no solo ocultando botones en la interfaz.</td></tr>
+            <tr><th>Criterio de éxito</th><td>La solicitud se rechaza por falta de permisos y ningún cupo se descuenta.</td></tr>
+            <tr><th>Nivel de prueba</th><td>Integración</td></tr>
+            <tr><th>Riesgo asociado</th><td>Alto</td></tr>
+            <tr><th>Caso de Prueba</th><td>Intentar reservar con una cuenta de profesor.</td></tr>
+            <tr><th>Procedimiento Caso de Prueba</th><td>Enviar la reserva por API con el correo del profesor y verificar el rechazo y el aforo.</td></tr>
+          </tbody>
+        </table>
+        <div class="table-wrap">
+          <table class="pasos">
+            <thead>
+              <tr>
+                <th class="c-paso">Paso</th><th class="c-accion">Acción</th><th class="c-datos">Datos</th>
+                <th class="c-esperado">Resultado esperado</th><th class="c-evid">Evidencia</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td class="paso">Paso 1</td><td>Anotar los cupos del bloque de las 06:00.</td><td><code>GET /api/slots/</code></td><td class="esperado">Muestra 20 disponibles.</td><td>Respuesta en Swagger</td></tr>
+              <tr><td class="paso">Paso 2</td><td>Enviar la reserva con el correo del profesor.</td><td><code>POST /api/reservations/</code> · <code>coach@udem.edu.co</code> · bloque 1</td><td class="esperado">Responde 403 indicando que profesores y administradores solo consultan el aforo.</td><td>Respuesta en Swagger</td></tr>
+              <tr><td class="paso">Paso 3</td><td>Verificar de nuevo los cupos.</td><td>—</td><td class="esperado">Siguen en 20: el intento no descontó nada.</td><td>Respuesta en Swagger</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </article>
+
+      <article class="caso">
+        <div class="caso-head">
+          <span class="caso-id">CP-018</span>
+          <h4>Reserva solicitada por un administrador</h4>
+          <span class="chip chip-alto">Alto</span>
+        </div>
+        <table class="ficha">
+          <tbody>
+            <tr><th>Escenario asociado</th><td>Esc26</td></tr>
+            <tr><th>Requisito asociado</th><td>RN02 — Solo el perfil de estudiante puede crear reservas</td></tr>
+            <tr><th>Descripción</th><td>Verificar que un administrador tampoco puede crear reservas por API.</td></tr>
+            <tr><th>Objetivo</th><td>Comprobar que la restricción no depende del perfil concreto: ningún rol distinto de estudiante puede reservar.</td></tr>
+            <tr><th>Criterio de éxito</th><td>La solicitud se rechaza igual que con el profesor y el aforo no cambia.</td></tr>
+            <tr><th>Nivel de prueba</th><td>Integración</td></tr>
+            <tr><th>Riesgo asociado</th><td>Alto</td></tr>
+            <tr><th>Caso de Prueba</th><td>Intentar reservar con una cuenta de administrador.</td></tr>
+            <tr><th>Procedimiento Caso de Prueba</th><td>Repetir la solicitud de CP-017 cambiando el correo por el del administrador.</td></tr>
+          </tbody>
+        </table>
+        <div class="table-wrap">
+          <table class="pasos">
+            <thead>
+              <tr>
+                <th class="c-paso">Paso</th><th class="c-accion">Acción</th><th class="c-datos">Datos</th>
+                <th class="c-esperado">Resultado esperado</th><th class="c-evid">Evidencia</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td class="paso">Paso 1</td><td>Enviar la reserva con el correo del administrador.</td><td><code>POST /api/reservations/</code> · <code>jefe@udemedellin.edu.co</code> · bloque 1</td><td class="esperado">Responde 403 con el mismo mensaje que en CP-017.</td><td>Respuesta en Swagger</td></tr>
+              <tr><td class="paso">Paso 2</td><td>Verificar los cupos del bloque.</td><td><code>GET /api/slots/</code></td><td class="esperado">Siguen en 20.</td><td>Respuesta en Swagger</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </article>
+
+      <article class="caso">
+        <div class="caso-head">
+          <span class="caso-id">CP-019</span>
+          <h4>Interfaz sin opciones de reserva</h4>
+          <span class="chip chip-medio">Medio</span>
+        </div>
+        <table class="ficha">
+          <tbody>
+            <tr><th>Escenario asociado</th><td>Esc26</td></tr>
+            <tr><th>Requisito asociado</th><td>RN02 — Profesor y administrador solo consultan el aforo</td></tr>
+            <tr><th>Descripción</th><td>Verificar que la interfaz de estos perfiles no ofrece ninguna vía para reservar.</td></tr>
+            <tr><th>Objetivo</th><td>Comprobar que la aplicación refleja la restricción y no muestra opciones que terminarían en error.</td></tr>
+            <tr><th>Criterio de éxito</th><td>La navegación no incluye «Reservar» ni «Mis reservas»; solo el aforo y las opciones de gestión.</td></tr>
+            <tr><th>Nivel de prueba</th><td>Sistema</td></tr>
+            <tr><th>Riesgo asociado</th><td>Medio</td></tr>
+            <tr><th>Caso de Prueba</th><td>Revisar la navegación con cada perfil.</td></tr>
+            <tr><th>Procedimiento Caso de Prueba</th><td>Iniciar sesión como profesor y como administrador y comparar el menú con el del estudiante.</td></tr>
+          </tbody>
+        </table>
+        <div class="table-wrap">
+          <table class="pasos">
+            <thead>
+              <tr>
+                <th class="c-paso">Paso</th><th class="c-accion">Acción</th><th class="c-datos">Datos</th>
+                <th class="c-esperado">Resultado esperado</th><th class="c-evid">Evidencia</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td class="paso">Paso 1</td><td>Iniciar sesión como profesor.</td><td><code>coach@udem.edu.co</code></td><td class="esperado">Entra directamente a la pantalla de aforo, sin Dashboard de reserva.</td><td>Pantalla completa</td></tr>
+              <tr><td class="paso">Paso 2</td><td>Revisar el menú superior.</td><td>—</td><td class="esperado">Solo aparecen «Aforo» y «Perfil»: no hay «Reservar» ni «Mis reservas».</td><td>Barra de navegación</td></tr>
+              <tr><td class="paso">Paso 3</td><td>Cerrar sesión e iniciar como administrador.</td><td><code>jefe@udemedellin.edu.co</code></td><td class="esperado">Aparecen «Aforo», «Usuarios» y «Perfil», tampoco opciones de reserva.</td><td>Barra de navegación</td></tr>
+              <tr><td class="paso">Paso 4</td><td>Iniciar sesión como estudiante para contrastar.</td><td>Estudiante A</td><td class="esperado">Este sí ve «Reservar», «Mis reservas» e «Historial».</td><td>Las dos barras juntas</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </article>
+    </div>
+  </section>
+
+  <!-- ==================== Esc27 ==================== -->
+  <section>
+    <div class="group">
+      <div class="group-label">
+        <span class="esc">Esc27</span>
+        <h3>Una cuenta penalizada no puede reservar</h3>
+        <span class="cuenta">CP-020 – CP-022</span>
+      </div>
+
+      <p class="precond">
+        <b>Precondición del escenario:</b> restaura los datos y penaliza al Estudiante A con el
+        comando correspondiente. Bloques con cupos disponibles.
+      </p>
+
+      <article class="caso">
+        <div class="caso-head">
+          <span class="caso-id">CP-020</span>
+          <h4>Reserva solicitada por cuenta penalizada</h4>
+          <span class="chip chip-alto">Alto</span>
+        </div>
+        <table class="ficha">
+          <tbody>
+            <tr><th>Escenario asociado</th><td>Esc27</td></tr>
+            <tr><th>Requisito asociado</th><td>RN09 / RN10 — Impedir reservas mientras dure la sanción</td></tr>
+            <tr><th>Descripción</th><td>Verificar que un estudiante penalizado no puede crear reservas.</td></tr>
+            <tr><th>Objetivo</th><td>Comprobar que la sanción cumple su función disuasiva y se aplica en el servidor.</td></tr>
+            <tr><th>Criterio de éxito</th><td>La reserva se rechaza por cuenta penalizada y no se descuenta ningún cupo.</td></tr>
+            <tr><th>Nivel de prueba</th><td>Integración</td></tr>
+            <tr><th>Riesgo asociado</th><td>Alto</td></tr>
+            <tr><th>Caso de Prueba</th><td>Intentar reservar con una cuenta penalizada.</td></tr>
+            <tr><th>Procedimiento Caso de Prueba</th><td>Enviar la reserva con el estudiante penalizado y verificar el rechazo y el aforo.</td></tr>
+          </tbody>
+        </table>
+        <div class="table-wrap">
+          <table class="pasos">
+            <thead>
+              <tr>
+                <th class="c-paso">Paso</th><th class="c-accion">Acción</th><th class="c-datos">Datos</th>
+                <th class="c-esperado">Resultado esperado</th><th class="c-evid">Evidencia</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td class="paso">Paso 1</td><td>Confirmar el estado de la cuenta.</td><td><code>db.users.findOne({email:"ana.gomez@soyudemedellin.edu.co"})</code></td><td class="esperado">El estado es PENALIZADO con fecha de fin futura.</td><td>Salida de mongosh</td></tr>
+              <tr><td class="paso">Paso 2</td><td>Intentar reservar desde Swagger.</td><td><code>POST /api/reservations/</code> · Estudiante A · bloque 1</td><td class="esperado">Responde 403 con «Tu cuenta está penalizada. No puedes reservar por ahora.».</td><td>Respuesta en Swagger</td></tr>
+              <tr><td class="paso">Paso 3</td><td>Verificar los cupos del bloque.</td><td><code>GET /api/slots/</code></td><td class="esperado">Siguen en 20.</td><td>Respuesta en Swagger</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </article>
+
+      <article class="caso">
+        <div class="caso-head">
+          <span class="caso-id">CP-021</span>
+          <h4>Consulta permitida durante la sanción</h4>
+          <span class="chip chip-medio">Medio</span>
+        </div>
+        <table class="ficha">
+          <tbody>
+            <tr><th>Escenario asociado</th><td>Esc27</td></tr>
+            <tr><th>Requisito asociado</th><td>RN09 / RN10 — La sanción bloquea reservar, no consultar</td></tr>
+            <tr><th>Descripción</th><td>Verificar que el estudiante penalizado sigue pudiendo consultar disponibilidad e historial.</td></tr>
+            <tr><th>Objetivo</th><td>Comprobar que la sanción es proporcional y no deja al estudiante sin acceso al sistema.</td></tr>
+            <tr><th>Criterio de éxito</th><td>Las consultas de disponibilidad e historial responden correctamente pese a la sanción.</td></tr>
+            <tr><th>Nivel de prueba</th><td>Integración</td></tr>
+            <tr><th>Riesgo asociado</th><td>Medio</td></tr>
+            <tr><th>Caso de Prueba</th><td>Consultar información con una cuenta penalizada.</td></tr>
+            <tr><th>Procedimiento Caso de Prueba</th><td>Con la cuenta penalizada, consultar disponibilidad e historial y comprobar que ambas responden.</td></tr>
+          </tbody>
+        </table>
+        <div class="table-wrap">
+          <table class="pasos">
+            <thead>
+              <tr>
+                <th class="c-paso">Paso</th><th class="c-accion">Acción</th><th class="c-datos">Datos</th>
+                <th class="c-esperado">Resultado esperado</th><th class="c-evid">Evidencia</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td class="paso">Paso 1</td><td>Iniciar sesión como Estudiante A.</td><td>Cuenta penalizada</td><td class="esperado">La sesión se abre con normalidad.</td><td>Pantalla de inicio</td></tr>
+              <tr><td class="paso">Paso 2</td><td>Abrir el Dashboard y revisar la disponibilidad.</td><td>—</td><td class="esperado">Los bloques y sus cupos se muestran correctamente.</td><td>Dashboard</td></tr>
+              <tr><td class="paso">Paso 3</td><td>Abrir «Historial».</td><td>—</td><td class="esperado">El historial carga sin error.</td><td>Pantalla del historial</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </article>
+
+      <article class="caso">
+        <div class="caso-head">
+          <span class="caso-id">CP-022</span>
+          <h4>Aviso del estado penalizado</h4>
+          <span class="chip chip-medio">Medio</span>
+        </div>
+        <table class="ficha">
+          <tbody>
+            <tr><th>Escenario asociado</th><td>Esc27</td></tr>
+            <tr><th>Requisito asociado</th><td>RN10 — El estudiante debe saber por qué no puede reservar</td></tr>
+            <tr><th>Descripción</th><td>Verificar que la aplicación muestra de forma visible que la cuenta está penalizada.</td></tr>
+            <tr><th>Objetivo</th><td>Comprobar que el estudiante entiende el motivo del bloqueo sin tener que preguntar.</td></tr>
+            <tr><th>Criterio de éxito</th><td>Aparece la franja «Cuenta penalizada» con la explicación, de forma permanente.</td></tr>
+            <tr><th>Nivel de prueba</th><td>Sistema</td></tr>
+            <tr><th>Riesgo asociado</th><td>Medio</td></tr>
+            <tr><th>Caso de Prueba</th><td>Observar el aviso de penalización en la aplicación.</td></tr>
+            <tr><th>Procedimiento Caso de Prueba</th><td>Con la cuenta penalizada, revisar la franja bajo la barra de navegación y el perfil.</td></tr>
+          </tbody>
+        </table>
+        <div class="table-wrap">
+          <table class="pasos">
+            <thead>
+              <tr>
+                <th class="c-paso">Paso</th><th class="c-accion">Acción</th><th class="c-datos">Datos</th>
+                <th class="c-esperado">Resultado esperado</th><th class="c-evid">Evidencia</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td class="paso">Paso 1</td><td>Iniciar sesión con la cuenta penalizada.</td><td>Estudiante A</td><td class="esperado">Bajo la barra de navegación aparece la franja «Cuenta penalizada».</td><td>Franja y barra</td></tr>
+              <tr><td class="paso">Paso 2</td><td>Navegar a otra sección.</td><td>Historial</td><td class="esperado">La franja sigue visible: el aviso es permanente, no un mensaje pasajero.</td><td>Segunda pantalla</td></tr>
+              <tr><td class="paso">Paso 3</td><td>Abrir «Mi perfil».</td><td>—</td><td class="esperado">El estado aparece como PENALIZADO en los contadores.</td><td>Pantalla del perfil</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </article>
+    </div>
+  </section>
+
+  <!-- ==================== Esc28 ==================== -->
+  <section>
+    <div class="group">
+      <div class="group-label">
+        <span class="esc">Esc28</span>
+        <h3>Alerta a las dos cancelaciones restantes</h3>
+        <span class="cuenta">CP-023 – CP-025</span>
+      </div>
+
+      <p class="precond">
+        <b>Precondición del escenario:</b> restaura los datos. Estudiante A ACTIVO con cero
+        cancelaciones. Este escenario es acumulativo: <b>ejecuta los tres casos en orden y sin
+        restaurar entre ellos</b>.
+      </p>
+
+      <article class="caso">
+        <div class="caso-head">
+          <span class="caso-id">CP-023</span>
+          <h4>Umbral de advertencia a las tres cancelaciones</h4>
+          <span class="chip chip-alto">Alto</span>
+        </div>
+        <table class="ficha">
+          <tbody>
+            <tr><th>Escenario asociado</th><td>Esc28</td></tr>
+            <tr><th>Requisito asociado</th><td>RN10 — Advertir cuando falten dos cancelaciones para la sanción</td></tr>
+            <tr><th>Descripción</th><td>Verificar que a la tercera cancelación la aplicación avisa que faltan dos para la penalización.</td></tr>
+            <tr><th>Objetivo</th><td>Comprobar que el estudiante recibe la advertencia con margen para corregir su conducta.</td></tr>
+            <tr><th>Criterio de éxito</th><td>Tras la tercera cancelación aparece la alerta indicando dos cancelaciones restantes y la cuenta sigue activa.</td></tr>
+            <tr><th>Nivel de prueba</th><td>Sistema</td></tr>
+            <tr><th>Riesgo asociado</th><td>Alto</td></tr>
+            <tr><th>Caso de Prueba</th><td>Acumular tres cancelaciones y revisar la alerta.</td></tr>
+            <tr><th>Procedimiento Caso de Prueba</th><td>Repetir tres veces el ciclo de reservar y cancelar, y observar la aplicación tras la tercera.</td></tr>
+          </tbody>
+        </table>
+        <div class="table-wrap">
+          <table class="pasos">
+            <thead>
+              <tr>
+                <th class="c-paso">Paso</th><th class="c-accion">Acción</th><th class="c-datos">Datos</th>
+                <th class="c-esperado">Resultado esperado</th><th class="c-evid">Evidencia</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td class="paso">Paso 1</td><td>Reservar y cancelar una primera vez.</td><td>Bloque 06:00</td><td class="esperado">Aviso de cancelación indicando 1 de 5 cancelaciones. Sin alerta todavía.</td><td>Aviso en pantalla</td></tr>
+              <tr><td class="paso">Paso 2</td><td>Repetir el ciclo una segunda vez.</td><td>Bloque 06:00</td><td class="esperado">Indica 2 de 5. Sigue sin alerta.</td><td>Aviso en pantalla</td></tr>
+              <tr><td class="paso">Paso 3</td><td>Repetir el ciclo una tercera vez.</td><td>Bloque 06:00</td><td class="esperado">Aparece el aviso «Estás a 2 cancelaciones de ser penalizado».</td><td>Aviso en pantalla</td></tr>
+              <tr><td class="paso">Paso 4</td><td>Revisar la franja bajo la barra de navegación.</td><td>—</td><td class="esperado">Muestra el aviso de cancelaciones de forma permanente.</td><td>Franja de aviso</td></tr>
+              <tr><td class="paso">Paso 5</td><td>Abrir «Mi perfil» y revisar el estado.</td><td>—</td><td class="esperado">Muestra 3 cancelaciones, 2 restantes, y la cuenta sigue ACTIVA.</td><td>Pantalla del perfil</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </article>
+
+      <article class="caso">
+        <div class="caso-head">
+          <span class="caso-id">CP-024</span>
+          <h4>Penalización automática al alcanzar el límite</h4>
+          <span class="chip chip-alto">Alto</span>
+        </div>
+        <table class="ficha">
+          <tbody>
+            <tr><th>Escenario asociado</th><td>Esc28</td></tr>
+            <tr><th>Requisito asociado</th><td>RN10 — Sancionar al llegar a cinco cancelaciones</td></tr>
+            <tr><th>Descripción</th><td>Verificar que la quinta cancelación deja la cuenta penalizada sin intervención manual.</td></tr>
+            <tr><th>Objetivo</th><td>Comprobar que la política se aplica sola, sin que nadie tenga que sancionar a mano.</td></tr>
+            <tr><th>Criterio de éxito</th><td>Tras la quinta cancelación el estado pasa a PENALIZADO con cero cancelaciones restantes.</td></tr>
+            <tr><th>Nivel de prueba</th><td>Integración</td></tr>
+            <tr><th>Riesgo asociado</th><td>Alto</td></tr>
+            <tr><th>Caso de Prueba</th><td>Completar la cuarta y quinta cancelación.</td></tr>
+            <tr><th>Procedimiento Caso de Prueba</th><td>Continuando desde CP-023, repetir el ciclo dos veces más y revisar el estado de la cuenta.</td></tr>
+          </tbody>
+        </table>
+        <div class="table-wrap">
+          <table class="pasos">
+            <thead>
+              <tr>
+                <th class="c-paso">Paso</th><th class="c-accion">Acción</th><th class="c-datos">Datos</th>
+                <th class="c-esperado">Resultado esperado</th><th class="c-evid">Evidencia</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td class="paso">Paso 1</td><td>Reservar y cancelar una cuarta vez.</td><td>Bloque 06:00</td><td class="esperado">El aviso indica que queda 1 cancelación antes de la sanción.</td><td>Aviso en pantalla</td></tr>
+              <tr><td class="paso">Paso 2</td><td>Reservar y cancelar una quinta vez.</td><td>Bloque 06:00</td><td class="esperado">El aviso informa que la cuenta quedó penalizada.</td><td>Aviso en pantalla</td></tr>
+              <tr><td class="paso">Paso 3</td><td>Revisar la franja superior.</td><td>—</td><td class="esperado">Cambia a «Cuenta penalizada» en rojo.</td><td>Franja de aviso</td></tr>
+              <tr><td class="paso">Paso 4</td><td>Confirmar el estado en la base de datos.</td><td><code>db.users.findOne({email:"ana.gomez@soyudemedellin.edu.co"})</code></td><td class="esperado">Estado PENALIZADO, 5 cancelaciones y fecha de fin de sanción registrada.</td><td>Salida de mongosh</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </article>
+
+      <article class="caso">
+        <div class="caso-head">
+          <span class="caso-id">CP-025</span>
+          <h4>Bloqueo posterior a la penalización</h4>
+          <span class="chip chip-alto">Alto</span>
+        </div>
+        <table class="ficha">
+          <tbody>
+            <tr><th>Escenario asociado</th><td>Esc28</td></tr>
+            <tr><th>Requisito asociado</th><td>RN10 — La sanción debe surtir efecto de inmediato</td></tr>
+            <tr><th>Descripción</th><td>Verificar que justo después de la quinta cancelación el estudiante ya no puede reservar.</td></tr>
+            <tr><th>Objetivo</th><td>Comprobar que la penalización se encadena con el bloqueo de reservas sin ningún retraso.</td></tr>
+            <tr><th>Criterio de éxito</th><td>El intento de reservar inmediatamente después es rechazado por cuenta penalizada.</td></tr>
+            <tr><th>Nivel de prueba</th><td>Integración</td></tr>
+            <tr><th>Riesgo asociado</th><td>Alto</td></tr>
+            <tr><th>Caso de Prueba</th><td>Intentar reservar justo después de ser penalizado.</td></tr>
+            <tr><th>Procedimiento Caso de Prueba</th><td>Continuando desde CP-024, intentar una nueva reserva desde la interfaz y por API.</td></tr>
+          </tbody>
+        </table>
+        <div class="table-wrap">
+          <table class="pasos">
+            <thead>
+              <tr>
+                <th class="c-paso">Paso</th><th class="c-accion">Acción</th><th class="c-datos">Datos</th>
+                <th class="c-esperado">Resultado esperado</th><th class="c-evid">Evidencia</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td class="paso">Paso 1</td><td>Intentar reservar desde el Dashboard.</td><td>Cualquier bloque con cupos</td><td class="esperado">Aparece un aviso de que la cuenta está penalizada y la reserva no se crea.</td><td>Aviso en pantalla</td></tr>
+              <tr><td class="paso">Paso 2</td><td>Repetir el intento por API.</td><td><code>POST /api/reservations/</code> · Estudiante A</td><td class="esperado">Responde 403 por cuenta penalizada.</td><td>Respuesta en Swagger</td></tr>
+              <tr><td class="paso">Paso 3</td><td>Verificar que no quedó ninguna reserva activa.</td><td><code>GET /api/reservations/</code></td><td class="esperado">Devuelve una lista vacía.</td><td>Respuesta en Swagger</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </article>
+    </div>
+  </section>
+
+  <!-- ==================== Esc29 ==================== -->
+  <section>
+    <div class="group">
+      <div class="group-label">
+        <span class="esc">Esc29</span>
+        <h3>Fila de espera en un bloque lleno</h3>
+        <span class="cuenta">CP-026 – CP-029</span>
+      </div>
+
+      <p class="precond">
+        <b>Precondición del escenario:</b> restaura los datos. Deja al Estudiante B con una reserva
+        activa en el bloque 1 y luego pon ese bloque en cero cupos con el comando correspondiente.
+        Estudiante A sin reserva en ese bloque. Los cuatro casos van <b>en orden y sin restaurar</b>.
+      </p>
+
+      <article class="caso">
+        <div class="caso-head">
+          <span class="caso-id">CP-026</span>
+          <h4>Inscripción en bloque lleno</h4>
+          <span class="chip chip-medio">Medio</span>
+        </div>
+        <table class="ficha">
+          <tbody>
+            <tr><th>Escenario asociado</th><td>Esc29</td></tr>
+            <tr><th>Requisito asociado</th><td>RF12 — Permitir inscribirse en la lista de espera de un bloque lleno</td></tr>
+            <tr><th>Descripción</th><td>Verificar que el estudiante puede entrar a la fila de espera cuando el bloque no tiene cupos.</td></tr>
+            <tr><th>Objetivo</th><td>Comprobar que el sistema registra el turno y le informa al estudiante su posición.</td></tr>
+            <tr><th>Criterio de éxito</th><td>La inscripción es aceptada y la respuesta indica la posición en la fila.</td></tr>
+            <tr><th>Nivel de prueba</th><td>Integración</td></tr>
+            <tr><th>Riesgo asociado</th><td>Medio</td></tr>
+            <tr><th>Caso de Prueba</th><td>Inscribirse en la lista de espera de un bloque sin cupos.</td></tr>
+            <tr><th>Procedimiento Caso de Prueba</th><td>Desde la tarjeta del bloque lleno, pulsar la opción de lista de espera y verificar la posición.</td></tr>
+          </tbody>
+        </table>
+        <div class="table-wrap">
+          <table class="pasos">
+            <thead>
+              <tr>
+                <th class="c-paso">Paso</th><th class="c-accion">Acción</th><th class="c-datos">Datos</th>
+                <th class="c-esperado">Resultado esperado</th><th class="c-evid">Evidencia</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td class="paso">Paso 1</td><td>Iniciar sesión como Estudiante A y abrir el Dashboard.</td><td>Bloque 1 sin cupos</td><td class="esperado">La tarjeta ofrece «Unirme a la lista de espera».</td><td>Tarjeta del bloque</td></tr>
+              <tr><td class="paso">Paso 2</td><td>Pulsar esa opción.</td><td>—</td><td class="esperado">Aviso confirmando la inscripción e indicando la posición 1.</td><td>Aviso en pantalla</td></tr>
+              <tr><td class="paso">Paso 3</td><td>Consultar la fila por API.</td><td><code>GET /api/slots/1/waitlist/</code></td><td class="esperado">Devuelve un único inscrito, el Estudiante A.</td><td>Respuesta en Swagger</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </article>
+
+      <article class="caso">
+        <div class="caso-head">
+          <span class="caso-id">CP-027</span>
+          <h4>Inscripción duplicada</h4>
+          <span class="chip chip-medio">Medio</span>
+        </div>
+        <table class="ficha">
+          <tbody>
+            <tr><th>Escenario asociado</th><td>Esc29</td></tr>
+            <tr><th>Requisito asociado</th><td>RF12 — La fila no debe admitir duplicados</td></tr>
+            <tr><th>Descripción</th><td>Verificar que un estudiante no puede ocupar dos turnos en la misma fila.</td></tr>
+            <tr><th>Objetivo</th><td>Comprobar que nadie mejora su posición inscribiéndose varias veces.</td></tr>
+            <tr><th>Criterio de éxito</th><td>La segunda inscripción se rechaza y la fila conserva un único registro suyo.</td></tr>
+            <tr><th>Nivel de prueba</th><td>Integración</td></tr>
+            <tr><th>Riesgo asociado</th><td>Medio</td></tr>
+            <tr><th>Caso de Prueba</th><td>Repetir la inscripción en la misma fila.</td></tr>
+            <tr><th>Procedimiento Caso de Prueba</th><td>Enviar la inscripción por segunda vez y verificar el rechazo y el tamaño de la fila.</td></tr>
+          </tbody>
+        </table>
+        <div class="table-wrap">
+          <table class="pasos">
+            <thead>
+              <tr>
+                <th class="c-paso">Paso</th><th class="c-accion">Acción</th><th class="c-datos">Datos</th>
+                <th class="c-esperado">Resultado esperado</th><th class="c-evid">Evidencia</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td class="paso">Paso 1</td><td>Enviar de nuevo la inscripción desde Swagger.</td><td><code>POST /api/slots/1/waitlist/</code> · Estudiante A</td><td class="esperado">Responde 409 con «Ya estás en la lista de espera de este bloque.».</td><td>Respuesta en Swagger</td></tr>
+              <tr><td class="paso">Paso 2</td><td>Consultar la fila.</td><td><code>GET /api/slots/1/waitlist/</code></td><td class="esperado">Sigue con un solo inscrito, no dos.</td><td>Respuesta en Swagger</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </article>
+
+      <article class="caso">
+        <div class="caso-head">
+          <span class="caso-id">CP-028</span>
+          <h4>Inscripción con cupos disponibles</h4>
+          <span class="chip chip-ok">Bajo</span>
+        </div>
+        <table class="ficha">
+          <tbody>
+            <tr><th>Escenario asociado</th><td>Esc29</td></tr>
+            <tr><th>Requisito asociado</th><td>RF12 — La fila solo aplica cuando no hay cupos</td></tr>
+            <tr><th>Descripción</th><td>Verificar que no se puede entrar a la fila de un bloque que todavía tiene cupos.</td></tr>
+            <tr><th>Objetivo</th><td>Comprobar que la fila no se usa como atajo cuando la reserva directa está disponible.</td></tr>
+            <tr><th>Criterio de éxito</th><td>La inscripción se rechaza indicando que puede reservar directamente.</td></tr>
+            <tr><th>Nivel de prueba</th><td>Integración</td></tr>
+            <tr><th>Riesgo asociado</th><td>Bajo</td></tr>
+            <tr><th>Caso de Prueba</th><td>Intentar entrar a la fila de un bloque con cupos.</td></tr>
+            <tr><th>Procedimiento Caso de Prueba</th><td>Enviar la inscripción sobre un bloque con disponibilidad y verificar el rechazo.</td></tr>
+          </tbody>
+        </table>
+        <div class="table-wrap">
+          <table class="pasos">
+            <thead>
+              <tr>
+                <th class="c-paso">Paso</th><th class="c-accion">Acción</th><th class="c-datos">Datos</th>
+                <th class="c-esperado">Resultado esperado</th><th class="c-evid">Evidencia</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td class="paso">Paso 1</td><td>Enviar la inscripción sobre un bloque con cupos.</td><td><code>POST /api/slots/2/waitlist/</code> · Estudiante A</td><td class="esperado">Responde 409 con «Aún hay cupos: puedes reservar directamente.».</td><td>Respuesta en Swagger</td></tr>
+              <tr><td class="paso">Paso 2</td><td>Revisar la tarjeta de ese bloque en la aplicación.</td><td>Bloque 08:00</td><td class="esperado">Ofrece «Reservar cupo», no la lista de espera.</td><td>Tarjeta del bloque</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </article>
+
+      <article class="caso">
+        <div class="caso-head">
+          <span class="caso-id">CP-029</span>
+          <h4>Avance de la fila al liberarse un cupo</h4>
+          <span class="chip chip-medio">Medio</span>
+        </div>
+        <table class="ficha">
+          <tbody>
+            <tr><th>Escenario asociado</th><td>Esc29</td></tr>
+            <tr><th>Requisito asociado</th><td>RF12 — La fila debe avanzar cuando se libera un cupo</td></tr>
+            <tr><th>Descripción</th><td>Verificar que al cancelarse una reserva el primero de la fila sale de la lista y el cupo queda libre.</td></tr>
+            <tr><th>Objetivo</th><td>Comprobar que la fila de espera reacciona a la liberación de cupos y no se queda congelada.</td></tr>
+            <tr><th>Criterio de éxito</th><td>Tras la cancelación, la fila queda vacía y el bloque vuelve a tener un cupo disponible.</td></tr>
+            <tr><th>Nivel de prueba</th><td>Integración</td></tr>
+            <tr><th>Riesgo asociado</th><td>Medio</td></tr>
+            <tr><th>Caso de Prueba</th><td>Cancelar una reserva del bloque y observar la fila.</td></tr>
+            <tr><th>Procedimiento Caso de Prueba</th><td>Cancelar la reserva del Estudiante B y comprobar el estado de la fila y del aforo.</td></tr>
+          </tbody>
+        </table>
+        <div class="table-wrap">
+          <table class="pasos">
+            <thead>
+              <tr>
+                <th class="c-paso">Paso</th><th class="c-accion">Acción</th><th class="c-datos">Datos</th>
+                <th class="c-esperado">Resultado esperado</th><th class="c-evid">Evidencia</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td class="paso">Paso 1</td><td>Confirmar que la fila tiene un inscrito antes de cancelar.</td><td><code>GET /api/slots/1/waitlist/</code></td><td class="esperado">Devuelve al Estudiante A.</td><td>Respuesta en Swagger</td></tr>
+              <tr><td class="paso">Paso 2</td><td>Cancelar la reserva del Estudiante B en ese bloque.</td><td>Reserva del Estudiante B</td><td class="esperado">La cancelación es aceptada y el bloque pasa a 1 cupo disponible.</td><td>Respuesta en Swagger</td></tr>
+              <tr><td class="paso">Paso 3</td><td>Consultar de nuevo la fila.</td><td><code>GET /api/slots/1/waitlist/</code></td><td class="esperado">La fila queda vacía: el primero salió al liberarse el cupo.</td><td>Respuesta en Swagger</td></tr>
+              <tr><td class="paso">Paso 4</td><td>Revisar si el Estudiante A recibió algún aviso.</td><td>Sesión del Estudiante A</td><td class="esperado">No recibe ninguna notificación; el cupo queda libre para cualquiera.</td><td>Pantalla del Estudiante A</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="note">
+          <b>El paso 4 no es un fallo, es el hallazgo de diseño.</b> El primero de la fila sale de la
+          lista sin quedarse con el cupo ni recibir aviso, así que cualquier otro estudiante puede
+          tomarlo antes. Regístralo como observación, no como defecto: el sistema hace lo que está
+          implementado, pero la fila no da el beneficio que promete.
+        </p>
+      </article>
+    </div>
+  </section>
+
+  <!-- ==================== Esc30 ==================== -->
+  <section>
+    <div class="group">
+      <div class="group-label">
+        <span class="esc">Esc30</span>
+        <h3>Solicitudes con datos incompletos o inexistentes</h3>
+        <span class="cuenta">CP-030 – CP-036</span>
+      </div>
+
+      <p class="precond">
+        <b>Precondición del escenario:</b> restaura los datos. Todos los bloques en 20 de 20 cupos.
+        Los siete casos se ejecutan desde Swagger y <b>ninguno debe modificar nada</b>: al terminar,
+        el aforo debe seguir intacto.
+      </p>
+
+      <article class="caso">
+        <div class="caso-head">
+          <span class="caso-id">CP-030</span>
+          <h4>Reserva sin el bloque horario</h4>
+          <span class="chip chip-medio">Medio</span>
+        </div>
+        <table class="ficha">
+          <tbody>
+            <tr><th>Escenario asociado</th><td>Esc30</td></tr>
+            <tr><th>Requisito asociado</th><td>RF06 — Rechazar solicitudes con campos obligatorios ausentes</td></tr>
+            <tr><th>Descripción</th><td>Verificar que la reserva sin bloque horario es rechazada con un mensaje claro.</td></tr>
+            <tr><th>Objetivo</th><td>Comprobar que el sistema valida las entradas antes de tocar la base de datos.</td></tr>
+            <tr><th>Criterio de éxito</th><td>La solicitud se rechaza indicando que el correo y el bloque son obligatorios.</td></tr>
+            <tr><th>Nivel de prueba</th><td>Integración</td></tr>
+            <tr><th>Riesgo asociado</th><td>Medio</td></tr>
+            <tr><th>Caso de Prueba</th><td>Enviar una reserva sin el bloque horario.</td></tr>
+            <tr><th>Procedimiento Caso de Prueba</th><td>Enviar la solicitud omitiendo el campo del bloque y verificar el rechazo.</td></tr>
+          </tbody>
+        </table>
+        <div class="table-wrap">
+          <table class="pasos">
+            <thead>
+              <tr>
+                <th class="c-paso">Paso</th><th class="c-accion">Acción</th><th class="c-datos">Datos</th>
+                <th class="c-esperado">Resultado esperado</th><th class="c-evid">Evidencia</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td class="paso">Paso 1</td><td>Enviar la reserva omitiendo el bloque.</td><td><code>{"email":"ana.gomez@soyudemedellin.edu.co"}</code></td><td class="esperado">Responde 400 con «email y slotId son obligatorios.».</td><td>Respuesta en Swagger</td></tr>
+              <tr><td class="paso">Paso 2</td><td>Comprobar que no se creó nada.</td><td><code>db.reservations.countDocuments({})</code></td><td class="esperado">Devuelve 0.</td><td>Salida de mongosh</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </article>
+
+      <article class="caso">
+        <div class="caso-head">
+          <span class="caso-id">CP-031</span>
+          <h4>Reserva sin el correo del estudiante</h4>
+          <span class="chip chip-medio">Medio</span>
+        </div>
+        <table class="ficha">
+          <tbody>
+            <tr><th>Escenario asociado</th><td>Esc30</td></tr>
+            <tr><th>Requisito asociado</th><td>RF06 — Rechazar solicitudes con campos obligatorios ausentes</td></tr>
+            <tr><th>Descripción</th><td>Verificar que la reserva sin correo es rechazada igual que sin bloque.</td></tr>
+            <tr><th>Objetivo</th><td>Comprobar que la validación cubre los dos campos obligatorios y no solo uno.</td></tr>
+            <tr><th>Criterio de éxito</th><td>La solicitud se rechaza con el mismo mensaje que en CP-030.</td></tr>
+            <tr><th>Nivel de prueba</th><td>Integración</td></tr>
+            <tr><th>Riesgo asociado</th><td>Medio</td></tr>
+            <tr><th>Caso de Prueba</th><td>Enviar una reserva sin el correo.</td></tr>
+            <tr><th>Procedimiento Caso de Prueba</th><td>Enviar la solicitud omitiendo el correo y verificar el rechazo.</td></tr>
+          </tbody>
+        </table>
+        <div class="table-wrap">
+          <table class="pasos">
+            <thead>
+              <tr>
+                <th class="c-paso">Paso</th><th class="c-accion">Acción</th><th class="c-datos">Datos</th>
+                <th class="c-esperado">Resultado esperado</th><th class="c-evid">Evidencia</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td class="paso">Paso 1</td><td>Enviar la reserva omitiendo el correo.</td><td><code>{"slotId":1}</code></td><td class="esperado">Responde 400 con «email y slotId son obligatorios.».</td><td>Respuesta en Swagger</td></tr>
+              <tr><td class="paso">Paso 2</td><td>Verificar los cupos del bloque.</td><td><code>GET /api/slots/</code></td><td class="esperado">Siguen en 20.</td><td>Respuesta en Swagger</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </article>
+
+      <article class="caso">
+        <div class="caso-head">
+          <span class="caso-id">CP-032</span>
+          <h4>Reserva con estudiante inexistente</h4>
+          <span class="chip chip-medio">Medio</span>
+        </div>
+        <table class="ficha">
+          <tbody>
+            <tr><th>Escenario asociado</th><td>Esc30</td></tr>
+            <tr><th>Requisito asociado</th><td>RF06 — Rechazar solicitudes con referencias inexistentes</td></tr>
+            <tr><th>Descripción</th><td>Verificar que no se puede reservar con un correo que no está registrado.</td></tr>
+            <tr><th>Objetivo</th><td>Comprobar que el sistema no crea reservas huérfanas sin usuario asociado.</td></tr>
+            <tr><th>Criterio de éxito</th><td>La solicitud se rechaza indicando que el usuario no existe.</td></tr>
+            <tr><th>Nivel de prueba</th><td>Integración</td></tr>
+            <tr><th>Riesgo asociado</th><td>Medio</td></tr>
+            <tr><th>Caso de Prueba</th><td>Reservar con un correo no registrado.</td></tr>
+            <tr><th>Procedimiento Caso de Prueba</th><td>Enviar la reserva con un correo inventado y verificar el rechazo.</td></tr>
+          </tbody>
+        </table>
+        <div class="table-wrap">
+          <table class="pasos">
+            <thead>
+              <tr>
+                <th class="c-paso">Paso</th><th class="c-accion">Acción</th><th class="c-datos">Datos</th>
+                <th class="c-esperado">Resultado esperado</th><th class="c-evid">Evidencia</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td class="paso">Paso 1</td><td>Enviar la reserva con un correo inexistente.</td><td><code>{"email":"fantasma@soyudemedellin.edu.co","slotId":1}</code></td><td class="esperado">Responde 404 con «El usuario de la reserva no existe.».</td><td>Respuesta en Swagger</td></tr>
+              <tr><td class="paso">Paso 2</td><td>Verificar los cupos del bloque.</td><td><code>GET /api/slots/</code></td><td class="esperado">Siguen en 20.</td><td>Respuesta en Swagger</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </article>
+
+      <article class="caso">
+        <div class="caso-head">
+          <span class="caso-id">CP-033</span>
+          <h4>Reserva de un bloque inexistente</h4>
+          <span class="chip chip-medio">Medio</span>
+        </div>
+        <table class="ficha">
+          <tbody>
+            <tr><th>Escenario asociado</th><td>Esc30</td></tr>
+            <tr><th>Requisito asociado</th><td>RF06 — Rechazar solicitudes con referencias inexistentes</td></tr>
+            <tr><th>Descripción</th><td>Verificar que no se puede reservar un bloque horario que no existe.</td></tr>
+            <tr><th>Objetivo</th><td>Comprobar que el sistema valida el bloque antes de intentar descontar cupos.</td></tr>
+            <tr><th>Criterio de éxito</th><td>La solicitud se rechaza indicando que el horario no fue encontrado.</td></tr>
+            <tr><th>Nivel de prueba</th><td>Integración</td></tr>
+            <tr><th>Riesgo asociado</th><td>Medio</td></tr>
+            <tr><th>Caso de Prueba</th><td>Reservar un bloque que no existe.</td></tr>
+            <tr><th>Procedimiento Caso de Prueba</th><td>Enviar la reserva con un identificador de bloque fuera de rango.</td></tr>
+          </tbody>
+        </table>
+        <div class="table-wrap">
+          <table class="pasos">
+            <thead>
+              <tr>
+                <th class="c-paso">Paso</th><th class="c-accion">Acción</th><th class="c-datos">Datos</th>
+                <th class="c-esperado">Resultado esperado</th><th class="c-evid">Evidencia</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td class="paso">Paso 1</td><td>Enviar la reserva con un bloque inexistente.</td><td><code>{"email":"ana.gomez@soyudemedellin.edu.co","slotId":999}</code></td><td class="esperado">Responde 404 con «Horario no encontrado.».</td><td>Respuesta en Swagger</td></tr>
+              <tr><td class="paso">Paso 2</td><td>Comprobar que no se creó ninguna reserva.</td><td><code>db.reservations.countDocuments({})</code></td><td class="esperado">Devuelve 0.</td><td>Salida de mongosh</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </article>
+
+      <article class="caso">
+        <div class="caso-head">
+          <span class="caso-id">CP-034</span>
+          <h4>Cancelación de una reserva inexistente</h4>
+          <span class="chip chip-ok">Bajo</span>
+        </div>
+        <table class="ficha">
+          <tbody>
+            <tr><th>Escenario asociado</th><td>Esc30</td></tr>
+            <tr><th>Requisito asociado</th><td>RF07 — Rechazar cancelaciones con referencias inexistentes</td></tr>
+            <tr><th>Descripción</th><td>Verificar que cancelar una reserva que no existe devuelve un error controlado.</td></tr>
+            <tr><th>Objetivo</th><td>Comprobar que el sistema distingue entre una reserva inexistente y una ya cancelada.</td></tr>
+            <tr><th>Criterio de éxito</th><td>La solicitud se rechaza indicando que la reserva no fue encontrada.</td></tr>
+            <tr><th>Nivel de prueba</th><td>Integración</td></tr>
+            <tr><th>Riesgo asociado</th><td>Bajo</td></tr>
+            <tr><th>Caso de Prueba</th><td>Cancelar una reserva que no existe.</td></tr>
+            <tr><th>Procedimiento Caso de Prueba</th><td>Enviar la cancelación con un identificador bien formado pero sin uso.</td></tr>
+          </tbody>
+        </table>
+        <div class="table-wrap">
+          <table class="pasos">
+            <thead>
+              <tr>
+                <th class="c-paso">Paso</th><th class="c-accion">Acción</th><th class="c-datos">Datos</th>
+                <th class="c-esperado">Resultado esperado</th><th class="c-evid">Evidencia</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td class="paso">Paso 1</td><td>Enviar la cancelación con un identificador sin uso.</td><td><code>DELETE /api/reservations/000000000000000000000000/</code></td><td class="esperado">Responde 404 con «Reserva no encontrada.».</td><td>Respuesta en Swagger</td></tr>
+              <tr><td class="paso">Paso 2</td><td>Verificar que los cupos no cambiaron.</td><td><code>GET /api/slots/</code></td><td class="esperado">Todos los bloques siguen en 20.</td><td>Respuesta en Swagger</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </article>
+
+      <article class="caso">
+        <div class="caso-head">
+          <span class="caso-id">CP-035</span>
+          <h4>Cancelación con identificador malformado</h4>
+          <span class="chip chip-ok">Bajo</span>
+        </div>
+        <table class="ficha">
+          <tbody>
+            <tr><th>Escenario asociado</th><td>Esc30</td></tr>
+            <tr><th>Requisito asociado</th><td>RF07 — Rechazar identificadores con formato inválido</td></tr>
+            <tr><th>Descripción</th><td>Verificar que un identificador con formato incorrecto no provoca un error interno.</td></tr>
+            <tr><th>Objetivo</th><td>Comprobar que el sistema responde con un error controlado y no con una caída del servidor.</td></tr>
+            <tr><th>Criterio de éxito</th><td>La solicitud se rechaza por identificador inválido, no con un error 500.</td></tr>
+            <tr><th>Nivel de prueba</th><td>Integración</td></tr>
+            <tr><th>Riesgo asociado</th><td>Bajo</td></tr>
+            <tr><th>Caso de Prueba</th><td>Cancelar usando un identificador con formato inválido.</td></tr>
+            <tr><th>Procedimiento Caso de Prueba</th><td>Enviar la cancelación con un texto que no cumple el formato esperado.</td></tr>
+          </tbody>
+        </table>
+        <div class="table-wrap">
+          <table class="pasos">
+            <thead>
+              <tr>
+                <th class="c-paso">Paso</th><th class="c-accion">Acción</th><th class="c-datos">Datos</th>
+                <th class="c-esperado">Resultado esperado</th><th class="c-evid">Evidencia</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td class="paso">Paso 1</td><td>Enviar la cancelación con un identificador inválido.</td><td><code>DELETE /api/reservations/no-es-objectid/</code></td><td class="esperado">Responde 400 con «ID de reserva inválido.».</td><td>Respuesta en Swagger</td></tr>
+              <tr><td class="paso">Paso 2</td><td>Confirmar que no fue un error del servidor.</td><td>—</td><td class="esperado">El código es 400, nunca 500: el error está controlado.</td><td>Código de respuesta</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </article>
+
+      <article class="caso">
+        <div class="caso-head">
+          <span class="caso-id">CP-036</span>
+          <h4>Consulta sin el correo del estudiante</h4>
+          <span class="chip chip-ok">Bajo</span>
+        </div>
+        <table class="ficha">
+          <tbody>
+            <tr><th>Escenario asociado</th><td>Esc30</td></tr>
+            <tr><th>Requisito asociado</th><td>RF06 — Rechazar consultas sin los parámetros obligatorios</td></tr>
+            <tr><th>Descripción</th><td>Verificar que consultar reservas sin indicar el correo devuelve un error claro.</td></tr>
+            <tr><th>Objetivo</th><td>Comprobar que el sistema no devuelve las reservas de todos los usuarios cuando falta el filtro.</td></tr>
+            <tr><th>Criterio de éxito</th><td>La consulta se rechaza indicando que el parámetro es requerido, sin exponer datos de otros.</td></tr>
+            <tr><th>Nivel de prueba</th><td>Integración</td></tr>
+            <tr><th>Riesgo asociado</th><td>Bajo</td></tr>
+            <tr><th>Caso de Prueba</th><td>Consultar reservas sin el parámetro de correo.</td></tr>
+            <tr><th>Procedimiento Caso de Prueba</th><td>Enviar la consulta sin el correo y verificar el rechazo y que no se filtren datos.</td></tr>
+          </tbody>
+        </table>
+        <div class="table-wrap">
+          <table class="pasos">
+            <thead>
+              <tr>
+                <th class="c-paso">Paso</th><th class="c-accion">Acción</th><th class="c-datos">Datos</th>
+                <th class="c-esperado">Resultado esperado</th><th class="c-evid">Evidencia</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td class="paso">Paso 1</td><td>Consultar reservas sin enviar el correo.</td><td><code>GET /api/reservations/</code> sin parámetros</td><td class="esperado">Responde 400 con «Parámetro email requerido.».</td><td>Respuesta en Swagger</td></tr>
+              <tr><td class="paso">Paso 2</td><td>Confirmar que no devolvió ninguna lista.</td><td>—</td><td class="esperado">El cuerpo trae solo el error, sin reservas de otros estudiantes.</td><td>Cuerpo de la respuesta</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </article>
+    </div>
+  </section>
+
+  <div class="footnote">
+    <h2>Antes de empezar a ejecutar</h2>
+    <ul>
+      <li><b>Restaura los datos entre escenarios.</b> Es el error más fácil de cometer: los contadores de cancelaciones que deja un escenario alteran el resultado del siguiente y te dan fallos que no son reales.</li>
+      <li><b>Dos escenarios son acumulativos y no se restauran por dentro:</b> Esc28 (los tres casos van seguidos hasta llegar a cinco cancelaciones) y Esc29 (los cuatro casos dependen del estado que deja el anterior).</li>
+      <li><b>Captura la evidencia en el momento.</b> Varios resultados se pierden al recargar o al ejecutar el caso siguiente, sobre todo los avisos en pantalla, que desaparecen a los pocos segundos.</li>
+      <li><b>CP-004 es el único que no se automatiza</b> y requiere una persona ajena al proyecto. Agéndalo aparte: no lo puedes hacer solo frente al computador.</li>
+      <li><b>CP-010 debe ejecutarse a mano</b> contra MongoDB real. La prueba automatizada equivalente usa una base simulada que corre en secuencia, así que valida la lógica pero no la concurrencia.</li>
+    </ul>
+  </div>
+
+</div>

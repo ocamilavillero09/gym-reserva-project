@@ -1,0 +1,2053 @@
+<title>Escenarios de Reserva UdeM</title>
+
+<style>
+  :root {
+    --ground:      #F7F5F4;
+    --surface:     #FFFFFF;
+    --surface-alt: #FBF9F9;
+    --ink:         #1A1513;
+    --ink-soft:    #5A4F4B;
+    --ink-faint:   #8B807B;
+    --line:        #E6DEDC;
+    --line-soft:   #F0EAE9;
+    --accent:      #CC0000;
+    --accent-soft: #FBEAE9;
+    --accent-line: #F0C9C6;
+    --alto-fg:     #A31C12;
+    --alto-bg:     #FBE8E5;
+    --medio-fg:    #8A5200;
+    --medio-bg:    #FBF0DC;
+    --ok-fg:       #1F6248;
+    --ok-bg:       #E3F1EA;
+    --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:      #15100F;
+      --surface:     #1E1817;
+      --surface-alt: #241D1C;
+      --ink:         #F2EAE8;
+      --ink-soft:    #BCADA9;
+      --ink-faint:   #8B7D79;
+      --line:        #372D2B;
+      --line-soft:   #2A2221;
+      --accent:      #FF6152;
+      --accent-soft: #38201D;
+      --accent-line: #5A2B26;
+      --alto-fg:     #FF8A7A;
+      --alto-bg:     #3B1E1A;
+      --medio-fg:    #E5A93F;
+      --medio-bg:    #362713;
+      --ok-fg:       #7FD1AE;
+      --ok-bg:       #163025;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ground:      #15100F;
+    --surface:     #1E1817;
+    --surface-alt: #241D1C;
+    --ink:         #F2EAE8;
+    --ink-soft:    #BCADA9;
+    --ink-faint:   #8B7D79;
+    --line:        #372D2B;
+    --line-soft:   #2A2221;
+    --accent:      #FF6152;
+    --accent-soft: #38201D;
+    --accent-line: #5A2B26;
+    --alto-fg:     #FF8A7A;
+    --alto-bg:     #3B1E1A;
+    --medio-fg:    #E5A93F;
+    --medio-bg:    #362713;
+    --ok-fg:       #7FD1AE;
+    --ok-bg:       #163025;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--font-sans);
+    font-size: 16px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .page {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 56px 28px 96px;
+    display: flex;
+    flex-direction: column;
+    gap: 56px;
+  }
+
+  /* ---------- Encabezado ---------- */
+  .masthead { display: flex; flex-direction: column; gap: 14px; }
+
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: var(--accent);
+    margin: 0;
+  }
+
+  h1 {
+    margin: 0;
+    font-size: clamp(1.9rem, 4vw, 2.6rem);
+    font-weight: 700;
+    letter-spacing: -0.022em;
+    line-height: 1.15;
+    text-wrap: balance;
+  }
+
+  .standfirst {
+    margin: 0;
+    max-width: 62ch;
+    color: var(--ink-soft);
+    font-size: 1.02rem;
+  }
+
+  .meta-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 26px;
+    padding-top: 12px;
+    border-top: 1px solid var(--line);
+    font-family: var(--font-mono);
+    font-size: 0.76rem;
+    color: var(--ink-faint);
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+  }
+  .meta-row b { color: var(--ink); font-weight: 600; }
+
+  /* ---------- Secciones ---------- */
+  section { display: flex; flex-direction: column; gap: 20px; }
+
+  .section-head { display: flex; flex-direction: column; gap: 6px; }
+
+  .section-head h2 {
+    margin: 0;
+    font-size: 1.35rem;
+    font-weight: 650;
+    letter-spacing: -0.012em;
+  }
+
+  .section-head p {
+    margin: 0;
+    max-width: 68ch;
+    color: var(--ink-soft);
+    font-size: 0.94rem;
+  }
+
+  /* ---------- Base de tablas ---------- */
+  table { border-collapse: collapse; width: 100%; }
+
+  .table-wrap {
+    overflow-x: auto;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--surface);
+  }
+
+  /* ---------- Matriz general ---------- */
+  table.matriz { min-width: 1150px; font-size: 0.83rem; }
+
+  table.matriz thead th {
+    position: sticky;
+    top: 0;
+    background: var(--surface-alt);
+    border-bottom: 1.5px solid var(--line);
+    padding: 12px 13px;
+    text-align: left;
+    vertical-align: bottom;
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--ink-soft);
+    white-space: nowrap;
+  }
+
+  table.matriz tbody td {
+    padding: 13px;
+    border-bottom: 1px solid var(--line-soft);
+    vertical-align: top;
+    color: var(--ink-soft);
+  }
+
+  table.matriz tbody tr:last-child td { border-bottom: none; }
+  table.matriz tbody tr:hover td { background: var(--surface-alt); }
+
+  table.matriz td.id-cell {
+    font-family: var(--font-mono);
+    font-weight: 600;
+    color: var(--accent);
+    white-space: nowrap;
+  }
+
+  table.matriz td.req-cell {
+    font-family: var(--font-mono);
+    font-size: 0.76rem;
+    color: var(--ink);
+    white-space: nowrap;
+  }
+
+  table.matriz td.strong-cell { color: var(--ink); }
+  table.matriz td.nowrap { white-space: nowrap; }
+  .col-req  { min-width: 270px; }
+  .col-desc { min-width: 310px; }
+
+  /* ---------- Matriz de casos de prueba ---------- */
+  table.casos { min-width: 2080px; font-size: 0.79rem; }
+  table.casos .col-hu   { min-width: 250px; }
+  table.casos .col-cond { min-width: 190px; }
+  table.casos .col-dcon { min-width: 330px; }
+  table.casos td.caso-cell { color: var(--accent); font-weight: 700; }
+  table.casos td.tabular { font-variant-numeric: tabular-nums; }
+  table.casos tbody tr.grupo-inicio td { border-top: 2px solid var(--line); }
+
+  /* ---------- Chips ---------- */
+  .chip {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  .chip-alto  { background: var(--alto-bg);  color: var(--alto-fg); }
+  .chip-medio { background: var(--medio-bg); color: var(--medio-fg); }
+  .chip-ok    { background: var(--ok-bg);    color: var(--ok-fg); }
+
+  /* ---------- Grupos y fichas ---------- */
+  .group { display: flex; flex-direction: column; gap: 18px; }
+
+  .group-label {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid var(--accent);
+  }
+
+  .group-label h3 {
+    margin: 0;
+    font-size: 1.02rem;
+    font-weight: 650;
+    letter-spacing: -0.008em;
+  }
+
+  .group-label span {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    color: var(--ink-faint);
+    letter-spacing: 0.06em;
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 22px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+
+  .card-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 10px 14px;
+  }
+
+  .card-id {
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: var(--surface);
+    background: var(--accent);
+    padding: 3px 9px;
+    border-radius: 5px;
+  }
+
+  .card-head h4 {
+    margin: 0;
+    font-size: 1.06rem;
+    font-weight: 650;
+    letter-spacing: -0.01em;
+    flex: 1 1 320px;
+  }
+
+  /* ---------- Ficha del escenario (plantilla de entrega) ---------- */
+  table.ficha {
+    font-size: 0.9rem;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  table.ficha th {
+    width: 218px;
+    background: var(--surface-alt);
+    border-right: 1px solid var(--line);
+    border-bottom: 1px solid var(--line-soft);
+    padding: 11px 14px;
+    text-align: left;
+    vertical-align: top;
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--ink-soft);
+  }
+
+  table.ficha td {
+    padding: 11px 15px;
+    border-bottom: 1px solid var(--line-soft);
+    vertical-align: top;
+    color: var(--ink);
+  }
+
+  table.ficha tr:last-child th,
+  table.ficha tr:last-child td { border-bottom: none; }
+
+  /* ---------- Guía de ejecución ---------- */
+  .exec {
+    background: var(--surface-alt);
+    border: 1px solid var(--line-soft);
+    border-radius: 8px;
+    padding: 16px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .exec-label {
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--accent);
+  }
+
+  dl {
+    margin: 0;
+    display: grid;
+    grid-template-columns: 158px 1fr;
+    gap: 11px 20px;
+  }
+
+  dt {
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--ink-faint);
+    padding-top: 3px;
+  }
+
+  dd { margin: 0; color: var(--ink-soft); font-size: 0.9rem; }
+  dd strong { color: var(--ink); font-weight: 600; }
+  dd ol, dd ul { margin: 0; padding-left: 19px; display: flex; flex-direction: column; gap: 5px; }
+
+  code {
+    font-family: var(--font-mono);
+    font-size: 0.84em;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 1px 5px;
+    color: var(--ink);
+    word-break: break-word;
+  }
+  table.ficha code { background: var(--surface-alt); }
+
+  /* ---------- Tabla de casos dentro de una ficha ---------- */
+  .cases-wrap { overflow-x: auto; }
+
+  table.cases {
+    min-width: 520px;
+    font-size: 0.82rem;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  table.cases th {
+    background: var(--surface);
+    border-bottom: 1px solid var(--line);
+    padding: 9px 12px;
+    text-align: left;
+    font-family: var(--font-mono);
+    font-size: 0.66rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--ink-soft);
+  }
+
+  table.cases td {
+    padding: 9px 12px;
+    border-bottom: 1px solid var(--line-soft);
+    vertical-align: top;
+    color: var(--ink-soft);
+  }
+
+  table.cases tr:last-child td { border-bottom: none; }
+  table.cases td:first-child { color: var(--ink); font-weight: 600; white-space: nowrap; }
+
+  /* ---------- Notas ---------- */
+  .note {
+    font-size: 0.87rem;
+    color: var(--ink-soft);
+    background: var(--accent-soft);
+    border: 1px solid var(--accent-line);
+    border-radius: 8px;
+    padding: 12px 15px;
+  }
+  .note b { color: var(--ink); }
+
+  .footnote {
+    border-top: 1px solid var(--line);
+    padding-top: 20px;
+    color: var(--ink-soft);
+    font-size: 0.9rem;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .footnote h2 { margin: 0 0 2px; font-size: 1.05rem; color: var(--ink); font-weight: 650; }
+  .footnote ul { margin: 0; padding-left: 19px; display: flex; flex-direction: column; gap: 7px; }
+
+  @media (max-width: 680px) {
+    .page { padding: 40px 18px 64px; gap: 44px; }
+    dl { grid-template-columns: 1fr; gap: 4px 0; }
+    dt { padding-top: 10px; }
+    table.ficha th, table.ficha td { display: block; width: auto; border-right: none; }
+    table.ficha th { border-bottom: none; }
+  }
+</style>
+
+<div class="page">
+
+  <header class="masthead">
+    <p class="eyebrow">Plan de pruebas · Módulo de reservas</p>
+    <h1>Escenarios de prueba Esc19 – Esc30</h1>
+    <p class="standfirst">
+      Doce escenarios para el módulo de gestión de reservas del gimnasio de la Universidad de
+      Medellín, verificados contra la implementación actual del backend. Incluye la ficha de cada
+      escenario con su guía de ejecución y la matriz de casos de prueba derivada.
+    </p>
+    <div class="meta-row">
+      <span>Responsable <b>Camila Villero</b></span>
+      <span>Módulo <b>Gestión de reservas</b></span>
+      <span>Escenarios <b>12</b></span>
+      <span>Condiciones <b>33</b></span>
+      <span>Casos <b>36</b></span>
+      <span>Estado <b>Diseñado</b></span>
+    </div>
+  </header>
+
+  <section>
+    <div class="section-head">
+      <h2>Matriz de escenarios</h2>
+      <p>
+        Mismas columnas que tu hoja de seguimiento. Estos doce escenarios <strong>reemplazan</strong> a
+        los que tenías en el rango Esc19 – Esc29, así que ocupan esa misma numeración y terminan en
+        Esc30.
+      </p>
+    </div>
+
+    <div class="table-wrap">
+      <table class="matriz">
+        <thead>
+          <tr>
+            <th>ID Escenario</th>
+            <th>ID Requisito o Historia de Usuario</th>
+            <th class="col-req">Requisito o Historia de Usuario</th>
+            <th>Módulo</th>
+            <th class="col-desc">Descripción</th>
+            <th>Nivel</th>
+            <th>Prioridad</th>
+            <th>Riesgo</th>
+            <th>Estado</th>
+            <th>Cobertura %</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="id-cell">Esc19</td>
+            <td class="req-cell">RF06 / RN03</td>
+            <td>El sistema debe registrar la reserva del estudiante fechada para el día siguiente, descontando un cupo del bloque seleccionado</td>
+            <td class="nowrap">Gestión de reservas</td>
+            <td class="strong-cell">Verificar que la reserva se crea en estado ACTIVA, queda fechada para el día siguiente y descuenta un cupo</td>
+            <td class="nowrap">Sistema</td>
+            <td class="nowrap">Alta</td>
+            <td><span class="chip chip-alto">Alto</span></td>
+            <td class="nowrap">Diseñado</td>
+            <td></td>
+          </tr>
+          <tr>
+            <td class="id-cell">Esc20</td>
+            <td class="req-cell">RF09 / RN05</td>
+            <td>El sistema debe permitir máximo una reserva activa por estudiante y por día, denegando cualquier otra reserva para esa misma fecha</td>
+            <td class="nowrap">Gestión de reservas</td>
+            <td class="strong-cell">Verificar que un estudiante con reserva vigente para mañana no pueda reservar un bloque distinto del mismo día</td>
+            <td class="nowrap">Sistema</td>
+            <td class="nowrap">Alta</td>
+            <td><span class="chip chip-alto">Alto</span></td>
+            <td class="nowrap">Diseñado</td>
+            <td></td>
+          </tr>
+          <tr>
+            <td class="id-cell">Esc21</td>
+            <td class="req-cell">RF07 / RN05</td>
+            <td>El sistema debe volver a habilitar la reserva del día cuando el estudiante cancela la que tenía vigente</td>
+            <td class="nowrap">Gestión de reservas</td>
+            <td class="strong-cell">Verificar que tras cancelar, el estudiante puede reservar otro bloque de la misma fecha</td>
+            <td class="nowrap">Sistema</td>
+            <td class="nowrap">Media</td>
+            <td><span class="chip chip-medio">Medio</span></td>
+            <td class="nowrap">Diseñado</td>
+            <td></td>
+          </tr>
+          <tr>
+            <td class="id-cell">Esc22</td>
+            <td class="req-cell">RF06</td>
+            <td>El sistema debe impedir el sobrecupo cuando dos estudiantes solicitan el último cupo de forma simultánea</td>
+            <td class="nowrap">Gestión de reservas</td>
+            <td class="strong-cell">Verificar que ante dos solicitudes concurrentes por el último cupo solo una prospera y el aforo nunca queda negativo</td>
+            <td class="nowrap">Integración</td>
+            <td class="nowrap">Alta</td>
+            <td><span class="chip chip-alto">Alto</span></td>
+            <td class="nowrap">Diseñado</td>
+            <td></td>
+          </tr>
+          <tr>
+            <td class="id-cell">Esc23</td>
+            <td class="req-cell">RF06</td>
+            <td>El sistema debe bloquear la opción de reserva en los bloques horarios cuyo aforo esté completo</td>
+            <td class="nowrap">Gestión de reservas</td>
+            <td class="strong-cell">Verificar el rechazo de la reserva cuando el bloque tiene cero cupos disponibles</td>
+            <td class="nowrap">Integración</td>
+            <td class="nowrap">Alta</td>
+            <td><span class="chip chip-alto">Alto</span></td>
+            <td class="nowrap">Diseñado</td>
+            <td></td>
+          </tr>
+          <tr>
+            <td class="id-cell">Esc24</td>
+            <td class="req-cell">RF07</td>
+            <td>El sistema debe permitir al estudiante cancelar su reserva activa, liberando el cupo de manera inmediata en la base de datos</td>
+            <td class="nowrap">Gestión de reservas</td>
+            <td class="strong-cell">Verificar que la cancelación libera el cupo al instante y retira la reserva del listado de activas</td>
+            <td class="nowrap">Sistema</td>
+            <td class="nowrap">Alta</td>
+            <td><span class="chip chip-alto">Alto</span></td>
+            <td class="nowrap">Diseñado</td>
+            <td></td>
+          </tr>
+          <tr>
+            <td class="id-cell">Esc25</td>
+            <td class="req-cell">RF07</td>
+            <td>El sistema debe impedir que una reserva ya cancelada vuelva a liberar cupo</td>
+            <td class="nowrap">Gestión de reservas</td>
+            <td class="strong-cell">Verificar que una segunda cancelación de la misma reserva no incrementa el aforo por encima del real</td>
+            <td class="nowrap">Integración</td>
+            <td class="nowrap">Alta</td>
+            <td><span class="chip chip-alto">Alto</span></td>
+            <td class="nowrap">Diseñado</td>
+            <td></td>
+          </tr>
+          <tr>
+            <td class="id-cell">Esc26</td>
+            <td class="req-cell">RN02</td>
+            <td>El sistema debe restringir la creación de reservas al perfil de estudiante; profesor y administrador únicamente consultan el aforo</td>
+            <td class="nowrap">Gestión de reservas</td>
+            <td class="strong-cell">Verificar que los perfiles de profesor y administrador no pueden crear reservas ni invocando la API directamente</td>
+            <td class="nowrap">Integración</td>
+            <td class="nowrap">Alta</td>
+            <td><span class="chip chip-alto">Alto</span></td>
+            <td class="nowrap">Diseñado</td>
+            <td></td>
+          </tr>
+          <tr>
+            <td class="id-cell">Esc27</td>
+            <td class="req-cell">RN09 / RN10</td>
+            <td>El sistema debe impedir nuevas reservas a los estudiantes cuya cuenta esté penalizada mientras dure la sanción</td>
+            <td class="nowrap">Gestión de reservas</td>
+            <td class="strong-cell">Verificar que una cuenta en estado PENALIZADO tiene bloqueada la creación de reservas</td>
+            <td class="nowrap">Sistema</td>
+            <td class="nowrap">Alta</td>
+            <td><span class="chip chip-alto">Alto</span></td>
+            <td class="nowrap">Diseñado</td>
+            <td></td>
+          </tr>
+          <tr>
+            <td class="id-cell">Esc28</td>
+            <td class="req-cell">RN10</td>
+            <td>El sistema debe advertir al estudiante cuando esté a dos cancelaciones de la penalización y sancionarlo al alcanzar el límite</td>
+            <td class="nowrap">Gestión de reservas</td>
+            <td class="strong-cell">Verificar la alerta en pantalla en la tercera cancelación y la penalización automática en la quinta</td>
+            <td class="nowrap">Sistema</td>
+            <td class="nowrap">Alta</td>
+            <td><span class="chip chip-medio">Medio</span></td>
+            <td class="nowrap">Diseñado</td>
+            <td></td>
+          </tr>
+          <tr>
+            <td class="id-cell">Esc29</td>
+            <td class="req-cell">RF12</td>
+            <td>El sistema debe permitir al estudiante inscribirse en la lista de espera de un bloque con aforo completo y hacer avanzar la fila cuando se libere un cupo</td>
+            <td class="nowrap">Gestión de reservas</td>
+            <td class="strong-cell">Verificar la inscripción en la lista de espera con su posición, el rechazo de duplicados y el avance de la fila al cancelarse una reserva</td>
+            <td class="nowrap">Sistema</td>
+            <td class="nowrap">Media</td>
+            <td><span class="chip chip-medio">Medio</span></td>
+            <td class="nowrap">Diseñado</td>
+            <td></td>
+          </tr>
+          <tr>
+            <td class="id-cell">Esc30</td>
+            <td class="req-cell">RF06 / RF07</td>
+            <td>El sistema debe rechazar las solicitudes de reserva, cancelación y consulta con datos incompletos o inexistentes, sin alterar el aforo</td>
+            <td class="nowrap">Gestión de reservas</td>
+            <td class="strong-cell">Verificar el manejo de datos inválidos: campos obligatorios faltantes, estudiante inexistente, bloque inexistente e identificador malformado</td>
+            <td class="nowrap">Sistema</td>
+            <td class="nowrap">Media</td>
+            <td><span class="chip chip-ok">Bajo</span></td>
+            <td class="nowrap">Diseñado</td>
+            <td></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p class="note">
+      <b>Sobre la columna de requisitos.</b> Esc19 a Esc25, Esc29 y Esc30 reutilizan los identificadores
+      que ya usas (RF06 reservar, RF07 cancelar, RF09 reserva única, RF12 lista de espera). Esc26, Esc27
+      y Esc28 corresponden a reglas de negocio que no tienen un RF asignado en tu documento: quedan
+      marcadas con su código de regla (RN02, RN09, RN10) para que les asignes el RF correcto antes de
+      entregar. Ten en cuenta también que en tu hoja actual RF06 aparece con dos enunciados distintos.
+    </p>
+  </section>
+
+  <section>
+    <div class="section-head">
+      <h2>Ficha por escenario</h2>
+      <p>
+        Cada escenario en el formato de entrega, seguido de su guía de ejecución. Los códigos de
+        respuesta y los mensajes son los que devuelve la implementación actual del sistema.
+      </p>
+    </div>
+
+    <!-- ===== GRUPO 1 ===== -->
+    <div class="group">
+      <div class="group-label">
+        <h3>Creación de la reserva</h3>
+        <span>Esc19</span>
+      </div>
+
+      <article class="card">
+        <div class="card-head">
+          <span class="card-id">Esc19</span>
+          <h4>La reserva se crea fechada para el día siguiente</h4>
+          <span class="chip chip-alto">Riesgo alto</span>
+        </div>
+
+        <table class="ficha">
+          <tbody>
+            <tr><th scope="row">Nombre del proyecto</th><td>Sistema de Gestión de Reservas del Gimnasio — Universidad de Medellín</td></tr>
+            <tr><th scope="row">Código escenario de prueba</th><td>Esc19</td></tr>
+            <tr><th scope="row">Requisito asociado</th><td>RF06 / RN03 — El sistema debe registrar la reserva del estudiante fechada para el día siguiente, descontando un cupo del bloque seleccionado.</td></tr>
+            <tr><th scope="row">Descripción</th><td>Un estudiante activo, sin reservas para el día siguiente, solicita el bloque de las 06:00 desde la aplicación y confirma la reserva.</td></tr>
+            <tr><th scope="row">Objetivo</th><td>Comprobar que el flujo principal de reserva funciona de extremo a extremo y que la fecha efectiva corresponde al día siguiente, que es la regla que la interfaz debe comunicarle al estudiante.</td></tr>
+            <tr><th scope="row">Criterio de éxito</th><td>La API responde <strong>201</strong>; la reserva queda en estado ACTIVA con <code>reserva_date</code> igual a la fecha de mañana y la etiqueta de fecha en español; el bloque baja de 20 a 19 cupos; la reserva aparece en el listado de activas y el Dashboard muestra la fecha del día siguiente.</td></tr>
+            <tr><th scope="row">Nivel de prueba</th><td>Sistema</td></tr>
+            <tr><th scope="row">Riesgo asociado</th><td>Alto</td></tr>
+            <tr><th scope="row">Responsable</th><td>Camila Villero</td></tr>
+          </tbody>
+        </table>
+
+        <div class="exec">
+          <span class="exec-label">Guía de ejecución</span>
+          <dl>
+            <dt>Precondiciones</dt>
+            <dd>Estudiante registrado con correo <code>@soyudemedellin.edu.co</code> y estado ACTIVO. Bloque de las 06:00 con 20 de 20 cupos. Sin reservas activas para el día siguiente.</dd>
+            <dt>Datos de prueba</dt>
+            <dd><code>email = ana.gomez@soyudemedellin.edu.co</code> · <code>slotId = 1</code></dd>
+            <dt>Pasos</dt>
+            <dd>
+              <ol>
+                <li>Iniciar sesión como el estudiante.</li>
+                <li>Enviar <code>POST /api/reservations/</code> con el correo y <code>slotId = 1</code>.</li>
+                <li>Consultar <code>GET /api/slots/</code>.</li>
+                <li>Consultar <code>GET /api/reservations/?email=…</code>.</li>
+              </ol>
+            </dd>
+            <dt>Prueba automatizada</dt>
+            <dd><code>test_reserva_descuenta_cupo</code> · <code>test_rn03_la_reserva_queda_fechada_para_manana</code></dd>
+          </dl>
+        </div>
+      </article>
+    </div>
+
+    <!-- ===== GRUPO 2 ===== -->
+    <div class="group">
+      <div class="group-label">
+        <h3>Regla de una reserva por día</h3>
+        <span>Esc20 – Esc21</span>
+      </div>
+
+      <article class="card">
+        <div class="card-head">
+          <span class="card-id">Esc20</span>
+          <h4>Un segundo bloque del mismo día se rechaza</h4>
+          <span class="chip chip-alto">Riesgo alto</span>
+        </div>
+
+        <table class="ficha">
+          <tbody>
+            <tr><th scope="row">Nombre del proyecto</th><td>Sistema de Gestión de Reservas del Gimnasio — Universidad de Medellín</td></tr>
+            <tr><th scope="row">Código escenario de prueba</th><td>Esc20</td></tr>
+            <tr><th scope="row">Requisito asociado</th><td>RF09 / RN05 — El sistema debe permitir máximo una reserva activa por estudiante y por día, denegando cualquier otra reserva para esa misma fecha.</td></tr>
+            <tr><th scope="row">Descripción</th><td>Un estudiante que ya tiene una reserva vigente para mañana intenta reservar un bloque horario diferente de esa misma fecha.</td></tr>
+            <tr><th scope="row">Objetivo</th><td>Verificar que la restricción se aplica sobre la fecha y no solo sobre el bloque, impidiendo que un mismo estudiante ocupe varios cupos del mismo día en perjuicio de sus compañeros.</td></tr>
+            <tr><th scope="row">Criterio de éxito</th><td>La API responde <strong>409</strong> indicando que solo se permite una reserva por día; el segundo bloque conserva todos sus cupos; el estudiante mantiene una única reserva activa y la interfaz muestra «Ya reservaste este día» en las demás tarjetas.</td></tr>
+            <tr><th scope="row">Nivel de prueba</th><td>Sistema</td></tr>
+            <tr><th scope="row">Riesgo asociado</th><td>Alto</td></tr>
+            <tr><th scope="row">Responsable</th><td>Camila Villero</td></tr>
+          </tbody>
+        </table>
+
+        <div class="exec">
+          <span class="exec-label">Guía de ejecución</span>
+          <dl>
+            <dt>Precondiciones</dt>
+            <dd>El estudiante tiene una reserva ACTIVA en el bloque de las 06:00 para mañana. El bloque de las 08:00 tiene cupos disponibles.</dd>
+            <dt>Datos de prueba</dt>
+            <dd><code>slotId = 2</code>, distinto del bloque ya reservado</dd>
+            <dt>Pasos</dt>
+            <dd>
+              <ol>
+                <li>Enviar <code>POST /api/reservations/</code> con <code>slotId = 2</code>.</li>
+                <li>Consultar <code>GET /api/slots/</code> y revisar el bloque de las 08:00.</li>
+                <li>Consultar el listado de reservas activas del estudiante.</li>
+              </ol>
+            </dd>
+            <dt>Prueba automatizada</dt>
+            <dd><code>test_rn05_solo_una_reserva_por_dia</code></dd>
+            <dt>Nota</dt>
+            <dd>Este es el caso que valida la regla. Repetir el <em>mismo</em> bloque también devuelve 409, pero ese comportamiento ya existía antes y no distingue la regla nueva.</dd>
+          </dl>
+        </div>
+      </article>
+
+      <article class="card">
+        <div class="card-head">
+          <span class="card-id">Esc21</span>
+          <h4>Cancelar vuelve a habilitar la reserva del día</h4>
+          <span class="chip chip-medio">Riesgo medio</span>
+        </div>
+
+        <table class="ficha">
+          <tbody>
+            <tr><th scope="row">Nombre del proyecto</th><td>Sistema de Gestión de Reservas del Gimnasio — Universidad de Medellín</td></tr>
+            <tr><th scope="row">Código escenario de prueba</th><td>Esc21</td></tr>
+            <tr><th scope="row">Requisito asociado</th><td>RF07 / RN05 — El sistema debe volver a habilitar la reserva del día cuando el estudiante cancela la que tenía vigente.</td></tr>
+            <tr><th scope="row">Descripción</th><td>Un estudiante cancela su reserva vigente y, a continuación, reserva un bloque distinto de la misma fecha.</td></tr>
+            <tr><th scope="row">Objetivo</th><td>Confirmar que el bloqueo por día es temporal y se libera al cancelar, de modo que el estudiante pueda corregir su horario sin quedar impedido durante el resto del día.</td></tr>
+            <tr><th scope="row">Criterio de éxito</th><td>La cancelación responde <strong>200</strong> y la nueva reserva <strong>201</strong>; el bloque cancelado recupera su cupo y el nuevo lo descuenta; el estudiante termina con una única reserva activa.</td></tr>
+            <tr><th scope="row">Nivel de prueba</th><td>Sistema</td></tr>
+            <tr><th scope="row">Riesgo asociado</th><td>Medio</td></tr>
+            <tr><th scope="row">Responsable</th><td>Camila Villero</td></tr>
+          </tbody>
+        </table>
+
+        <div class="exec">
+          <span class="exec-label">Guía de ejecución</span>
+          <dl>
+            <dt>Precondiciones</dt>
+            <dd>El estudiante tiene una reserva ACTIVA en el bloque de las 06:00 para mañana.</dd>
+            <dt>Datos de prueba</dt>
+            <dd>Reserva vigente en <code>slotId = 1</code>; nuevo intento sobre <code>slotId = 3</code> (10:00)</dd>
+            <dt>Pasos</dt>
+            <dd>
+              <ol>
+                <li>Enviar <code>DELETE /api/reservations/&lt;id&gt;/</code> sobre la reserva vigente.</li>
+                <li>Enviar <code>POST /api/reservations/</code> con <code>slotId = 3</code>.</li>
+                <li>Consultar los cupos de ambos bloques.</li>
+              </ol>
+            </dd>
+            <dt>Prueba automatizada</dt>
+            <dd><code>test_rn05_tras_cancelar_puede_reservar_otro_bloque_del_dia</code></dd>
+          </dl>
+        </div>
+      </article>
+    </div>
+
+    <!-- ===== GRUPO 3 ===== -->
+    <div class="group">
+      <div class="group-label">
+        <h3>Aforo y sobrecupo</h3>
+        <span>Esc22 – Esc23</span>
+      </div>
+
+      <article class="card">
+        <div class="card-head">
+          <span class="card-id">Esc22</span>
+          <h4>Dos estudiantes compiten por el último cupo</h4>
+          <span class="chip chip-alto">Riesgo alto</span>
+        </div>
+
+        <table class="ficha">
+          <tbody>
+            <tr><th scope="row">Nombre del proyecto</th><td>Sistema de Gestión de Reservas del Gimnasio — Universidad de Medellín</td></tr>
+            <tr><th scope="row">Código escenario de prueba</th><td>Esc22</td></tr>
+            <tr><th scope="row">Requisito asociado</th><td>RF06 — El sistema debe impedir el sobrecupo cuando dos estudiantes solicitan el último cupo de forma simultánea.</td></tr>
+            <tr><th scope="row">Descripción</th><td>Dos estudiantes distintos solicitan al mismo tiempo el último cupo disponible de un bloque horario.</td></tr>
+            <tr><th scope="row">Objetivo</th><td>Comprobar que el descuento de cupo es atómico y que la concurrencia no permite asignar más cupos de los que el gimnasio tiene físicamente, que es el riesgo más grave del módulo.</td></tr>
+            <tr><th scope="row">Criterio de éxito</th><td>Una solicitud responde <strong>201</strong> y la otra <strong>409</strong>; el bloque queda exactamente en <strong>0</strong> cupos, nunca en un valor negativo; se registra una sola reserva activa para ese bloque.</td></tr>
+            <tr><th scope="row">Nivel de prueba</th><td>Integración</td></tr>
+            <tr><th scope="row">Riesgo asociado</th><td>Alto</td></tr>
+            <tr><th scope="row">Responsable</th><td>Camila Villero</td></tr>
+          </tbody>
+        </table>
+
+        <div class="exec">
+          <span class="exec-label">Guía de ejecución</span>
+          <dl>
+            <dt>Precondiciones</dt>
+            <dd>El bloque de las 06:00 tiene exactamente un cupo disponible. Dos estudiantes distintos, ambos ACTIVOS y sin reservas para mañana.</dd>
+            <dt>Datos de prueba</dt>
+            <dd><code>ana.gomez@soyudemedellin.edu.co</code> y <code>juan.perez@soyudemedellin.edu.co</code>, ambos sobre <code>slotId = 1</code></dd>
+            <dt>Pasos</dt>
+            <dd>
+              <ol>
+                <li>Lanzar las dos peticiones <code>POST /api/reservations/</code> de forma simultánea.</li>
+                <li>Consultar el cupo restante del bloque.</li>
+                <li>Contar las reservas activas registradas para ese bloque.</li>
+              </ol>
+            </dd>
+            <dt>Prueba automatizada</dt>
+            <dd><code>test_descuento_atomico_no_sobrevende</code></dd>
+            <dt>Nota</dt>
+            <dd>Es el escenario que justifica el descuento atómico condicional del backend. Si falla, el gimnasio asignaría más cupos de los que tiene.</dd>
+          </dl>
+        </div>
+      </article>
+
+      <article class="card">
+        <div class="card-head">
+          <span class="card-id">Esc23</span>
+          <h4>Bloque con aforo completo</h4>
+          <span class="chip chip-alto">Riesgo alto</span>
+        </div>
+
+        <table class="ficha">
+          <tbody>
+            <tr><th scope="row">Nombre del proyecto</th><td>Sistema de Gestión de Reservas del Gimnasio — Universidad de Medellín</td></tr>
+            <tr><th scope="row">Código escenario de prueba</th><td>Esc23</td></tr>
+            <tr><th scope="row">Requisito asociado</th><td>RF06 — El sistema debe bloquear la opción de reserva en los bloques horarios cuyo aforo esté completo.</td></tr>
+            <tr><th scope="row">Descripción</th><td>Un estudiante intenta reservar un bloque horario cuyo aforo ya está completo.</td></tr>
+            <tr><th scope="row">Objetivo</th><td>Verificar que el sistema rechaza la reserva sin dejar registro y que la interfaz ofrece la lista de espera como alternativa, en lugar de un botón que llevaría al error.</td></tr>
+            <tr><th scope="row">Criterio de éxito</th><td>La API responde <strong>409</strong> con «No hay cupos disponibles en este horario.»; no se inserta ninguna reserva; el contador permanece en 0 y la tarjeta muestra «Sin cupos» ofreciendo unirse a la lista de espera.</td></tr>
+            <tr><th scope="row">Nivel de prueba</th><td>Integración</td></tr>
+            <tr><th scope="row">Riesgo asociado</th><td>Alto</td></tr>
+            <tr><th scope="row">Responsable</th><td>Camila Villero</td></tr>
+          </tbody>
+        </table>
+
+        <div class="exec">
+          <span class="exec-label">Guía de ejecución</span>
+          <dl>
+            <dt>Precondiciones</dt>
+            <dd>El bloque de las 06:00 tiene cero cupos disponibles. El estudiante está ACTIVO y sin reservas para mañana.</dd>
+            <dt>Datos de prueba</dt>
+            <dd><code>slotId = 1</code> con <code>available = 0</code></dd>
+            <dt>Pasos</dt>
+            <dd>
+              <ol>
+                <li>Enviar <code>POST /api/reservations/</code> sobre el bloque lleno.</li>
+                <li>Verificar en la base de datos que no se creó ningún registro.</li>
+                <li>Abrir el Dashboard y observar la tarjeta de ese bloque.</li>
+              </ol>
+            </dd>
+            <dt>Prueba automatizada</dt>
+            <dd><code>test_rechaza_sin_cupos</code></dd>
+          </dl>
+        </div>
+      </article>
+    </div>
+
+    <!-- ===== GRUPO 4 ===== -->
+    <div class="group">
+      <div class="group-label">
+        <h3>Cancelación e integridad del aforo</h3>
+        <span>Esc24 – Esc25</span>
+      </div>
+
+      <article class="card">
+        <div class="card-head">
+          <span class="card-id">Esc24</span>
+          <h4>La cancelación libera el cupo de inmediato</h4>
+          <span class="chip chip-alto">Riesgo alto</span>
+        </div>
+
+        <table class="ficha">
+          <tbody>
+            <tr><th scope="row">Nombre del proyecto</th><td>Sistema de Gestión de Reservas del Gimnasio — Universidad de Medellín</td></tr>
+            <tr><th scope="row">Código escenario de prueba</th><td>Esc24</td></tr>
+            <tr><th scope="row">Requisito asociado</th><td>RF07 — El sistema debe permitir al estudiante cancelar su reserva activa, liberando el cupo de manera inmediata en la base de datos.</td></tr>
+            <tr><th scope="row">Descripción</th><td>Un estudiante con una reserva activa la cancela desde la sección «Mis reservas».</td></tr>
+            <tr><th scope="row">Objetivo</th><td>Comprobar que la cancelación devuelve el cupo al instante para que otro estudiante pueda aprovecharlo, que es el propósito de obligar a cancelar cuando no se puede asistir.</td></tr>
+            <tr><th scope="row">Criterio de éxito</th><td>La API responde <strong>200</strong> con «Reserva cancelada. Cupo liberado.»; el bloque vuelve a 20 cupos; la reserva desaparece del listado de activas y aparece en el historial como CANCELADA; la respuesta incluye el contador de cancelaciones actualizado.</td></tr>
+            <tr><th scope="row">Nivel de prueba</th><td>Sistema</td></tr>
+            <tr><th scope="row">Riesgo asociado</th><td>Alto</td></tr>
+            <tr><th scope="row">Responsable</th><td>Camila Villero</td></tr>
+          </tbody>
+        </table>
+
+        <div class="exec">
+          <span class="exec-label">Guía de ejecución</span>
+          <dl>
+            <dt>Precondiciones</dt>
+            <dd>El estudiante tiene una reserva ACTIVA en el bloque de las 06:00, que quedó con 19 de 20 cupos.</dd>
+            <dt>Datos de prueba</dt>
+            <dd>Identificador de la reserva vigente</dd>
+            <dt>Pasos</dt>
+            <dd>
+              <ol>
+                <li>Enviar <code>DELETE /api/reservations/&lt;id&gt;/</code>.</li>
+                <li>Consultar <code>GET /api/slots/</code>.</li>
+                <li>Consultar el listado de reservas activas.</li>
+                <li>Consultar <code>GET /api/reservations/history/?email=…</code>.</li>
+              </ol>
+            </dd>
+            <dt>Prueba automatizada</dt>
+            <dd><code>test_cancelar_libera_cupo</code> · <code>test_solo_muestra_activas</code></dd>
+          </dl>
+        </div>
+      </article>
+
+      <article class="card">
+        <div class="card-head">
+          <span class="card-id">Esc25</span>
+          <h4>Una segunda cancelación no infla el aforo</h4>
+          <span class="chip chip-alto">Riesgo alto</span>
+        </div>
+
+        <table class="ficha">
+          <tbody>
+            <tr><th scope="row">Nombre del proyecto</th><td>Sistema de Gestión de Reservas del Gimnasio — Universidad de Medellín</td></tr>
+            <tr><th scope="row">Código escenario de prueba</th><td>Esc25</td></tr>
+            <tr><th scope="row">Requisito asociado</th><td>RF07 — El sistema debe impedir que una reserva ya cancelada vuelva a liberar cupo.</td></tr>
+            <tr><th scope="row">Descripción</th><td>Se envía una segunda solicitud de cancelación sobre una reserva que ya fue cancelada previamente.</td></tr>
+            <tr><th scope="row">Objetivo</th><td>Verificar la guarda de estado que evita que una operación repetida infle el aforo por encima de la capacidad real del gimnasio y distorsione los contadores del estudiante.</td></tr>
+            <tr><th scope="row">Criterio de éxito</th><td>La API responde <strong>409</strong> con «La reserva ya no está activa.»; el bloque permanece en 20 cupos y no sube a 21; el contador de cancelaciones del estudiante no se incrementa por segunda vez.</td></tr>
+            <tr><th scope="row">Nivel de prueba</th><td>Integración</td></tr>
+            <tr><th scope="row">Riesgo asociado</th><td>Alto</td></tr>
+            <tr><th scope="row">Responsable</th><td>Camila Villero</td></tr>
+          </tbody>
+        </table>
+
+        <div class="exec">
+          <span class="exec-label">Guía de ejecución</span>
+          <dl>
+            <dt>Precondiciones</dt>
+            <dd>Una reserva ya cancelada; el bloque volvió a 20 de 20 cupos y el estudiante tiene <code>cancel_count = 1</code>.</dd>
+            <dt>Datos de prueba</dt>
+            <dd>El mismo identificador de reserva usado en Esc24</dd>
+            <dt>Pasos</dt>
+            <dd>
+              <ol>
+                <li>Repetir <code>DELETE /api/reservations/&lt;id&gt;/</code> sobre la reserva ya cancelada.</li>
+                <li>Consultar los cupos del bloque.</li>
+                <li>Consultar el contador de cancelaciones del estudiante.</li>
+              </ol>
+            </dd>
+            <dt>Prueba automatizada</dt>
+            <dd><code>test_doble_cancelacion_no_suma_cupo_ni_contador</code></dd>
+            <dt>Nota</dt>
+            <dd>Si este escenario falla, el sistema mostraría más cupos de los que el gimnasio tiene físicamente.</dd>
+          </dl>
+        </div>
+      </article>
+    </div>
+
+    <!-- ===== GRUPO 5 ===== -->
+    <div class="group">
+      <div class="group-label">
+        <h3>Perfiles y penalizaciones</h3>
+        <span>Esc26 – Esc28</span>
+      </div>
+
+      <article class="card">
+        <div class="card-head">
+          <span class="card-id">Esc26</span>
+          <h4>Profesor y administrador no pueden reservar</h4>
+          <span class="chip chip-alto">Riesgo alto</span>
+        </div>
+
+        <table class="ficha">
+          <tbody>
+            <tr><th scope="row">Nombre del proyecto</th><td>Sistema de Gestión de Reservas del Gimnasio — Universidad de Medellín</td></tr>
+            <tr><th scope="row">Código escenario de prueba</th><td>Esc26</td></tr>
+            <tr><th scope="row">Requisito asociado</th><td>RN02 — El sistema debe restringir la creación de reservas al perfil de estudiante; profesor y administrador únicamente consultan el aforo.</td></tr>
+            <tr><th scope="row">Descripción</th><td>Un profesor y un administrador intentan crear una reserva, tanto desde la interfaz como invocando la API directamente.</td></tr>
+            <tr><th scope="row">Objetivo</th><td>Comprobar que la restricción de perfil está aplicada en el servidor y no solo ocultando botones, de modo que no pueda evadirse llamando la API por fuera de la aplicación.</td></tr>
+            <tr><th scope="row">Criterio de éxito</th><td>La API responde <strong>403</strong> para ambos perfiles con el mensaje correspondiente; ningún cupo se descuenta; en la interfaz estos perfiles no ven las secciones de reservar ni «Mis reservas», únicamente el aforo.</td></tr>
+            <tr><th scope="row">Nivel de prueba</th><td>Integración</td></tr>
+            <tr><th scope="row">Riesgo asociado</th><td>Alto</td></tr>
+            <tr><th scope="row">Responsable</th><td>Camila Villero</td></tr>
+          </tbody>
+        </table>
+
+        <div class="exec">
+          <span class="exec-label">Guía de ejecución</span>
+          <dl>
+            <dt>Precondiciones</dt>
+            <dd>Un usuario profesor (<code>@udem.edu.co</code>) y un administrador (<code>@udemedellin.edu.co</code>) registrados. Bloques con cupos disponibles.</dd>
+            <dt>Datos de prueba</dt>
+            <dd><code>coach@udem.edu.co</code> y <code>jefe@udemedellin.edu.co</code> sobre <code>slotId = 1</code></dd>
+            <dt>Pasos</dt>
+            <dd>
+              <ol>
+                <li>Enviar <code>POST /api/reservations/</code> con el correo del profesor.</li>
+                <li>Repetir con el correo del administrador.</li>
+                <li>Iniciar sesión con cada perfil y revisar la navegación disponible.</li>
+              </ol>
+            </dd>
+            <dt>Prueba automatizada</dt>
+            <dd><code>test_rn02_el_profesor_no_puede_reservar</code> · <code>test_rn02_el_administrador_no_puede_reservar</code></dd>
+            <dt>Nota</dt>
+            <dd>La prueba debe hacerse <strong>por API</strong>, no solo por interfaz: ocultar un botón no es un control de acceso.</dd>
+          </dl>
+        </div>
+      </article>
+
+      <article class="card">
+        <div class="card-head">
+          <span class="card-id">Esc27</span>
+          <h4>Una cuenta penalizada no puede reservar</h4>
+          <span class="chip chip-alto">Riesgo alto</span>
+        </div>
+
+        <table class="ficha">
+          <tbody>
+            <tr><th scope="row">Nombre del proyecto</th><td>Sistema de Gestión de Reservas del Gimnasio — Universidad de Medellín</td></tr>
+            <tr><th scope="row">Código escenario de prueba</th><td>Esc27</td></tr>
+            <tr><th scope="row">Requisito asociado</th><td>RN09 / RN10 — El sistema debe impedir nuevas reservas a los estudiantes cuya cuenta esté penalizada mientras dure la sanción.</td></tr>
+            <tr><th scope="row">Descripción</th><td>Un estudiante con la cuenta penalizada, por cancelaciones o por inasistencias, intenta crear una nueva reserva.</td></tr>
+            <tr><th scope="row">Objetivo</th><td>Verificar que la sanción cumple su función disuasiva bloqueando la reserva, sin impedirle al estudiante consultar la información del gimnasio ni su propio historial.</td></tr>
+            <tr><th scope="row">Criterio de éxito</th><td>La API responde <strong>403</strong> con «Tu cuenta está penalizada. No puedes reservar por ahora.»; no se descuenta cupo; el estudiante sí puede consultar disponibilidad e historial, y la aplicación muestra la franja «Cuenta penalizada».</td></tr>
+            <tr><th scope="row">Nivel de prueba</th><td>Sistema</td></tr>
+            <tr><th scope="row">Riesgo asociado</th><td>Alto</td></tr>
+            <tr><th scope="row">Responsable</th><td>Camila Villero</td></tr>
+          </tbody>
+        </table>
+
+        <div class="exec">
+          <span class="exec-label">Guía de ejecución</span>
+          <dl>
+            <dt>Precondiciones</dt>
+            <dd>Estudiante con estado PENALIZADO y fecha de fin de sanción en el futuro. Se llega a ese estado con 5 cancelaciones o 3 inasistencias.</dd>
+            <dt>Datos de prueba</dt>
+            <dd>Estudiante penalizado · cualquier <code>slotId</code> con cupos</dd>
+            <dt>Pasos</dt>
+            <dd>
+              <ol>
+                <li>Enviar <code>POST /api/reservations/</code> con el estudiante penalizado.</li>
+                <li>Consultar <code>GET /api/slots/</code> con ese mismo usuario.</li>
+                <li>Consultar su historial de reservas.</li>
+              </ol>
+            </dd>
+            <dt>Prueba automatizada</dt>
+            <dd><code>test_rn10_quinta_cancelacion_penaliza_y_bloquea</code> · <code>test_tres_no_show_penaliza_y_bloquea_reserva</code></dd>
+          </dl>
+        </div>
+      </article>
+
+      <article class="card">
+        <div class="card-head">
+          <span class="card-id">Esc28</span>
+          <h4>Alerta a las dos cancelaciones restantes</h4>
+          <span class="chip chip-medio">Riesgo medio</span>
+        </div>
+
+        <table class="ficha">
+          <tbody>
+            <tr><th scope="row">Nombre del proyecto</th><td>Sistema de Gestión de Reservas del Gimnasio — Universidad de Medellín</td></tr>
+            <tr><th scope="row">Código escenario de prueba</th><td>Esc28</td></tr>
+            <tr><th scope="row">Requisito asociado</th><td>RN10 — El sistema debe advertir al estudiante cuando esté a dos cancelaciones de la penalización y sancionarlo al alcanzar el límite de cinco.</td></tr>
+            <tr><th scope="row">Descripción</th><td>Un estudiante acumula cancelaciones sucesivas hasta alcanzar el límite, observando la aplicación en la tercera y en la quinta.</td></tr>
+            <tr><th scope="row">Objetivo</th><td>Comprobar que el estudiante recibe la advertencia con margen suficiente para corregir su conducta antes de la sanción, y que la penalización se aplica automáticamente al llegar al límite.</td></tr>
+            <tr><th scope="row">Criterio de éxito</th><td>En la tercera cancelación: <code>cancelaciones_restantes = 2</code>, el mensaje «Estás a 2 cancelaciones de ser penalizado» y la franja de aviso visible, con la cuenta aún ACTIVA. En la quinta: <code>penalizado = true</code>, estado PENALIZADO y la siguiente reserva rechazada con <strong>403</strong>.</td></tr>
+            <tr><th scope="row">Nivel de prueba</th><td>Sistema</td></tr>
+            <tr><th scope="row">Riesgo asociado</th><td>Medio</td></tr>
+            <tr><th scope="row">Responsable</th><td>Camila Villero</td></tr>
+          </tbody>
+        </table>
+
+        <div class="exec">
+          <span class="exec-label">Guía de ejecución</span>
+          <dl>
+            <dt>Precondiciones</dt>
+            <dd>Estudiante ACTIVO con cero cancelaciones. Límite configurado en 5 cancelaciones.</dd>
+            <dt>Datos de prueba</dt>
+            <dd>Ciclo de reservar y cancelar repetido cinco veces</dd>
+            <dt>Pasos</dt>
+            <dd>
+              <ol>
+                <li>Reservar y cancelar tres veces seguidas.</li>
+                <li>Revisar la respuesta de la tercera cancelación y la pantalla de la aplicación.</li>
+                <li>Continuar hasta completar la quinta cancelación.</li>
+                <li>Intentar una nueva reserva.</li>
+              </ol>
+            </dd>
+            <dt>Prueba automatizada</dt>
+            <dd><code>test_rn10_alerta_cuando_faltan_dos_cancelaciones</code> · <code>test_rn10_quinta_cancelacion_penaliza_y_bloquea</code></dd>
+          </dl>
+        </div>
+      </article>
+    </div>
+
+    <!-- ===== GRUPO 6 ===== -->
+    <div class="group">
+      <div class="group-label">
+        <h3>Lista de espera</h3>
+        <span>Esc29</span>
+      </div>
+
+      <article class="card">
+        <div class="card-head">
+          <span class="card-id">Esc29</span>
+          <h4>Fila de espera en un bloque lleno</h4>
+          <span class="chip chip-medio">Riesgo medio</span>
+        </div>
+
+        <table class="ficha">
+          <tbody>
+            <tr><th scope="row">Nombre del proyecto</th><td>Sistema de Gestión de Reservas del Gimnasio — Universidad de Medellín</td></tr>
+            <tr><th scope="row">Código escenario de prueba</th><td>Esc29</td></tr>
+            <tr><th scope="row">Requisito asociado</th><td>RF12 — El sistema debe permitir al estudiante inscribirse en la lista de espera de un bloque con aforo completo y hacer avanzar la fila cuando se libere un cupo.</td></tr>
+            <tr><th scope="row">Descripción</th><td>Un estudiante se inscribe en la lista de espera de un bloque completo, intenta inscribirse una segunda vez y luego se cancela una reserva de ese bloque.</td></tr>
+            <tr><th scope="row">Objetivo</th><td>Verificar que la fila de espera registra el turno sin duplicados, se ofrece solo cuando no hay cupos y avanza cuando se libera uno.</td></tr>
+            <tr><th scope="row">Criterio de éxito</th><td>La inscripción responde <strong>201</strong> con su posición; el intento repetido <strong>409</strong> sin duplicar el registro; con cupos disponibles la inscripción se rechaza con <strong>409</strong>; al cancelarse una reserva, el primero de la fila sale de la lista y el cupo queda disponible.</td></tr>
+            <tr><th scope="row">Nivel de prueba</th><td>Sistema</td></tr>
+            <tr><th scope="row">Riesgo asociado</th><td>Medio</td></tr>
+            <tr><th scope="row">Responsable</th><td>Camila Villero</td></tr>
+          </tbody>
+        </table>
+
+        <div class="exec">
+          <span class="exec-label">Guía de ejecución</span>
+          <dl>
+            <dt>Precondiciones</dt>
+            <dd>El bloque de las 06:00 tiene cero cupos. Un estudiante A con reserva ACTIVA en ese bloque. Un estudiante B, ACTIVO, sin reserva en ese bloque.</dd>
+            <dt>Datos de prueba</dt>
+            <dd>Estudiante B: <code>ana.gomez@soyudemedellin.edu.co</code> · <code>slotId = 1</code></dd>
+            <dt>Pasos</dt>
+            <dd>
+              <ol>
+                <li>Con el estudiante B, enviar <code>POST /api/slots/1/waitlist/</code>.</li>
+                <li>Repetir exactamente la misma petición.</li>
+                <li>Consultar <code>GET /api/slots/1/waitlist/</code>.</li>
+                <li>Cancelar la reserva del estudiante A.</li>
+                <li>Volver a consultar la lista de espera y los cupos del bloque.</li>
+                <li>Como caso aparte, intentar inscribirse en un bloque que sí tenga cupos.</li>
+              </ol>
+            </dd>
+            <dt>Prueba automatizada</dt>
+            <dd><code>test_rf12_lista_de_espera</code> · <code>test_rf12_no_lista_si_hay_cupos</code>. El paso 5 <strong>no tiene prueba automatizada</strong>: verifícalo manualmente.</dd>
+            <dt>Observación</dt>
+            <dd>Al liberarse el cupo, el primero de la fila <strong>sale de la lista pero no queda con el cupo reservado ni recibe aviso</strong>, así que cualquier otro estudiante puede tomarlo antes. Conviene registrarlo como hallazgo de diseño, no como defecto.</dd>
+          </dl>
+        </div>
+      </article>
+    </div>
+
+    <!-- ===== GRUPO 7 ===== -->
+    <div class="group">
+      <div class="group-label">
+        <h3>Validación de datos de entrada</h3>
+        <span>Esc30</span>
+      </div>
+
+      <article class="card">
+        <div class="card-head">
+          <span class="card-id">Esc30</span>
+          <h4>Solicitudes con datos incompletos o inexistentes</h4>
+          <span class="chip chip-ok">Riesgo bajo</span>
+        </div>
+
+        <table class="ficha">
+          <tbody>
+            <tr><th scope="row">Nombre del proyecto</th><td>Sistema de Gestión de Reservas del Gimnasio — Universidad de Medellín</td></tr>
+            <tr><th scope="row">Código escenario de prueba</th><td>Esc30</td></tr>
+            <tr><th scope="row">Requisito asociado</th><td>RF06 / RF07 — El sistema debe rechazar las solicitudes de reserva, cancelación y consulta con datos incompletos o inexistentes, sin alterar el aforo.</td></tr>
+            <tr><th scope="row">Descripción</th><td>Se envían siete solicitudes con datos inválidos sobre los servicios de reserva, cancelación y consulta: campos obligatorios faltantes, estudiante inexistente, bloque inexistente e identificadores malformados.</td></tr>
+            <tr><th scope="row">Objetivo</th><td>Comprobar que el sistema valida las entradas antes de tocar la base de datos y devuelve mensajes claros, de modo que un dato inválido no altere el aforo ni deje registros inconsistentes.</td></tr>
+            <tr><th scope="row">Criterio de éxito</th><td>Cada caso responde con su código (<strong>400</strong> o <strong>404</strong>) y su mensaje correspondiente; tras ejecutar los siete, el aforo permanece en 20 de 20 y no existe ninguna reserva creada, modificada ni cancelada.</td></tr>
+            <tr><th scope="row">Nivel de prueba</th><td>Sistema</td></tr>
+            <tr><th scope="row">Riesgo asociado</th><td>Bajo</td></tr>
+            <tr><th scope="row">Responsable</th><td>Camila Villero</td></tr>
+          </tbody>
+        </table>
+
+        <div class="exec">
+          <span class="exec-label">Guía de ejecución</span>
+          <dl>
+            <dt>Precondiciones</dt>
+            <dd>Estudiante ACTIVO registrado. Bloques horarios sembrados con 20 de 20 cupos cada uno.</dd>
+          </dl>
+          <div class="cases-wrap">
+            <table class="cases">
+              <thead>
+                <tr>
+                  <th>Caso</th>
+                  <th>Petición</th>
+                  <th>Respuesta esperada</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Falta el bloque</td>
+                  <td><code>POST /api/reservations/</code> sin <code>slotId</code></td>
+                  <td><strong>400</strong> · «email y slotId son obligatorios.»</td>
+                </tr>
+                <tr>
+                  <td>Falta el correo</td>
+                  <td><code>POST /api/reservations/</code> sin <code>email</code></td>
+                  <td><strong>400</strong> · «email y slotId son obligatorios.»</td>
+                </tr>
+                <tr>
+                  <td>Estudiante inexistente</td>
+                  <td><code>POST</code> con un correo no registrado</td>
+                  <td><strong>404</strong> · «El usuario de la reserva no existe.»</td>
+                </tr>
+                <tr>
+                  <td>Bloque inexistente</td>
+                  <td><code>POST</code> con <code>slotId = 999</code></td>
+                  <td><strong>404</strong> · «Horario no encontrado.»</td>
+                </tr>
+                <tr>
+                  <td>Identificador malformado</td>
+                  <td><code>DELETE /api/reservations/no-es-objectid/</code></td>
+                  <td><strong>400</strong> · «ID de reserva inválido.»</td>
+                </tr>
+                <tr>
+                  <td>Reserva inexistente</td>
+                  <td><code>DELETE</code> con identificador válido sin uso</td>
+                  <td><strong>404</strong> · «Reserva no encontrada.»</td>
+                </tr>
+                <tr>
+                  <td>Consulta sin correo</td>
+                  <td><code>GET /api/reservations/</code> sin el parámetro</td>
+                  <td><strong>400</strong> · «Parámetro email requerido.»</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <dl>
+            <dt>Prueba automatizada</dt>
+            <dd><code>test_usuario_inexistente_no_reserva</code> · <code>test_rechaza_slot_inexistente</code> · <code>test_id_invalido</code>. Los casos de <strong>campos faltantes</strong> y <strong>consulta sin correo</strong> todavía no tienen test.</dd>
+          </dl>
+        </div>
+      </article>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-head">
+      <h2>Matriz de casos de prueba</h2>
+      <p>
+        Los doce escenarios descompuestos en 33 condiciones de prueba y 36 casos ejecutables. Una
+        condición puede dar origen a varios casos cuando cambia el dato de entrada pero no lo que se
+        verifica: CND-030, CND-031 y CND-033 son los ejemplos.
+      </p>
+    </div>
+
+    <div class="table-wrap">
+      <table class="matriz casos">
+        <thead>
+          <tr>
+            <th>ID Caso</th>
+            <th>ID Escenario</th>
+            <th>ID Requisito o Historia de Usuario</th>
+            <th class="col-hu">Requisito o Historia de Usuario</th>
+            <th>ID Condición Prueba</th>
+            <th class="col-cond">Condición Prueba</th>
+            <th class="col-dcon">Descripción de Condición</th>
+            <th>Nivel</th>
+            <th>Tipo</th>
+            <th>Prioridad</th>
+            <th>Estado</th>
+            <th>Responsable</th>
+            <th>ID Defecto</th>
+            <th>Automatizable</th>
+          </tr>
+        </thead>
+        <tbody>
+          <!-- Esc19 -->
+          <tr class="grupo-inicio">
+            <td class="caso-cell tabular">CP-001</td>
+            <td class="id-cell">Esc19</td>
+            <td class="req-cell">RF06 / RN03</td>
+            <td>El sistema debe registrar la reserva del estudiante fechada para el día siguiente, descontando un cupo del bloque seleccionado</td>
+            <td class="req-cell tabular">CND-001</td>
+            <td class="strong-cell">Registro de la reserva con descuento de cupo</td>
+            <td>Un estudiante activo reserva el bloque de las 06:00 con cupos disponibles: se espera 201, estado ACTIVA y el bloque descontado de 20 a 19</td>
+            <td class="nowrap">Integración</td>
+            <td class="nowrap">Funcional</td>
+            <td class="nowrap">Alta</td>
+            <td class="nowrap">Diseñado</td>
+            <td class="nowrap">Camila Villero</td>
+            <td></td>
+            <td class="nowrap">Sí</td>
+          </tr>
+          <tr>
+            <td class="caso-cell tabular">CP-002</td>
+            <td class="id-cell">Esc19</td>
+            <td class="req-cell">RF06 / RN03</td>
+            <td>El sistema debe registrar la reserva del estudiante fechada para el día siguiente, descontando un cupo del bloque seleccionado</td>
+            <td class="req-cell tabular">CND-002</td>
+            <td class="strong-cell">Formato de la fecha en español</td>
+            <td>La función de formato devuelve la etiqueta legible «martes 18 de agosto de 2026» sin depender del idioma del servidor</td>
+            <td class="nowrap">Unitario</td>
+            <td class="nowrap">Funcional</td>
+            <td class="nowrap">Media</td>
+            <td class="nowrap">Diseñado</td>
+            <td class="nowrap">Camila Villero</td>
+            <td></td>
+            <td class="nowrap">Sí</td>
+          </tr>
+          <tr>
+            <td class="caso-cell tabular">CP-003</td>
+            <td class="id-cell">Esc19</td>
+            <td class="req-cell">RF06 / RN03</td>
+            <td>El sistema debe registrar la reserva del estudiante fechada para el día siguiente, descontando un cupo del bloque seleccionado</td>
+            <td class="req-cell tabular">CND-003</td>
+            <td class="strong-cell">Fecha efectiva de la reserva</td>
+            <td>La reserva creada queda con la fecha del día siguiente y no la del día en curso, verificado contra la zona horaria América/Bogotá</td>
+            <td class="nowrap">Integración</td>
+            <td class="nowrap">Funcional</td>
+            <td class="nowrap">Alta</td>
+            <td class="nowrap">Diseñado</td>
+            <td class="nowrap">Camila Villero</td>
+            <td></td>
+            <td class="nowrap">Sí</td>
+          </tr>
+          <tr>
+            <td class="caso-cell tabular">CP-004</td>
+            <td class="id-cell">Esc19</td>
+            <td class="req-cell">RF06 / RN03</td>
+            <td>El sistema debe registrar la reserva del estudiante fechada para el día siguiente, descontando un cupo del bloque seleccionado</td>
+            <td class="req-cell tabular">CND-004</td>
+            <td class="strong-cell">Comprensión de la fecha por el estudiante</td>
+            <td>Un estudiante sin instrucción previa identifica, al usar la aplicación, que su reserva es para el día siguiente y para qué fecha exacta</td>
+            <td class="nowrap">Aceptación</td>
+            <td class="nowrap">Usabilidad</td>
+            <td class="nowrap">Media</td>
+            <td class="nowrap">Diseñado</td>
+            <td class="nowrap">Camila Villero</td>
+            <td></td>
+            <td class="nowrap">No</td>
+          </tr>
+
+          <!-- Esc20 -->
+          <tr class="grupo-inicio">
+            <td class="caso-cell tabular">CP-005</td>
+            <td class="id-cell">Esc20</td>
+            <td class="req-cell">RF09 / RN05</td>
+            <td>El sistema debe permitir máximo una reserva activa por estudiante y por día, denegando cualquier otra reserva para esa misma fecha</td>
+            <td class="req-cell tabular">CND-005</td>
+            <td class="strong-cell">Segundo bloque distinto en la misma fecha</td>
+            <td>Con una reserva vigente en el bloque de las 06:00, el estudiante intenta reservar el de las 08:00: se espera 409 y que el segundo bloque conserve sus cupos</td>
+            <td class="nowrap">Sistema</td>
+            <td class="nowrap">Funcional</td>
+            <td class="nowrap">Alta</td>
+            <td class="nowrap">Diseñado</td>
+            <td class="nowrap">Camila Villero</td>
+            <td></td>
+            <td class="nowrap">Sí</td>
+          </tr>
+          <tr>
+            <td class="caso-cell tabular">CP-006</td>
+            <td class="id-cell">Esc20</td>
+            <td class="req-cell">RF09 / RN05</td>
+            <td>El sistema debe permitir máximo una reserva activa por estudiante y por día, denegando cualquier otra reserva para esa misma fecha</td>
+            <td class="req-cell tabular">CND-006</td>
+            <td class="strong-cell">Repetición del mismo bloque</td>
+            <td>El estudiante intenta reservar por segunda vez el bloque que ya tiene reservado: se espera 409 sin doble descuento de cupo</td>
+            <td class="nowrap">Integración</td>
+            <td class="nowrap">Funcional</td>
+            <td class="nowrap">Media</td>
+            <td class="nowrap">Diseñado</td>
+            <td class="nowrap">Camila Villero</td>
+            <td></td>
+            <td class="nowrap">Sí</td>
+          </tr>
+          <tr>
+            <td class="caso-cell tabular">CP-007</td>
+            <td class="id-cell">Esc20</td>
+            <td class="req-cell">RF09 / RN05</td>
+            <td>El sistema debe permitir máximo una reserva activa por estudiante y por día, denegando cualquier otra reserva para esa misma fecha</td>
+            <td class="req-cell tabular">CND-007</td>
+            <td class="strong-cell">Bloqueo reflejado en la interfaz</td>
+            <td>Con una reserva vigente, las demás tarjetas de bloque muestran «Ya reservaste este día» y su botón queda deshabilitado</td>
+            <td class="nowrap">Sistema</td>
+            <td class="nowrap">Usabilidad</td>
+            <td class="nowrap">Media</td>
+            <td class="nowrap">Diseñado</td>
+            <td class="nowrap">Camila Villero</td>
+            <td></td>
+            <td class="nowrap">Sí</td>
+          </tr>
+
+          <!-- Esc21 -->
+          <tr class="grupo-inicio">
+            <td class="caso-cell tabular">CP-008</td>
+            <td class="id-cell">Esc21</td>
+            <td class="req-cell">RF07 / RN05</td>
+            <td>El sistema debe volver a habilitar la reserva del día cuando el estudiante cancela la que tenía vigente</td>
+            <td class="req-cell tabular">CND-008</td>
+            <td class="strong-cell">Nueva reserva tras cancelar en la misma fecha</td>
+            <td>El estudiante cancela su reserva de las 06:00 y reserva la de las 10:00 el mismo día: se esperan 200 y 201, con los cupos de ambos bloques correctos</td>
+            <td class="nowrap">Sistema</td>
+            <td class="nowrap">Funcional</td>
+            <td class="nowrap">Media</td>
+            <td class="nowrap">Diseñado</td>
+            <td class="nowrap">Camila Villero</td>
+            <td></td>
+            <td class="nowrap">Sí</td>
+          </tr>
+
+          <!-- Esc22 -->
+          <tr class="grupo-inicio">
+            <td class="caso-cell tabular">CP-009</td>
+            <td class="id-cell">Esc22</td>
+            <td class="req-cell">RF06</td>
+            <td>El sistema debe impedir el sobrecupo cuando dos estudiantes solicitan el último cupo de forma simultánea</td>
+            <td class="req-cell tabular">CND-009</td>
+            <td class="strong-cell">Resolución de la carrera por el último cupo</td>
+            <td>Dos estudiantes envían la reserva del último cupo a la vez: exactamente una responde 201 y la otra 409, y queda una sola reserva activa</td>
+            <td class="nowrap">Integración</td>
+            <td class="nowrap">Funcional</td>
+            <td class="nowrap">Alta</td>
+            <td class="nowrap">Diseñado</td>
+            <td class="nowrap">Camila Villero</td>
+            <td></td>
+            <td class="nowrap">Sí</td>
+          </tr>
+          <tr>
+            <td class="caso-cell tabular">CP-010</td>
+            <td class="id-cell">Esc22</td>
+            <td class="req-cell">RF06</td>
+            <td>El sistema debe impedir el sobrecupo cuando dos estudiantes solicitan el último cupo de forma simultánea</td>
+            <td class="req-cell tabular">CND-010</td>
+            <td class="strong-cell">Integridad del aforo bajo concurrencia</td>
+            <td>Tras la ejecución simultánea, el contador del bloque queda en cero y nunca en un valor negativo, aunque se repita la prueba con varias parejas de estudiantes</td>
+            <td class="nowrap">Integración</td>
+            <td class="nowrap">Rendimiento</td>
+            <td class="nowrap">Alta</td>
+            <td class="nowrap">Diseñado</td>
+            <td class="nowrap">Camila Villero</td>
+            <td></td>
+            <td class="nowrap">Sí</td>
+          </tr>
+
+          <!-- Esc23 -->
+          <tr class="grupo-inicio">
+            <td class="caso-cell tabular">CP-011</td>
+            <td class="id-cell">Esc23</td>
+            <td class="req-cell">RF06</td>
+            <td>El sistema debe bloquear la opción de reserva en los bloques horarios cuyo aforo esté completo</td>
+            <td class="req-cell tabular">CND-011</td>
+            <td class="strong-cell">Reserva sobre bloque sin cupos</td>
+            <td>El estudiante intenta reservar un bloque con cero cupos: se espera 409 y que no se inserte ningún registro de reserva</td>
+            <td class="nowrap">Integración</td>
+            <td class="nowrap">Funcional</td>
+            <td class="nowrap">Alta</td>
+            <td class="nowrap">Diseñado</td>
+            <td class="nowrap">Camila Villero</td>
+            <td></td>
+            <td class="nowrap">Sí</td>
+          </tr>
+          <tr>
+            <td class="caso-cell tabular">CP-012</td>
+            <td class="id-cell">Esc23</td>
+            <td class="req-cell">RF06</td>
+            <td>El sistema debe bloquear la opción de reserva en los bloques horarios cuyo aforo esté completo</td>
+            <td class="req-cell tabular">CND-012</td>
+            <td class="strong-cell">Alternativa ofrecida al estudiante</td>
+            <td>La tarjeta del bloque lleno muestra «Sin cupos» y ofrece unirse a la lista de espera en lugar del botón de reservar</td>
+            <td class="nowrap">Sistema</td>
+            <td class="nowrap">Usabilidad</td>
+            <td class="nowrap">Media</td>
+            <td class="nowrap">Diseñado</td>
+            <td class="nowrap">Camila Villero</td>
+            <td></td>
+            <td class="nowrap">Sí</td>
+          </tr>
+
+          <!-- Esc24 -->
+          <tr class="grupo-inicio">
+            <td class="caso-cell tabular">CP-013</td>
+            <td class="id-cell">Esc24</td>
+            <td class="req-cell">RF07</td>
+            <td>El sistema debe permitir al estudiante cancelar su reserva activa, liberando el cupo de manera inmediata en la base de datos</td>
+            <td class="req-cell tabular">CND-013</td>
+            <td class="strong-cell">Liberación inmediata del cupo</td>
+            <td>Al cancelar una reserva activa se espera 200 y que el bloque recupere el cupo en la misma operación, pasando de 19 a 20</td>
+            <td class="nowrap">Sistema</td>
+            <td class="nowrap">Funcional</td>
+            <td class="nowrap">Alta</td>
+            <td class="nowrap">Diseñado</td>
+            <td class="nowrap">Camila Villero</td>
+            <td></td>
+            <td class="nowrap">Sí</td>
+          </tr>
+          <tr>
+            <td class="caso-cell tabular">CP-014</td>
+            <td class="id-cell">Esc24</td>
+            <td class="req-cell">RF07</td>
+            <td>El sistema debe permitir al estudiante cancelar su reserva activa, liberando el cupo de manera inmediata en la base de datos</td>
+            <td class="req-cell tabular">CND-014</td>
+            <td class="strong-cell">Actualización de listados e historial</td>
+            <td>La reserva cancelada desaparece del listado de activas y aparece en el historial del estudiante con estado CANCELADA</td>
+            <td class="nowrap">Integración</td>
+            <td class="nowrap">Funcional</td>
+            <td class="nowrap">Media</td>
+            <td class="nowrap">Diseñado</td>
+            <td class="nowrap">Camila Villero</td>
+            <td></td>
+            <td class="nowrap">Sí</td>
+          </tr>
+
+          <!-- Esc25 -->
+          <tr class="grupo-inicio">
+            <td class="caso-cell tabular">CP-015</td>
+            <td class="id-cell">Esc25</td>
+            <td class="req-cell">RF07</td>
+            <td>El sistema debe impedir que una reserva ya cancelada vuelva a liberar cupo</td>
+            <td class="req-cell tabular">CND-015</td>
+            <td class="strong-cell">Cancelación repetida sobre reserva no activa</td>
+            <td>Se repite la cancelación sobre una reserva ya cancelada: se espera 409 y que el aforo permanezca en 20, sin subir a 21</td>
+            <td class="nowrap">Integración</td>
+            <td class="nowrap">Funcional</td>
+            <td class="nowrap">Alta</td>
+            <td class="nowrap">Diseñado</td>
+            <td class="nowrap">Camila Villero</td>
+            <td></td>
+            <td class="nowrap">Sí</td>
+          </tr>
+          <tr>
+            <td class="caso-cell tabular">CP-016</td>
+            <td class="id-cell">Esc25</td>
+            <td class="req-cell">RF07</td>
+            <td>El sistema debe impedir que una reserva ya cancelada vuelva a liberar cupo</td>
+            <td class="req-cell tabular">CND-016</td>
+            <td class="strong-cell">Integridad del contador de cancelaciones</td>
+            <td>La cancelación repetida no incrementa por segunda vez el contador del estudiante, para no acercarlo injustamente a la penalización</td>
+            <td class="nowrap">Integración</td>
+            <td class="nowrap">Funcional</td>
+            <td class="nowrap">Media</td>
+            <td class="nowrap">Diseñado</td>
+            <td class="nowrap">Camila Villero</td>
+            <td></td>
+            <td class="nowrap">Sí</td>
+          </tr>
+
+          <!-- Esc26 -->
+          <tr class="grupo-inicio">
+            <td class="caso-cell tabular">CP-017</td>
+            <td class="id-cell">Esc26</td>
+            <td class="req-cell">RN02</td>
+            <td>El sistema debe restringir la creación de reservas al perfil de estudiante; profesor y administrador únicamente consultan el aforo</td>
+            <td class="req-cell tabular">CND-017</td>
+            <td class="strong-cell">Reserva solicitada por un profesor</td>
+            <td>Se envía una reserva con un correo del dominio de profesor invocando la API directamente: se espera 403 y ningún descuento de cupo</td>
+            <td class="nowrap">Integración</td>
+            <td class="nowrap">Seguridad</td>
+            <td class="nowrap">Alta</td>
+            <td class="nowrap">Diseñado</td>
+            <td class="nowrap">Camila Villero</td>
+            <td></td>
+            <td class="nowrap">Sí</td>
+          </tr>
+          <tr>
+            <td class="caso-cell tabular">CP-018</td>
+            <td class="id-cell">Esc26</td>
+            <td class="req-cell">RN02</td>
+            <td>El sistema debe restringir la creación de reservas al perfil de estudiante; profesor y administrador únicamente consultan el aforo</td>
+            <td class="req-cell tabular">CND-018</td>
+            <td class="strong-cell">Reserva solicitada por un administrador</td>
+            <td>Se repite la solicitud con un correo del dominio de administrador: se espera 403, confirmando que la restricción no depende del perfil concreto</td>
+            <td class="nowrap">Integración</td>
+            <td class="nowrap">Seguridad</td>
+            <td class="nowrap">Alta</td>
+            <td class="nowrap">Diseñado</td>
+            <td class="nowrap">Camila Villero</td>
+            <td></td>
+            <td class="nowrap">Sí</td>
+          </tr>
+          <tr>
+            <td class="caso-cell tabular">CP-019</td>
+            <td class="id-cell">Esc26</td>
+            <td class="req-cell">RN02</td>
+            <td>El sistema debe restringir la creación de reservas al perfil de estudiante; profesor y administrador únicamente consultan el aforo</td>
+            <td class="req-cell tabular">CND-019</td>
+            <td class="strong-cell">Interfaz sin opciones de reserva</td>
+            <td>Al iniciar sesión como profesor o administrador, la navegación no ofrece «Reservar» ni «Mis reservas»: únicamente el aforo y las opciones de gestión</td>
+            <td class="nowrap">Sistema</td>
+            <td class="nowrap">Usabilidad</td>
+            <td class="nowrap">Media</td>
+            <td class="nowrap">Diseñado</td>
+            <td class="nowrap">Camila Villero</td>
+            <td></td>
+            <td class="nowrap">Sí</td>
+          </tr>
+
+          <!-- Esc27 -->
+          <tr class="grupo-inicio">
+            <td class="caso-cell tabular">CP-020</td>
+            <td class="id-cell">Esc27</td>
+            <td class="req-cell">RN09 / RN10</td>
+            <td>El sistema debe impedir nuevas reservas a los estudiantes cuya cuenta esté penalizada mientras dure la sanción</td>
+            <td class="req-cell tabular">CND-020</td>
+            <td class="strong-cell">Reserva solicitada por cuenta penalizada</td>
+            <td>Un estudiante en estado PENALIZADO con sanción vigente intenta reservar: se espera 403 y ningún descuento de cupo</td>
+            <td class="nowrap">Integración</td>
+            <td class="nowrap">Seguridad</td>
+            <td class="nowrap">Alta</td>
+            <td class="nowrap">Diseñado</td>
+            <td class="nowrap">Camila Villero</td>
+            <td></td>
+            <td class="nowrap">Sí</td>
+          </tr>
+          <tr>
+            <td class="caso-cell tabular">CP-021</td>
+            <td class="id-cell">Esc27</td>
+            <td class="req-cell">RN09 / RN10</td>
+            <td>El sistema debe impedir nuevas reservas a los estudiantes cuya cuenta esté penalizada mientras dure la sanción</td>
+            <td class="req-cell tabular">CND-021</td>
+            <td class="strong-cell">Consulta permitida durante la sanción</td>
+            <td>El mismo estudiante penalizado consulta disponibilidad e historial: ambas responden 200, porque la sanción bloquea reservar y no navegar</td>
+            <td class="nowrap">Integración</td>
+            <td class="nowrap">Funcional</td>
+            <td class="nowrap">Media</td>
+            <td class="nowrap">Diseñado</td>
+            <td class="nowrap">Camila Villero</td>
+            <td></td>
+            <td class="nowrap">Sí</td>
+          </tr>
+          <tr>
+            <td class="caso-cell tabular">CP-022</td>
+            <td class="id-cell">Esc27</td>
+            <td class="req-cell">RN09 / RN10</td>
+            <td>El sistema debe impedir nuevas reservas a los estudiantes cuya cuenta esté penalizada mientras dure la sanción</td>
+            <td class="req-cell tabular">CND-022</td>
+            <td class="strong-cell">Aviso del estado penalizado</td>
+            <td>La aplicación muestra de forma permanente la franja «Cuenta penalizada» explicando por qué el estudiante no puede reservar</td>
+            <td class="nowrap">Sistema</td>
+            <td class="nowrap">Usabilidad</td>
+            <td class="nowrap">Media</td>
+            <td class="nowrap">Diseñado</td>
+            <td class="nowrap">Camila Villero</td>
+            <td></td>
+            <td class="nowrap">Sí</td>
+          </tr>
+
+          <!-- Esc28 -->
+          <tr class="grupo-inicio">
+            <td class="caso-cell tabular">CP-023</td>
+            <td class="id-cell">Esc28</td>
+            <td class="req-cell">RN10</td>
+            <td>El sistema debe advertir al estudiante cuando esté a dos cancelaciones de la penalización y sancionarlo al alcanzar el límite de cinco</td>
+            <td class="req-cell tabular">CND-023</td>
+            <td class="strong-cell">Umbral de advertencia a las tres cancelaciones</td>
+            <td>Al llegar a la tercera cancelación, la respuesta indica dos cancelaciones restantes, la aplicación muestra la alerta y la cuenta sigue ACTIVA</td>
+            <td class="nowrap">Sistema</td>
+            <td class="nowrap">Funcional</td>
+            <td class="nowrap">Alta</td>
+            <td class="nowrap">Diseñado</td>
+            <td class="nowrap">Camila Villero</td>
+            <td></td>
+            <td class="nowrap">Sí</td>
+          </tr>
+          <tr>
+            <td class="caso-cell tabular">CP-024</td>
+            <td class="id-cell">Esc28</td>
+            <td class="req-cell">RN10</td>
+            <td>El sistema debe advertir al estudiante cuando esté a dos cancelaciones de la penalización y sancionarlo al alcanzar el límite de cinco</td>
+            <td class="req-cell tabular">CND-024</td>
+            <td class="strong-cell">Penalización automática al alcanzar el límite</td>
+            <td>La quinta cancelación deja la cuenta en estado PENALIZADO sin intervención manual, con cero cancelaciones restantes</td>
+            <td class="nowrap">Integración</td>
+            <td class="nowrap">Funcional</td>
+            <td class="nowrap">Alta</td>
+            <td class="nowrap">Diseñado</td>
+            <td class="nowrap">Camila Villero</td>
+            <td></td>
+            <td class="nowrap">Sí</td>
+          </tr>
+          <tr>
+            <td class="caso-cell tabular">CP-025</td>
+            <td class="id-cell">Esc28</td>
+            <td class="req-cell">RN10</td>
+            <td>El sistema debe advertir al estudiante cuando esté a dos cancelaciones de la penalización y sancionarlo al alcanzar el límite de cinco</td>
+            <td class="req-cell tabular">CND-025</td>
+            <td class="strong-cell">Bloqueo posterior a la penalización</td>
+            <td>Inmediatamente después de la quinta cancelación, el intento de reservar responde 403, encadenando la sanción con la restricción de Esc27</td>
+            <td class="nowrap">Integración</td>
+            <td class="nowrap">Seguridad</td>
+            <td class="nowrap">Alta</td>
+            <td class="nowrap">Diseñado</td>
+            <td class="nowrap">Camila Villero</td>
+            <td></td>
+            <td class="nowrap">Sí</td>
+          </tr>
+
+          <!-- Esc29 -->
+          <tr class="grupo-inicio">
+            <td class="caso-cell tabular">CP-026</td>
+            <td class="id-cell">Esc29</td>
+            <td class="req-cell">RF12</td>
+            <td>El sistema debe permitir al estudiante inscribirse en la lista de espera de un bloque con aforo completo y hacer avanzar la fila cuando se libere un cupo</td>
+            <td class="req-cell tabular">CND-026</td>
+            <td class="strong-cell">Inscripción en bloque lleno</td>
+            <td>Un estudiante se inscribe en la lista de espera de un bloque sin cupos: se espera 201 y que la respuesta devuelva su posición en la fila</td>
+            <td class="nowrap">Integración</td>
+            <td class="nowrap">Funcional</td>
+            <td class="nowrap">Media</td>
+            <td class="nowrap">Diseñado</td>
+            <td class="nowrap">Camila Villero</td>
+            <td></td>
+            <td class="nowrap">Sí</td>
+          </tr>
+          <tr>
+            <td class="caso-cell tabular">CP-027</td>
+            <td class="id-cell">Esc29</td>
+            <td class="req-cell">RF12</td>
+            <td>El sistema debe permitir al estudiante inscribirse en la lista de espera de un bloque con aforo completo y hacer avanzar la fila cuando se libere un cupo</td>
+            <td class="req-cell tabular">CND-027</td>
+            <td class="strong-cell">Inscripción duplicada</td>
+            <td>El mismo estudiante repite la inscripción en el mismo bloque: se espera 409 y que la fila conserve un único registro suyo</td>
+            <td class="nowrap">Integración</td>
+            <td class="nowrap">Funcional</td>
+            <td class="nowrap">Media</td>
+            <td class="nowrap">Diseñado</td>
+            <td class="nowrap">Camila Villero</td>
+            <td></td>
+            <td class="nowrap">Sí</td>
+          </tr>
+          <tr>
+            <td class="caso-cell tabular">CP-028</td>
+            <td class="id-cell">Esc29</td>
+            <td class="req-cell">RF12</td>
+            <td>El sistema debe permitir al estudiante inscribirse en la lista de espera de un bloque con aforo completo y hacer avanzar la fila cuando se libere un cupo</td>
+            <td class="req-cell tabular">CND-028</td>
+            <td class="strong-cell">Inscripción con cupos disponibles</td>
+            <td>Se intenta entrar a la lista de espera de un bloque que aún tiene cupos: se espera 409 indicando que puede reservar directamente</td>
+            <td class="nowrap">Integración</td>
+            <td class="nowrap">Funcional</td>
+            <td class="nowrap">Baja</td>
+            <td class="nowrap">Diseñado</td>
+            <td class="nowrap">Camila Villero</td>
+            <td></td>
+            <td class="nowrap">Sí</td>
+          </tr>
+          <tr>
+            <td class="caso-cell tabular">CP-029</td>
+            <td class="id-cell">Esc29</td>
+            <td class="req-cell">RF12</td>
+            <td>El sistema debe permitir al estudiante inscribirse en la lista de espera de un bloque con aforo completo y hacer avanzar la fila cuando se libere un cupo</td>
+            <td class="req-cell tabular">CND-029</td>
+            <td class="strong-cell">Avance de la fila al liberarse un cupo</td>
+            <td>Al cancelarse una reserva del bloque, el primero de la fila sale de la lista de espera y el cupo queda disponible</td>
+            <td class="nowrap">Integración</td>
+            <td class="nowrap">Funcional</td>
+            <td class="nowrap">Media</td>
+            <td class="nowrap">Diseñado</td>
+            <td class="nowrap">Camila Villero</td>
+            <td></td>
+            <td class="nowrap">Sí</td>
+          </tr>
+
+          <!-- Esc30 -->
+          <tr class="grupo-inicio">
+            <td class="caso-cell tabular">CP-030</td>
+            <td class="id-cell">Esc30</td>
+            <td class="req-cell">RF06 / RF07</td>
+            <td>El sistema debe rechazar las solicitudes de reserva, cancelación y consulta con datos incompletos o inexistentes, sin alterar el aforo</td>
+            <td class="req-cell tabular">CND-030</td>
+            <td class="strong-cell">Campos obligatorios ausentes</td>
+            <td>Se envía la reserva sin el bloque horario: se espera 400 indicando que el correo y el bloque son obligatorios</td>
+            <td class="nowrap">Integración</td>
+            <td class="nowrap">Funcional</td>
+            <td class="nowrap">Media</td>
+            <td class="nowrap">Diseñado</td>
+            <td class="nowrap">Camila Villero</td>
+            <td></td>
+            <td class="nowrap">Sí</td>
+          </tr>
+          <tr>
+            <td class="caso-cell tabular">CP-031</td>
+            <td class="id-cell">Esc30</td>
+            <td class="req-cell">RF06 / RF07</td>
+            <td>El sistema debe rechazar las solicitudes de reserva, cancelación y consulta con datos incompletos o inexistentes, sin alterar el aforo</td>
+            <td class="req-cell tabular">CND-030</td>
+            <td class="strong-cell">Campos obligatorios ausentes</td>
+            <td>Se envía la reserva sin el correo del estudiante: se espera el mismo 400, confirmando que la validación cubre ambos campos</td>
+            <td class="nowrap">Integración</td>
+            <td class="nowrap">Funcional</td>
+            <td class="nowrap">Media</td>
+            <td class="nowrap">Diseñado</td>
+            <td class="nowrap">Camila Villero</td>
+            <td></td>
+            <td class="nowrap">Sí</td>
+          </tr>
+          <tr>
+            <td class="caso-cell tabular">CP-032</td>
+            <td class="id-cell">Esc30</td>
+            <td class="req-cell">RF06 / RF07</td>
+            <td>El sistema debe rechazar las solicitudes de reserva, cancelación y consulta con datos incompletos o inexistentes, sin alterar el aforo</td>
+            <td class="req-cell tabular">CND-031</td>
+            <td class="strong-cell">Referencias inexistentes</td>
+            <td>Se reserva con un correo que no está registrado: se espera 404 indicando que el usuario de la reserva no existe</td>
+            <td class="nowrap">Integración</td>
+            <td class="nowrap">Funcional</td>
+            <td class="nowrap">Media</td>
+            <td class="nowrap">Diseñado</td>
+            <td class="nowrap">Camila Villero</td>
+            <td></td>
+            <td class="nowrap">Sí</td>
+          </tr>
+          <tr>
+            <td class="caso-cell tabular">CP-033</td>
+            <td class="id-cell">Esc30</td>
+            <td class="req-cell">RF06 / RF07</td>
+            <td>El sistema debe rechazar las solicitudes de reserva, cancelación y consulta con datos incompletos o inexistentes, sin alterar el aforo</td>
+            <td class="req-cell tabular">CND-031</td>
+            <td class="strong-cell">Referencias inexistentes</td>
+            <td>Se reserva un bloque horario que no existe: se espera 404 indicando que el horario no fue encontrado</td>
+            <td class="nowrap">Integración</td>
+            <td class="nowrap">Funcional</td>
+            <td class="nowrap">Media</td>
+            <td class="nowrap">Diseñado</td>
+            <td class="nowrap">Camila Villero</td>
+            <td></td>
+            <td class="nowrap">Sí</td>
+          </tr>
+          <tr>
+            <td class="caso-cell tabular">CP-034</td>
+            <td class="id-cell">Esc30</td>
+            <td class="req-cell">RF06 / RF07</td>
+            <td>El sistema debe rechazar las solicitudes de reserva, cancelación y consulta con datos incompletos o inexistentes, sin alterar el aforo</td>
+            <td class="req-cell tabular">CND-031</td>
+            <td class="strong-cell">Referencias inexistentes</td>
+            <td>Se cancela una reserva con un identificador bien formado pero sin uso: se espera 404 indicando que la reserva no fue encontrada</td>
+            <td class="nowrap">Integración</td>
+            <td class="nowrap">Funcional</td>
+            <td class="nowrap">Baja</td>
+            <td class="nowrap">Diseñado</td>
+            <td class="nowrap">Camila Villero</td>
+            <td></td>
+            <td class="nowrap">Sí</td>
+          </tr>
+          <tr>
+            <td class="caso-cell tabular">CP-035</td>
+            <td class="id-cell">Esc30</td>
+            <td class="req-cell">RF06 / RF07</td>
+            <td>El sistema debe rechazar las solicitudes de reserva, cancelación y consulta con datos incompletos o inexistentes, sin alterar el aforo</td>
+            <td class="req-cell tabular">CND-032</td>
+            <td class="strong-cell">Identificador malformado</td>
+            <td>Se cancela usando un identificador que no cumple el formato esperado: se espera 400 y no un error interno del servidor</td>
+            <td class="nowrap">Integración</td>
+            <td class="nowrap">Funcional</td>
+            <td class="nowrap">Baja</td>
+            <td class="nowrap">Diseñado</td>
+            <td class="nowrap">Camila Villero</td>
+            <td></td>
+            <td class="nowrap">Sí</td>
+          </tr>
+          <tr>
+            <td class="caso-cell tabular">CP-036</td>
+            <td class="id-cell">Esc30</td>
+            <td class="req-cell">RF06 / RF07</td>
+            <td>El sistema debe rechazar las solicitudes de reserva, cancelación y consulta con datos incompletos o inexistentes, sin alterar el aforo</td>
+            <td class="req-cell tabular">CND-033</td>
+            <td class="strong-cell">Consulta sin parámetro obligatorio</td>
+            <td>Se consultan las reservas sin enviar el correo: se espera 400 indicando que el parámetro es requerido</td>
+            <td class="nowrap">Integración</td>
+            <td class="nowrap">Funcional</td>
+            <td class="nowrap">Baja</td>
+            <td class="nowrap">Diseñado</td>
+            <td class="nowrap">Camila Villero</td>
+            <td></td>
+            <td class="nowrap">Sí</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p class="note">
+      <b>Sobre las dos últimas columnas.</b> <b>ID Defecto</b> va vacío porque ningún caso se ha
+      ejecutado todavía: se llena al registrar un fallo. <b>Automatizable</b> es «Sí» en 35 de los 36
+      casos porque este módulo se prueba por API y la interfaz permite verificar textos concretos; el
+      único «No» es CP-004, que exige observar a un estudiante real usando la aplicación. Distinto es
+      cuáles <em>ya están</em> automatizados: CP-029 y los casos de campos faltantes (CP-030, CP-031,
+      CP-036) todavía no tienen prueba escrita.
+    </p>
+  </section>
+
+  <section>
+    <div class="section-head">
+      <h2>Alcance de ejecución</h2>
+      <p>
+        De los 36 casos diseñados se ejecutan <strong>17</strong> en esta iteración. El criterio no es
+        «los que alcanzamos»: se ejecutan todos los de riesgo alto, toda la funcionalidad nueva y al
+        menos un caso por escenario, de modo que <strong>ningún escenario queda sin cobertura</strong>.
+        Los 19 restantes se conservan en el diseño con su motivo de aplazamiento.
+      </p>
+    </div>
+
+    <div class="table-wrap">
+      <table class="matriz" style="min-width:820px">
+        <thead>
+          <tr>
+            <th>ID Caso</th><th>ID Escenario</th><th>ID Condición</th>
+            <th class="col-cond">Condición Prueba</th>
+            <th>Nivel</th><th>Tipo</th><th>Prioridad</th><th>Estado</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="grupo-inicio"><td class="caso-cell tabular">CP-001</td><td class="id-cell">Esc19</td><td class="req-cell tabular">CND-001</td><td class="strong-cell">Registro de la reserva con descuento de cupo</td><td class="nowrap">Integración</td><td class="nowrap">Funcional</td><td class="nowrap">Alta</td><td class="nowrap">Por ejecutar</td></tr>
+          <tr><td class="caso-cell tabular">CP-003</td><td class="id-cell">Esc19</td><td class="req-cell tabular">CND-003</td><td class="strong-cell">Fecha efectiva de la reserva</td><td class="nowrap">Integración</td><td class="nowrap">Funcional</td><td class="nowrap">Alta</td><td class="nowrap">Por ejecutar</td></tr>
+          <tr class="grupo-inicio"><td class="caso-cell tabular">CP-005</td><td class="id-cell">Esc20</td><td class="req-cell tabular">CND-005</td><td class="strong-cell">Segundo bloque distinto en la misma fecha</td><td class="nowrap">Sistema</td><td class="nowrap">Funcional</td><td class="nowrap">Alta</td><td class="nowrap">Por ejecutar</td></tr>
+          <tr class="grupo-inicio"><td class="caso-cell tabular">CP-008</td><td class="id-cell">Esc21</td><td class="req-cell tabular">CND-008</td><td class="strong-cell">Nueva reserva tras cancelar en la misma fecha</td><td class="nowrap">Sistema</td><td class="nowrap">Funcional</td><td class="nowrap">Media</td><td class="nowrap">Por ejecutar</td></tr>
+          <tr class="grupo-inicio"><td class="caso-cell tabular">CP-009</td><td class="id-cell">Esc22</td><td class="req-cell tabular">CND-009</td><td class="strong-cell">Resolución de la carrera por el último cupo</td><td class="nowrap">Integración</td><td class="nowrap">Funcional</td><td class="nowrap">Alta</td><td class="nowrap">Por ejecutar</td></tr>
+          <tr><td class="caso-cell tabular">CP-010</td><td class="id-cell">Esc22</td><td class="req-cell tabular">CND-010</td><td class="strong-cell">Integridad del aforo bajo concurrencia</td><td class="nowrap">Integración</td><td class="nowrap">Rendimiento</td><td class="nowrap">Alta</td><td class="nowrap">Por ejecutar</td></tr>
+          <tr class="grupo-inicio"><td class="caso-cell tabular">CP-011</td><td class="id-cell">Esc23</td><td class="req-cell tabular">CND-011</td><td class="strong-cell">Reserva sobre bloque sin cupos</td><td class="nowrap">Integración</td><td class="nowrap">Funcional</td><td class="nowrap">Alta</td><td class="nowrap">Por ejecutar</td></tr>
+          <tr class="grupo-inicio"><td class="caso-cell tabular">CP-013</td><td class="id-cell">Esc24</td><td class="req-cell tabular">CND-013</td><td class="strong-cell">Liberación inmediata del cupo</td><td class="nowrap">Sistema</td><td class="nowrap">Funcional</td><td class="nowrap">Alta</td><td class="nowrap">Por ejecutar</td></tr>
+          <tr class="grupo-inicio"><td class="caso-cell tabular">CP-015</td><td class="id-cell">Esc25</td><td class="req-cell tabular">CND-015</td><td class="strong-cell">Cancelación repetida sobre reserva no activa</td><td class="nowrap">Integración</td><td class="nowrap">Funcional</td><td class="nowrap">Alta</td><td class="nowrap">Por ejecutar</td></tr>
+          <tr class="grupo-inicio"><td class="caso-cell tabular">CP-017</td><td class="id-cell">Esc26</td><td class="req-cell tabular">CND-017</td><td class="strong-cell">Reserva solicitada por un profesor</td><td class="nowrap">Integración</td><td class="nowrap">Seguridad</td><td class="nowrap">Alta</td><td class="nowrap">Por ejecutar</td></tr>
+          <tr class="grupo-inicio"><td class="caso-cell tabular">CP-020</td><td class="id-cell">Esc27</td><td class="req-cell tabular">CND-020</td><td class="strong-cell">Reserva solicitada por cuenta penalizada</td><td class="nowrap">Integración</td><td class="nowrap">Seguridad</td><td class="nowrap">Alta</td><td class="nowrap">Por ejecutar</td></tr>
+          <tr class="grupo-inicio"><td class="caso-cell tabular">CP-023</td><td class="id-cell">Esc28</td><td class="req-cell tabular">CND-023</td><td class="strong-cell">Umbral de advertencia a las tres cancelaciones</td><td class="nowrap">Sistema</td><td class="nowrap">Funcional</td><td class="nowrap">Alta</td><td class="nowrap">Por ejecutar</td></tr>
+          <tr><td class="caso-cell tabular">CP-024</td><td class="id-cell">Esc28</td><td class="req-cell tabular">CND-024</td><td class="strong-cell">Penalización automática al alcanzar el límite</td><td class="nowrap">Integración</td><td class="nowrap">Funcional</td><td class="nowrap">Alta</td><td class="nowrap">Por ejecutar</td></tr>
+          <tr><td class="caso-cell tabular">CP-025</td><td class="id-cell">Esc28</td><td class="req-cell tabular">CND-025</td><td class="strong-cell">Bloqueo posterior a la penalización</td><td class="nowrap">Integración</td><td class="nowrap">Seguridad</td><td class="nowrap">Alta</td><td class="nowrap">Por ejecutar</td></tr>
+          <tr class="grupo-inicio"><td class="caso-cell tabular">CP-026</td><td class="id-cell">Esc29</td><td class="req-cell tabular">CND-026</td><td class="strong-cell">Inscripción en bloque lleno</td><td class="nowrap">Integración</td><td class="nowrap">Funcional</td><td class="nowrap">Media</td><td class="nowrap">Por ejecutar</td></tr>
+          <tr><td class="caso-cell tabular">CP-029</td><td class="id-cell">Esc29</td><td class="req-cell tabular">CND-029</td><td class="strong-cell">Avance de la fila al liberarse un cupo</td><td class="nowrap">Integración</td><td class="nowrap">Funcional</td><td class="nowrap">Media</td><td class="nowrap">Por ejecutar</td></tr>
+          <tr class="grupo-inicio"><td class="caso-cell tabular">CP-030</td><td class="id-cell">Esc30</td><td class="req-cell tabular">CND-030</td><td class="strong-cell">Campos obligatorios ausentes</td><td class="nowrap">Integración</td><td class="nowrap">Funcional</td><td class="nowrap">Media</td><td class="nowrap">Por ejecutar</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="section-head" style="margin-top:14px">
+      <h2 style="font-size:1.1rem">Los 19 casos diferidos y su motivo</h2>
+      <p>
+        No se borran de la matriz: se marcan como no ejecutados con su justificación. Un caso diseñado
+        y aplazado con motivo demuestra control del alcance; una matriz que ignora la mitad de los
+        caminos del módulo, no.
+      </p>
+    </div>
+
+    <div class="table-wrap">
+      <table class="matriz" style="min-width:720px">
+        <thead>
+          <tr><th>Casos</th><th class="col-cond">Motivo de aplazamiento</th><th>Respaldo</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="caso-cell tabular">CP-006, CP-018, CP-031</td>
+            <td class="strong-cell">Duplicados: recorren exactamente la misma validación del código que un caso ya seleccionado, cambiando solo el dato de entrada.</td>
+            <td>Cubiertos por CP-005, CP-017 y CP-030</td>
+          </tr>
+          <tr>
+            <td class="caso-cell tabular">CP-002, CP-014, CP-016, CP-027, CP-032, CP-033, CP-035</td>
+            <td class="strong-cell">Ya verificados por pruebas automatizadas que se ejecutan con la suite del backend.</td>
+            <td>Suite automatizada (57 pruebas)</td>
+          </tr>
+          <tr>
+            <td class="caso-cell tabular">CP-007, CP-012, CP-019, CP-022</td>
+            <td class="strong-cell">Verificaciones de interfaz sobre textos y estados visuales; el comportamiento de fondo ya queda probado por el caso funcional del mismo escenario.</td>
+            <td>CP-005, CP-011, CP-017, CP-020</td>
+          </tr>
+          <tr>
+            <td class="caso-cell tabular">CP-021, CP-028, CP-034, CP-036</td>
+            <td class="strong-cell">Riesgo bajo: casos borde de consulta y validación cuyo fallo no compromete el aforo ni el acceso.</td>
+            <td>—</td>
+          </tr>
+          <tr>
+            <td class="caso-cell tabular">CP-004</td>
+            <td class="strong-cell">Requiere una sesión con una persona ajena al proyecto; se aplaza por costo de coordinación, no por dificultad técnica.</td>
+            <td>Pendiente de agendar</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="section-head" style="margin-top:14px">
+      <h2 style="font-size:1.1rem">Cobertura por escenario</h2>
+      <p>Casos ejecutados sobre casos diseñados. Define así la columna en tu hoja para que el número sea interpretable.</p>
+    </div>
+
+    <div class="table-wrap">
+      <table class="matriz" style="min-width:640px">
+        <thead>
+          <tr><th>Escenario</th><th>Casos diseñados</th><th>Casos ejecutados</th><th>Cobertura %</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="id-cell">Esc19</td><td class="tabular">4</td><td class="tabular">2</td><td class="tabular strong-cell">50 %</td></tr>
+          <tr><td class="id-cell">Esc20</td><td class="tabular">3</td><td class="tabular">1</td><td class="tabular strong-cell">33 %</td></tr>
+          <tr><td class="id-cell">Esc21</td><td class="tabular">1</td><td class="tabular">1</td><td class="tabular strong-cell">100 %</td></tr>
+          <tr><td class="id-cell">Esc22</td><td class="tabular">2</td><td class="tabular">2</td><td class="tabular strong-cell">100 %</td></tr>
+          <tr><td class="id-cell">Esc23</td><td class="tabular">2</td><td class="tabular">1</td><td class="tabular strong-cell">50 %</td></tr>
+          <tr><td class="id-cell">Esc24</td><td class="tabular">2</td><td class="tabular">1</td><td class="tabular strong-cell">50 %</td></tr>
+          <tr><td class="id-cell">Esc25</td><td class="tabular">2</td><td class="tabular">1</td><td class="tabular strong-cell">50 %</td></tr>
+          <tr><td class="id-cell">Esc26</td><td class="tabular">3</td><td class="tabular">1</td><td class="tabular strong-cell">33 %</td></tr>
+          <tr><td class="id-cell">Esc27</td><td class="tabular">3</td><td class="tabular">1</td><td class="tabular strong-cell">33 %</td></tr>
+          <tr><td class="id-cell">Esc28</td><td class="tabular">3</td><td class="tabular">3</td><td class="tabular strong-cell">100 %</td></tr>
+          <tr><td class="id-cell">Esc29</td><td class="tabular">4</td><td class="tabular">2</td><td class="tabular strong-cell">50 %</td></tr>
+          <tr><td class="id-cell">Esc30</td><td class="tabular">7</td><td class="tabular">1</td><td class="tabular strong-cell">14 %</td></tr>
+          <tr style="border-top:2px solid var(--line)"><td class="id-cell"><b>Total</b></td><td class="tabular"><b>36</b></td><td class="tabular"><b>17</b></td><td class="tabular strong-cell"><b>47 %</b></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p class="note">
+      <b>El 47 % no es un mal número si lo acompañas del criterio.</b> Cobertura de escenarios: 100 %,
+      los doce tienen al menos un caso ejecutado. Cobertura de casos de riesgo alto: 100 %. Y siete de
+      los diecinueve aplazados están verificados por la suite automatizada. Sin esa explicación, un
+      47 % suelto se lee como trabajo incompleto.
+    </p>
+  </section>
+
+  <div class="footnote">
+    <h2>Cómo usar este documento</h2>
+    <ul>
+      <li>Esc19 a Esc28 tienen <strong>prueba automatizada completa en el backend</strong>, así que su cobertura puede sustentarse con la ejecución de la suite. Esc29 y Esc30 están <strong>cubiertos solo en parte</strong>: el avance de la fila de espera y los casos de campos faltantes aún no tienen test.</li>
+      <li>Esc22, Esc23, Esc25 y Esc26 son de <strong>nivel integración</strong>: se ejecutan contra la API, no por la interfaz. Esc22 requiere lanzar dos peticiones concurrentes.</li>
+      <li>Antes de entregar, asigna un RF propio a Esc26, Esc27 y Esc28, y resuelve el doble uso de RF06 en la hoja original.</li>
+      <li>Esc29 dejó a la vista un <strong>hallazgo de diseño</strong>, no un defecto: quien encabeza la lista de espera sale de la fila sin quedarse con el cupo ni recibir aviso. Regístralo aparte de los resultados de prueba.</li>
+    </ul>
+  </div>
+
+</div>

@@ -53,8 +53,13 @@ function Toast({ message, type, onClose }) {
  * pocas cancelaciones de ser penalizado. El texto lo calcula el backend.
  */
 function PenaltyAlert({ user }) {
-  if (!user?.alerta) return null;
-  const bloqueado = user.estado === 'PENALIZADO' || user.cancelaciones_restantes === 0;
+  // RN10 (cancelaciones) y RF16/RF18 (inasistencias): se muestra el aviso más
+  // urgente que tenga el estudiante en ese momento.
+  const aviso = user?.alerta_inasistencias || user?.alerta;
+  if (!aviso) return null;
+  const bloqueado = user.estado === 'PENALIZADO'
+    || user.cancelaciones_restantes === 0
+    || user.inasistencias_restantes === 0;
   return (
     <div style={{
       backgroundColor: bloqueado ? '#FEE2E2' : '#FFF7ED',
@@ -65,10 +70,10 @@ function PenaltyAlert({ user }) {
         <span style={{ fontSize: 20, flexShrink: 0 }}>{bloqueado ? '🚫' : '⚠️'}</span>
         <div>
           <p style={{ fontWeight: 800, fontSize: 14, color: bloqueado ? '#991B1B' : '#92400E', marginBottom: 2 }}>
-            {bloqueado ? 'Cuenta penalizada' : 'Aviso de cancelaciones'}
+            {bloqueado ? 'Cuenta penalizada' : 'Aviso de penalización'}
           </p>
           <p style={{ fontSize: 13, color: bloqueado ? '#991B1B' : '#78350F', lineHeight: 1.6, margin: 0 }}>
-            {user.alerta}
+            {aviso}
           </p>
         </div>
       </div>
@@ -164,10 +169,14 @@ export default function App() {
 
   const handleReserve = async (slot) => {
     try {
-      await reservationsApi.create({ email: user.email, slotId: slot.id });
+      // RF23 / P23 — Notificación de confirmación de la reserva.
+      const r = await reservationsApi.create({ email: user.email, slotId: slot.id });
       await refreshData(user.email);
-      showToast(`¡Reserva confirmada para las ${slot.hour} del ${reservaFecha?.label ?? 'día siguiente'}!`);
+      showToast(
+        r.notificacion || `¡Reserva confirmada para las ${slot.hour} del ${reservaFecha?.label ?? 'día siguiente'}!`,
+      );
     } catch (err) {
+      // RF24 / P24 — Notificación al intentar una segunda reserva del mismo día.
       showToast(err.message, 'warning');
     }
   };
@@ -192,7 +201,11 @@ export default function App() {
       } else if (r.alerta) {
         showToast(r.alerta, 'warning');
       } else {
-        showToast(`Reserva cancelada. El cupo fue liberado. Llevas ${r.cancel_count} de ${r.cancelacion_limite} cancelaciones.`, 'info');
+        // RF25 / P25 — Notificación de cancelación registrada.
+        showToast(
+          `${r.notificacion || 'Reserva cancelada.'} Llevas ${r.cancel_count} de ${r.cancelacion_limite} cancelaciones.`,
+          'info',
+        );
       }
     } catch (err) {
       showToast(err.message, 'error');

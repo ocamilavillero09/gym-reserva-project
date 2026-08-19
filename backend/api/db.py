@@ -8,7 +8,9 @@ from django.utils import timezone
 _client = None
 
 # Roles y estados de usuario (RF02 / RN09 del documento de análisis).
-ROLES = ('ESTUDIANTE', 'ENTRENADOR', 'ADMIN')
+# SIN_ROL es el estado final de una cuenta a la que el administrador principal
+# le retiró el rol de administrador (RF22).
+ROLES = ('ESTUDIANTE', 'ENTRENADOR', 'ADMIN', 'SIN_ROL')
 ESTADOS = ('ACTIVO', 'PENALIZADO', 'INACTIVO')
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -25,7 +27,7 @@ DOMINIOS_ROL = {
 
 # Reglas de negocio configurables.
 MAX_RESERVAS_POR_DIA = 1      # RN05: una única reserva activa por día
-NO_SHOW_LIMITE = 3            # RN09: 3 inasistencias -> PENALIZADO
+NO_SHOW_LIMITE = 5            # RF16: 5 inasistencias -> PENALIZADO
 CANCELACION_LIMITE = 5        # RN10: 5 cancelaciones -> PENALIZADO
 CANCELACION_ALERTA = 2        # RN10: avisar cuando falten 2 para la penalización
 PENALIZACION_DIAS_HABILES = 5  # RN09/RN10: penalización de 5 días hábiles
@@ -35,6 +37,40 @@ PENALIZACION_DIAS_HABILES = 5  # RN09/RN10: penalización de 5 días hábiles
 _DIAS = ('lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo')
 _MESES = ('enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio',
           'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre')
+
+
+# RF01/RF02 — El DOCUMENTO DE IDENTIDAD es el dato con el que la persona se
+# registra y, además, la contraseña con la que inicia sesión. Se guarda en
+# claro para poder buscarlo (RF11: el entrenador busca al estudiante por su
+# documento) y hasheado en el campo `password` para validar el inicio de sesión.
+DOCUMENTO_MIN = 6             # longitud mínima del documento de identidad
+NO_SHOW_ALERTA = 2            # RF18: avisar cuando falten 2 inasistencias
+
+
+def normalizar_documento(documento) -> str:
+    """Deja el documento sin espacios ni puntos: '1.020 304' -> '1020304'."""
+    texto = str(documento or '').strip()
+    return texto.replace('.', '').replace(' ', '').replace('-', '')
+
+
+def inasistencias_restantes(user: dict) -> int:
+    """RF18 — Cuántas inasistencias le faltan al estudiante para ser penalizado."""
+    usadas = (user or {}).get('no_show_count', 0)
+    return max(NO_SHOW_LIMITE - usadas, 0)
+
+
+def alerta_inasistencias(user: dict):
+    """RF18 — Mensaje sobre el estado de inasistencias del estudiante."""
+    restantes = inasistencias_restantes(user)
+    usadas = (user or {}).get('no_show_count', 0)
+    if restantes == 0:
+        return (f'Alcanzaste el límite de {NO_SHOW_LIMITE} inasistencias. '
+                'Tu cuenta quedó penalizada.')
+    if usadas > 0 and restantes <= NO_SHOW_ALERTA:
+        veces = 'inasistencia' if restantes == 1 else 'inasistencias'
+        return (f'Llevas {usadas} inasistencias. Estás a {restantes} {veces} '
+                'de ser penalizado.')
+    return None
 
 
 def role_for_email(email: str):
