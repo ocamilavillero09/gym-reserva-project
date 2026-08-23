@@ -1,0 +1,200 @@
+/*
+ * ESTILOS BASE Y ELEMENTOS COMPARTIDOS
+ *
+ * Tipografía, fondo de la página y las piezas que se repiten en varias
+ * pantallas: tarjetas, botones, campos de formulario, etiquetas de estado y
+ * avisos. Cada pantalla añade lo suyo en su propia hoja de estilos.
+ */
+@import './variables.css';
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  background-color: var(--fondo);
+  color: var(--texto);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Estructura de página ─────────────────────────────────────────────── */
+.pagina {
+  max-width: var(--ancho-maximo);
+  margin: 0 auto;
+  padding: 32px 24px 64px;
+}
+
+.pagina__titulo {
+  font-size: 30px;
+  font-weight: 800;
+}
+
+.pagina__subtitulo {
+  color: var(--texto-tenue);
+  font-size: 14px;
+  margin-top: 4px;
+}
+
+.seccion {
+  margin-top: 28px;
+}
+
+/* ── Tarjetas ─────────────────────────────────────────────────────────── */
+.tarjeta {
+  background-color: var(--superficie);
+  border: 1px solid var(--borde);
+  border-radius: var(--radio-grande);
+  box-shadow: var(--sombra);
+  padding: 24px;
+}
+
+.tarjeta__titulo {
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.tarjeta__nota {
+  color: var(--texto-tenue);
+  font-size: 13px;
+  margin-top: 4px;
+}
+
+/* ── Botones ──────────────────────────────────────────────────────────── */
+.boton {
+  padding: 11px 18px;
+  border: none;
+  border-radius: var(--radio-chico);
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 700;
+  font-family: inherit;
+  transition: filter 0.15s, background-color 0.15s;
+}
+
+.boton:hover:not(:disabled) {
+  filter: brightness(0.94);
+}
+
+.boton:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+.boton--primario {
+  background-color: var(--rojo);
+  color: #ffffff;
+}
+
+.boton--secundario {
+  background-color: var(--superficie);
+  color: var(--texto);
+  border: 1.5px solid var(--borde-fuerte);
+}
+
+.boton--apagado {
+  background-color: #ededed;
+  color: var(--texto-tenue);
+  cursor: not-allowed;
+}
+
+.boton--ancho {
+  width: 100%;
+}
+
+/* ── Formularios ──────────────────────────────────────────────────────── */
+.campo {
+  display: block;
+  margin-bottom: 14px;
+}
+
+.campo__etiqueta {
+  display: block;
+  font-size: 13px;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.campo__entrada {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1.5px solid var(--borde);
+  border-radius: var(--radio-chico);
+  font-size: 14px;
+  font-family: inherit;
+  background-color: #fafafa;
+}
+
+.campo__entrada:focus {
+  outline: none;
+  border-color: var(--rojo);
+  background-color: var(--superficie);
+}
+
+.campo__ayuda {
+  color: var(--texto-tenue);
+  font-size: 12px;
+  margin-top: 5px;
+}
+
+/* ── Etiquetas de estado ──────────────────────────────────────────────── */
+.etiqueta {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.etiqueta--activo      { background-color: var(--verde-claro); color: var(--verde); }
+.etiqueta--penalizado  { background-color: var(--rojo-claro);  color: var(--rojo-intenso); }
+.etiqueta--estudiante  { background-color: var(--azul-claro);  color: var(--azul); }
+.etiqueta--entrenador  { background-color: var(--verde-claro); color: var(--verde); }
+.etiqueta--admin       { background-color: var(--rojo-claro);  color: var(--rojo-intenso); }
+.etiqueta--neutra      { background-color: #eeeeee;            color: var(--texto-suave); }
+
+/* ── Avisos ───────────────────────────────────────────────────────────── */
+.aviso {
+  padding: 14px 16px;
+  border-radius: var(--radio);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.aviso--error       { background-color: var(--rojo-claro);  color: #991b1b; }
+.aviso--atencion    { background-color: var(--ambar-claro); color: var(--ambar); border: 1px solid #f0dda8; }
+.aviso--exito       { background-color: var(--verde-claro); color: var(--verde); }
+.aviso--informativo { background-color: var(--azul-claro);  color: var(--azul); }
+
+/* ── Estados vacíos ───────────────────────────────────────────────────── */
+.vacio {
+  text-align: center;
+  padding: 48px 24px;
+  color: var(--texto-tenue);
+}
+
+.vacio__icono  { font-size: 40px; }
+.vacio__titulo { font-size: 16px; font-weight: 700; margin-top: 12px; color: var(--texto); }
+.vacio__texto  { font-size: 13px; margin-top: 6px; }
+
+/* ── Rejillas ─────────────────────────────────────────────────────────── */
+.rejilla {
+  display: grid;
+  gap: 16px;
+}
+
+.rejilla--3 { grid-template-columns: repeat(3, 1fr); }
+.rejilla--2 { grid-template-columns: repeat(2, 1fr); }
+
+@media (max-width: 900px) {
+  .rejilla--3 { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 640px) {
+  .rejilla--3,
+  .rejilla--2 { grid-template-columns: 1fr; }
+  .pagina { padding: 24px 16px 48px; }
+}

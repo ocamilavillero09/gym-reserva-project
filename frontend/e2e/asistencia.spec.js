@@ -54,14 +54,20 @@ test('el entrenador busca por documento, registra la asistencia y ve el reporte 
   await page.getByRole('button', { name: 'Buscar' }).click();
   await expect(page.getByText(`Doc. ${estudiante.documento}`, { exact: false })).toBeVisible();
 
-  // --- RF13: registrar la asistencia ---
-  await page.getByRole('button', { name: 'Registrar asistencia' }).first().click();
-  await expect(page.getByText(/Asistencia registrada/i).first()).toBeVisible();
+  // --- RF13: todavía NO se puede registrar la asistencia ---
+  // La reserva se acaba de crear y es para MAÑANA: el estudiante aún no ha
+  // tenido ocasión de presentarse, así que el sistema no ofrece el botón.
+  // El camino feliz (registrar el día de la reserva) lo cubren las pruebas
+  // unitarias de RF13, que sí pueden adelantar el reloj.
+  await expect(page.getByText(/Aún no es el día de esta reserva/)).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Registrar asistencia' })).toHaveCount(0);
 
-  // --- RF19: el reporte general diario refleja la asistencia ---
+  // --- RF19: el reporte general diario del gimnasio ---
   await expect(page.getByText('📄 Reporte general diario')).toBeVisible();
   await expect(page.getByText('Estudiantes penalizados').first()).toBeVisible();
-  // RF20: el botón de impresión del PDF apunta al reporte diario.
-  await expect(page.getByRole('link', { name: /Generar PDF/ }))
-    .toHaveAttribute('href', /\/reports\/daily\.pdf\?actor_email=/);
+  // RF20: el botón descarga el reporte diario en PDF. Ya no es un enlace: se
+  // pide con fetch para que el navegador no devuelva una copia en caché.
+  const descarga = page.waitForEvent('download');
+  await page.getByRole('button', { name: /Generar PDF/ }).click();
+  expect((await descarga).suggestedFilename()).toMatch(/^reporte-diario-.*\.pdf$/);
 });

@@ -52,52 +52,45 @@ export const reservationsApi = {
   getByEmail: (email) => request(`/reservations/?email=${encodeURIComponent(email)}`),
   create:     (body)  => request('/reservations/', { method: 'POST', body: JSON.stringify(body) }),
   cancel:     (id)    => request(`/reservations/${id}/`, { method: 'DELETE' }),
-  // RN09 — el profesor/admin marca una inasistencia (No-Show).
+  // RF16 — el profesor/admin marca una inasistencia.
   noShow:     (id, actorEmail) =>
     request(`/reservations/${id}/no-show/`, { method: 'POST', body: JSON.stringify({ actor_email: actorEmail }) }),
-  // RF17 — el profesor confirma asistencia.
-  complete:   (id, actorEmail) =>
-    request(`/reservations/${id}/complete/`, { method: 'POST', body: JSON.stringify({ actor_email: actorEmail }) }),
-  // RF11 — historial.
+  // RF17 — historial.
   history:    (email) => request(`/reservations/history/?email=${encodeURIComponent(email)}`),
 };
 
-// RF12 — Lista de espera.
-export const waitlistApi = {
-  join: (slotId, email) => request(`/slots/${slotId}/waitlist/`, { method: 'POST', body: JSON.stringify({ email }) }),
-};
-
-// RF13 — Perfil y metas.
+// RF04/RF05 — Perfil del estudiante y del personal.
 export const profileApi = {
   get:    (email) => request(`/users/profile/?email=${encodeURIComponent(email)}`),
   update: (body)  => request('/users/profile/', { method: 'PUT', body: JSON.stringify(body) }),
 };
 
-// RF15 — Calificación del servicio.
-export const ratingsApi = {
-  list:   ()     => request('/ratings/'),
-  create: (body) => request('/ratings/', { method: 'POST', body: JSON.stringify(body) }),
-};
-
-// Reportes: aforo, por estudiante, personal (RF18) y general diario (RF19/RF20).
+// RF07/RF12 — aforo · RF18 — reporte personal · RF19/RF20 — reporte diario.
 export const reportsApi = {
   occupancy: () => request('/reports/occupancy/'),
-  students:  () => request('/reports/students/'),
   // RF18 — Reporte personal del estudiante: inasistencias y penalizaciones.
   personal:  (email) => request(`/reports/personal/?email=${encodeURIComponent(email)}`),
   // RF19 — Reporte general diario del gimnasio.
+  // `cache: no-store` y el parámetro `_` obligan a traer siempre datos frescos:
+  // sin ellos el navegador reutilizaba la respuesta anterior y el reporte se
+  // quedaba desactualizado tras registrar asistencias.
   daily:     (actorEmail, fecha = '') =>
-    request(`/reports/daily/?actor_email=${encodeURIComponent(actorEmail)}&fecha=${fecha}`),
-  // RF20 — El mismo reporte diario en PDF, listo para imprimir.
-  dailyPdfUrl: (actorEmail, fecha = '') =>
-    `${BASE}/reports/daily.pdf?actor_email=${encodeURIComponent(actorEmail)}&fecha=${fecha}`,
-  csvUrl:    `${BASE}/reports/usage.csv`,
-  pdfUrl:    `${BASE}/reports/usage.pdf`,
-};
+    request(`/reports/daily/?actor_email=${encodeURIComponent(actorEmail)}`
+      + `&fecha=${encodeURIComponent(fecha)}&_=${Date.now()}`, { cache: 'no-store' }),
 
-// RF18 — Máquinas.
-export const machinesApi = {
-  list:      ()                         => request('/machines/'),
-  create:    (name, actorEmail)         => request('/machines/', { method: 'POST', body: JSON.stringify({ name, actor_email: actorEmail }) }),
-  setEstado: (id, estado, note, actor)  => request(`/machines/${id}/`, { method: 'PATCH', body: JSON.stringify({ estado, note, actor_email: actor }) }),
+  // RF20 — El mismo reporte diario en PDF, listo para imprimir.
+  // Se pide con fetch y se entrega como archivo en lugar de abrir un enlace:
+  // así el navegador no devuelve una copia guardada en caché y el botón
+  // funciona aunque estén bloqueadas las ventanas emergentes.
+  dailyPdf: async (actorEmail, fecha = '') => {
+    const url = `${BASE}/reports/daily.pdf?actor_email=${encodeURIComponent(actorEmail)}`
+      + `&fecha=${encodeURIComponent(fecha)}&_=${Date.now()}`;
+    const res = await fetch(url, { cache: 'no-store' });
+    if (!res.ok) {
+      let mensaje = 'No se pudo generar el reporte en PDF.';
+      try { mensaje = (await res.json()).error || mensaje; } catch { /* la respuesta no era JSON */ }
+      throw new Error(mensaje);
+    }
+    return res.blob();
+  },
 };

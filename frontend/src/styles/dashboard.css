@@ -1,0 +1,304 @@
+/*
+ * TABLERO DE RESERVA DEL ESTUDIANTE
+ *
+ * Saludo, franja con la fecha del día siguiente, cifras rápidas, rejilla de
+ * bloques horarios y ventana de confirmación.
+ */
+@import './base.css';
+
+.tablero {
+  max-width: var(--ancho-maximo);
+  margin: 0 auto;
+  padding: 36px 24px;
+  animation: fadeUp 0.4s ease;
+}
+
+/* ── Saludo ───────────────────────────────────────────────────────────── */
+.tablero__saludo        { margin-bottom: 28px; }
+.tablero__titulo        { font-size: 30px; font-weight: 900; letter-spacing: -0.5px; margin-bottom: 4px; }
+.tablero__fecha-hoy     { color: var(--texto-tenue); font-size: 15px; text-transform: capitalize; }
+
+/* ── Franja de la fecha de reserva ────────────────────────────────────── */
+.tablero__franja {
+  background: linear-gradient(120deg, var(--rojo) 0%, #990000 100%);
+  border-radius: 18px;
+  padding: 22px 26px;
+  margin-bottom: 24px;
+  display: flex;
+  gap: 18px;
+  align-items: center;
+  color: #ffffff;
+  box-shadow: 0 6px 24px rgba(204, 0, 0, 0.25);
+}
+
+.tablero__franja-icono {
+  font-size: 38px;
+  flex-shrink: 0;
+}
+
+.tablero__franja-rotulo {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  opacity: 0.85;
+  margin-bottom: 4px;
+}
+
+.tablero__franja-fecha {
+  font-size: 22px;
+  font-weight: 900;
+  text-transform: capitalize;
+  line-height: 1.2;
+}
+
+.tablero__franja-nota {
+  font-size: 13px;
+  opacity: 0.9;
+  margin-top: 6px;
+}
+
+/* ── Cifras rápidas ───────────────────────────────────────────────────── */
+.tablero__cifras {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+  margin-bottom: 28px;
+}
+
+.cifra {
+  background-color: var(--superficie);
+  border: 1.5px solid transparent;
+  border-radius: var(--radio-grande);
+  padding: 20px 24px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.07);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.cifra--alerta { border-color: #f59e0b; }
+
+.cifra__icono  { font-size: 32px; }
+.cifra__valor  { font-size: 26px; font-weight: 900; line-height: 1; }
+.cifra__rotulo { font-size: 12px; color: var(--texto-tenue); margin-top: 4px; }
+
+.cifra--alerta .cifra__valor { color: #b45309; }
+
+/* ── Encabezado de la rejilla ─────────────────────────────────────────── */
+.tablero__encabezado {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.tablero__seccion { font-size: 20px; font-weight: 800; }
+
+.tablero__en-vivo {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--rojo);
+  background-color: #fee2e2;
+  padding: 6px 14px;
+  border-radius: 20px;
+}
+
+.tablero__bloques {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
+  gap: 20px;
+}
+
+/* ── Tarjeta de bloque horario ────────────────────────────────────────── */
+.bloque {
+  position: relative;
+  overflow: hidden;
+  background-color: var(--superficie);
+  border-radius: 18px;
+  padding: 26px;
+  box-shadow: 0 2px 14px rgba(0, 0, 0, 0.07);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.bloque:not(.bloque--deshabilitado):hover {
+  transform: translateY(-5px);
+  cursor: pointer;
+}
+
+.bloque--reservado {
+  box-shadow: 0 0 0 2.5px var(--rojo), 0 6px 24px rgba(204, 0, 0, 0.14);
+}
+
+.bloque--limitado { opacity: 0.65; }
+
+.bloque__insignia {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  background-color: var(--rojo);
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.3px;
+  padding: 4px 12px;
+  border-radius: 24px;
+}
+
+.bloque__rotulo {
+  font-size: 13px;
+  color: #aaaaaa;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 4px;
+}
+
+.bloque__hora {
+  font-size: 42px;
+  font-weight: 900;
+  line-height: 1;
+  margin-bottom: 16px;
+}
+
+.bloque__barra {
+  height: 7px;
+  background-color: #f0f0f0;
+  border-radius: 6px;
+  margin-bottom: 10px;
+  overflow: hidden;
+}
+
+.bloque__barra-relleno {
+  height: 100%;
+  border-radius: 6px;
+  transition: width 0.6s ease;
+}
+
+.bloque__barra-relleno--libre   { background-color: #16a34a; }
+.bloque__barra-relleno--pocos   { background-color: #d97706; }
+.bloque__barra-relleno--lleno   { background-color: #dc2626; }
+
+.bloque__cifras {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 22px;
+}
+
+.bloque__cupos        { font-size: 13px; color: var(--texto-suave); }
+.bloque__cupos strong { color: var(--texto); }
+
+.bloque__estado           { font-size: 12px; font-weight: 700; }
+.bloque__estado--libre    { color: #16a34a; }
+.bloque__estado--pocos    { color: #d97706; }
+.bloque__estado--lleno    { color: #dc2626; }
+
+.bloque__accion {
+  width: 100%;
+  padding: 13px 0;
+  border: none;
+  border-radius: var(--radio);
+  cursor: pointer;
+  background-color: var(--rojo);
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 700;
+  font-family: inherit;
+  box-shadow: 0 4px 14px rgba(204, 0, 0, 0.3);
+}
+
+.bloque__accion:disabled {
+  background-color: #f5f5f5;
+  color: #999999;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+/* ── Ventana de confirmación ──────────────────────────────────────────── */
+.confirmar {
+  position: fixed;
+  inset: 0;
+  z-index: 999;
+  padding: 24px;
+  background-color: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.confirmar__tarjeta {
+  background-color: var(--superficie);
+  border-radius: 22px;
+  padding: 36px 32px;
+  max-width: 440px;
+  width: 100%;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+  animation: scaleIn 0.25s ease;
+}
+
+.confirmar__cabecera { text-align: center; margin-bottom: 24px; }
+.confirmar__icono    { font-size: 52px; margin-bottom: 12px; }
+.confirmar__titulo   { font-size: 22px; font-weight: 900; margin-bottom: 8px; }
+.confirmar__bloque   { color: var(--texto-suave); font-size: 15px; }
+.confirmar__hora     { color: var(--rojo); }
+
+.confirmar__fecha {
+  background-color: var(--fondo);
+  border-radius: 14px;
+  padding: 14px 18px;
+  margin-bottom: 18px;
+  text-align: center;
+}
+
+.confirmar__fecha-rotulo {
+  font-size: 12px;
+  color: var(--texto-tenue);
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+.confirmar__fecha-valor {
+  font-size: 15px;
+  font-weight: 800;
+  text-transform: capitalize;
+}
+
+.confirmar__politica {
+  background-color: #fff8e6;
+  border: 1.5px solid #ffc107;
+  border-radius: 14px;
+  padding: 16px 18px;
+  margin-bottom: 26px;
+}
+
+.confirmar__politica-titulo { font-weight: 700; color: #92400e; font-size: 14px; margin-bottom: 6px; }
+.confirmar__politica-texto  { color: #78350f; font-size: 13px; line-height: 1.7; }
+
+.confirmar__acciones { display: flex; gap: 12px; }
+
+.confirmar__boton {
+  flex: 1;
+  padding: 14px;
+  border-radius: var(--radio);
+  cursor: pointer;
+  font-size: 14px;
+  font-family: inherit;
+}
+
+.confirmar__boton--cancelar {
+  border: 1.5px solid #e5e7eb;
+  background-color: var(--superficie);
+  color: var(--texto-suave);
+  font-weight: 600;
+}
+
+.confirmar__boton--aceptar {
+  border: none;
+  background-color: var(--rojo);
+  color: #ffffff;
+  font-weight: 800;
+  box-shadow: 0 4px 16px rgba(204, 0, 0, 0.35);
+}

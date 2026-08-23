@@ -1,0 +1,268 @@
+/*
+ * PANTALLA DE ACCESO Y REGISTRO
+ *
+ * Dos columnas: a la izquierda la presentación del sistema, a la derecha el
+ * formulario. En pantallas pequeñas la columna decorativa se oculta.
+ */
+@import './base.css';
+
+.acceso {
+  min-height: 100vh;
+  display: flex;
+}
+
+/* ── Columna izquierda (presentación) ─────────────────────────────────── */
+.acceso__presentacion {
+  flex: 1;
+  background: linear-gradient(145deg, var(--rojo) 0%, #990000 100%);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 60px;
+}
+
+.acceso__presentacion-contenido {
+  text-align: center;
+  color: #ffffff;
+  animation: fadeUp 0.6s ease;
+}
+
+.acceso__logo-grande {
+  width: 220px;
+  margin-bottom: 28px;
+  filter: drop-shadow(0 4px 16px rgba(0, 0, 0, 0.25));
+}
+
+.acceso__lema {
+  font-size: 17px;
+  opacity: 0.88;
+  max-width: 300px;
+  line-height: 1.7;
+  margin: 0 auto;
+}
+
+.acceso__caracteristicas {
+  margin-top: 48px;
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.acceso__caracteristica {
+  background-color: rgba(255, 255, 255, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  padding: 8px 16px;
+  border-radius: 24px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.acceso__cita {
+  margin-top: 60px;
+  padding: 20px 32px;
+  background-color: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: var(--radio-grande);
+  font-size: 13px;
+  opacity: 0.85;
+  line-height: 1.7;
+}
+
+/* ── Columna derecha (formulario) ─────────────────────────────────────── */
+.acceso__formulario {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 40px 24px;
+  background-color: var(--fondo);
+}
+
+.acceso__caja {
+  width: 100%;
+  max-width: 420px;
+  animation: fadeUp 0.4s ease;
+}
+
+.acceso__logo-caja {
+  text-align: center;
+  margin-bottom: 32px;
+}
+
+.acceso__logo-caja img { width: 180px; }
+
+.acceso__tarjeta {
+  background-color: var(--superficie);
+  border-radius: 22px;
+  padding: 36px 32px;
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.1);
+}
+
+.acceso__titulo {
+  font-size: 24px;
+  font-weight: 800;
+  margin-bottom: 6px;
+}
+
+.acceso__descripcion {
+  color: var(--texto-tenue);
+  font-size: 14px;
+  margin-bottom: 28px;
+}
+
+/* ── Pestañas ─────────────────────────────────────────────────────────── */
+.acceso__pestanas {
+  display: flex;
+  background-color: var(--fondo);
+  border-radius: var(--radio);
+  padding: 4px;
+  margin-bottom: 28px;
+}
+
+.acceso__pestana {
+  flex: 1;
+  padding: 10px 0;
+  border: none;
+  border-radius: var(--radio-chico);
+  cursor: pointer;
+  background-color: transparent;
+  color: var(--texto-tenue);
+  font-size: 14px;
+  font-weight: 400;
+  font-family: inherit;
+  transition: all 0.2s;
+}
+
+.acceso__pestana--activa {
+  background-color: var(--superficie);
+  color: var(--rojo);
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* ── Formulario ───────────────────────────────────────────────────────── */
+.acceso__campos {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.acceso__etiqueta {
+  display: block;
+  font-size: 13px;
+  color: var(--texto-suave);
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.acceso__entrada {
+  width: 100%;
+  padding: 12px 16px;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 10px;
+  font-size: 14px;
+  font-family: inherit;
+  color: var(--texto);
+  background-color: #fafafa;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.acceso__pista        { font-size: 12px; margin-top: 6px; }
+.acceso__pista--ok    { color: var(--verde); }
+.acceso__pista--error { color: #991b1b; }
+.acceso__nota         { font-size: 12px; color: var(--texto-tenue); margin-top: 6px; }
+
+.acceso__error {
+  background-color: #fee2e2;
+  border: 1px solid #fca5a5;
+  border-radius: 10px;
+  padding: 10px 14px;
+  color: #991b1b;
+  font-size: 13px;
+}
+
+.acceso__enviar {
+  width: 100%;
+  padding: 15px;
+  margin-top: 4px;
+  border: none;
+  border-radius: var(--radio);
+  background-color: var(--rojo);
+  color: #ffffff;
+  font-size: 15px;
+  font-weight: 800;
+  font-family: inherit;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(204, 0, 0, 0.35);
+}
+
+.acceso__enviar:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+/* ── Ayuda de dominios ────────────────────────────────────────────────── */
+.acceso__dominios {
+  padding: 12px 16px;
+  background-color: #fff8f0;
+  border: 1px solid #ffd9a0;
+  border-radius: 10px;
+  text-align: center;
+}
+
+.acceso__dominios-titulo {
+  font-size: 12px;
+  color: #92400e;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.acceso__dominio {
+  font-size: 12px;
+  color: #92400e;
+  line-height: 1.7;
+}
+
+/* ── Registro completado ──────────────────────────────────────────────── */
+.registro-ok {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background-color: var(--fondo);
+}
+
+.registro-ok__tarjeta {
+  background-color: var(--superficie);
+  border-radius: 22px;
+  padding: 48px 40px;
+  max-width: 440px;
+  width: 100%;
+  text-align: center;
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.1);
+  animation: scaleIn 0.3s ease;
+}
+
+.registro-ok__icono {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background-color: #dcfce7;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 20px;
+  font-size: 40px;
+}
+
+.registro-ok__titulo   { font-size: 24px; font-weight: 900; margin-bottom: 10px; }
+.registro-ok__texto    { color: var(--texto-suave); font-size: 15px; line-height: 1.7; margin-bottom: 8px; }
+.registro-ok__detalle  { color: var(--texto-tenue); font-size: 14px; line-height: 1.7; margin-bottom: 32px; }
+.registro-ok__correo   { color: var(--rojo); }
+
+@media (max-width: 768px) {
+  .acceso__presentacion { display: none; }
+}

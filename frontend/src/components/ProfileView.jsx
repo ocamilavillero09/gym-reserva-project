@@ -1,9 +1,16 @@
+/*
+ * MI PERFIL
+ *
+ * Muestra los datos de la cuenta, el reporte personal de inasistencias y
+ * penalizaciones, las cancelaciones acumuladas y —solo para estudiantes— la
+ * información de entrenamiento.
+ *
+ * Solo estructura y comportamiento. La presentación vive en
+ * src/styles/perfil.css.
+ */
 import { useCallback, useEffect, useState } from 'react';
 import { profileApi, reportsApi } from '../services/api';
-
-const RED = '#CC0000';
-const inputStyle = { width: '100%', padding: '12px 16px', border: '1.5px solid #E5E7EB', borderRadius: 10, fontSize: 14, backgroundColor: '#FAFAFA' };
-const card = { background: 'white', borderRadius: 18, padding: 26, marginBottom: 20, boxShadow: '0 2px 14px rgba(0,0,0,0.07)' };
+import '../styles/perfil.css';
 
 const ROLE_LABEL = {
   ESTUDIANTE: 'Estudiante',
@@ -12,16 +19,6 @@ const ROLE_LABEL = {
   SIN_ROL: 'Sin rol asignado',
 };
 
-/**
- * Mi perfil.
- *
- *   RF05 — Entrenadores y administradores consultan su nombre, DOCUMENTO DE
- *          IDENTIDAD y rol asignado.
- *   RF04 — El estudiante consulta y gestiona su edad, peso, altura y objetivo
- *          de entrenamiento.
- *   RF18 — El estudiante consulta su reporte personal de inasistencias y
- *          penalizaciones, y cuántas inasistencias le faltan para el límite.
- */
 export default function ProfileView({ user, showToast }) {
   const [edad, setEdad] = useState('');
   const [peso, setPeso] = useState('');
@@ -44,7 +41,7 @@ export default function ProfileView({ user, showToast }) {
 
   const esEstudiante = (datos?.role ?? user.role) === 'ESTUDIANTE';
 
-  // RF18 — Reporte personal de inasistencias y penalizaciones.
+  // Reporte personal de inasistencias y penalizaciones.
   useEffect(() => {
     if (!esEstudiante) return;
     reportsApi.personal(user.email).then(setReporte).catch(() => {});
@@ -65,21 +62,17 @@ export default function ProfileView({ user, showToast }) {
     } catch (err) { showToast(err.message, 'error'); }
   };
 
-  const restantes = datos?.cancelaciones_restantes ?? 0;
-  const enAlerta = esEstudiante && restantes <= 2;
   const inasistenciasRestantes = reporte?.inasistencias_restantes ?? datos?.inasistencias_restantes ?? 0;
   const penalizado = (reporte?.estado ?? datos?.estado) === 'PENALIZADO';
 
   return (
-    <div style={{ maxWidth: 620, margin: '0 auto', padding: '36px 24px', animation: 'fadeUp 0.4s ease' }}>
-      <h2 style={{ fontSize: 30, fontWeight: 900, marginBottom: 4 }}>Mi perfil</h2>
-      <p style={{ color: '#999', fontSize: 15, marginBottom: 28 }}>
-        Datos de tu cuenta en el sistema de reservas
-      </p>
+    <div className="perfil">
+      <h2 className="perfil__titulo">Mi perfil</h2>
+      <p className="perfil__subtitulo">Datos de tu cuenta en el sistema de reservas</p>
 
-      {/* RF05 — Nombre, documento de identidad y rol asignado (todos los roles) */}
-      <div style={card}>
-        <h3 style={{ fontSize: 18, fontWeight: 800, marginBottom: 16 }}>🪪 Mis datos</h3>
+      {/* Nombre, documento de identidad y rol asignado (todos los roles) */}
+      <div className="perfil__tarjeta">
+        <h3 className="perfil__seccion">🪪 Mis datos</h3>
         <Dato label="Nombre" valor={datos?.name ?? user.name} />
         <Dato label="Correo institucional" valor={datos?.email ?? user.email} />
         <Dato label="Documento de identidad" valor={datos?.documento || user.documento || '—'} />
@@ -91,16 +84,14 @@ export default function ProfileView({ user, showToast }) {
         <Dato label="Estado de la cuenta" valor={datos?.estado ?? user.estado} />
       </div>
 
-      {/* RF18 / HU08 — Mis inasistencias y penalizaciones */}
+      {/* Mis inasistencias y penalizaciones */}
       {esEstudiante && reporte && (
-        <div style={{ ...card, border: penalizado ? '1.5px solid #DC2626' : '1.5px solid transparent' }}>
-          <h3 style={{ fontSize: 18, fontWeight: 800, marginBottom: 6 }}>
-            🚦 Mis inasistencias y penalizaciones
-          </h3>
-          <p style={{ fontSize: 13, color: '#777', marginBottom: 16 }}>
+        <div className={`perfil__tarjeta${penalizado ? ' perfil__tarjeta--penalizado' : ''}`}>
+          <h3 className="perfil__seccion">🚦 Mis inasistencias y penalizaciones</h3>
+          <p className="perfil__nota">
             La cuenta se penaliza al llegar a {reporte.no_show_limite} inasistencias.
           </p>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px,1fr))', gap: 14 }}>
+          <div className="perfil__contadores">
             <Contador
               label="Inasistencias"
               value={reporte.no_show_count}
@@ -121,29 +112,23 @@ export default function ProfileView({ user, showToast }) {
           </div>
 
           {penalizado ? (
-            <div style={{ marginTop: 18, background: '#FEE2E2', border: '1.5px solid #DC2626', borderRadius: 12, padding: '14px 16px' }}>
-              <p style={{ fontSize: 13, lineHeight: 1.6, color: '#991B1B', margin: 0 }}>
-                🚫 Tu cuenta está <strong>PENALIZADA</strong> y no puedes reservar
-                {reporte.penalizado_hasta ? ` hasta el ${reporte.penalizado_hasta}` : ''}.
-              </p>
+            <div className="perfil__aviso perfil__aviso--bloqueado">
+              🚫 Tu cuenta está <strong>PENALIZADA</strong> y no puedes reservar
+              {reporte.penalizado_hasta ? ` hasta el ${reporte.penalizado_hasta}` : ''}.
             </div>
           ) : reporte.alerta_inasistencias && (
-            <div style={{ marginTop: 18, background: '#FFF7ED', border: '1.5px solid #F59E0B', borderRadius: 12, padding: '14px 16px' }}>
-              <p style={{ fontSize: 13, lineHeight: 1.6, color: '#78350F', margin: 0 }}>
-                ⚠️ {reporte.alerta_inasistencias}
-              </p>
+            <div className="perfil__aviso perfil__aviso--atencion">
+              ⚠️ {reporte.alerta_inasistencias}
             </div>
           )}
 
           {reporte.inasistencias.length > 0 && (
-            <div style={{ marginTop: 18 }}>
-              <p style={{ fontSize: 13, fontWeight: 700, color: '#555', marginBottom: 8 }}>
-                Detalle de mis inasistencias
-              </p>
+            <div className="perfil__detalle">
+              <p className="perfil__detalle-titulo">Detalle de mis inasistencias</p>
               {reporte.inasistencias.map((i) => (
-                <div key={i.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #F0F0F0', fontSize: 13 }}>
-                  <span style={{ fontWeight: 700 }}>{i.hour}</span>
-                  <span style={{ color: '#999' }}>{i.date}</span>
+                <div key={i.id} className="perfil__detalle-fila">
+                  <span className="perfil__detalle-hora">{i.hour}</span>
+                  <span className="perfil__detalle-fecha">{i.date}</span>
                 </div>
               ))}
             </div>
@@ -151,70 +136,65 @@ export default function ProfileView({ user, showToast }) {
         </div>
       )}
 
-      {/* RN10 — Cancelaciones acumuladas del estudiante */}
+      {/* Cancelaciones acumuladas. Es solo informativo: cancelar no penaliza
+          la cuenta ni cuenta como inasistencia. */}
       {esEstudiante && datos && (
-        <div style={{ ...card, border: enAlerta ? '1.5px solid #F59E0B' : '1.5px solid transparent' }}>
-          <h3 style={{ fontSize: 18, fontWeight: 800, marginBottom: 16 }}>📊 Mis cancelaciones</h3>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px,1fr))', gap: 14 }}>
+        <div className="perfil__tarjeta">
+          <h3 className="perfil__seccion">📊 Mis cancelaciones</h3>
+          <p className="perfil__nota">
+            Cancelar a tiempo devuelve el cupo a otro compañero y no penaliza tu cuenta.
+            Este contador es solo informativo.
+          </p>
+          <div className="perfil__contadores">
             <Contador
               label="Veces que he cancelado"
               value={datos.cancel_count}
-              sub={`de ${datos.cancelacion_limite} permitidas`}
-              alerta={enAlerta}
+              sub="no afectan a tu cuenta"
             />
             <Contador
-              label="Cancelaciones restantes"
-              value={restantes}
-              sub="antes de la penalización"
-              alerta={enAlerta}
+              label="Inasistencias"
+              value={datos.no_show_count}
+              sub={`de ${datos.no_show_limite} permitidas`}
+              alerta={datos.no_show_count > 0}
             />
           </div>
-          {datos.alerta && (
-            <div style={{
-              marginTop: 18, backgroundColor: restantes === 0 ? '#FEE2E2' : '#FFF7ED',
-              border: `1.5px solid ${restantes === 0 ? '#DC2626' : '#F59E0B'}`,
-              borderRadius: 12, padding: '14px 16px',
-            }}>
-              <p style={{ fontSize: 13, lineHeight: 1.6, color: restantes === 0 ? '#991B1B' : '#78350F', margin: 0 }}>
-                ⚠️ {datos.alerta}
-              </p>
-            </div>
-          )}
         </div>
       )}
 
-      {/* RF04 / HU03 — Información personal de entrenamiento (solo estudiantes) */}
+      {/* Información personal de entrenamiento (solo estudiantes) */}
       {esEstudiante ? (
-        <form onSubmit={save} style={{ ...card, display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <form className="perfil__tarjeta perfil__formulario" onSubmit={save}>
           <div>
-            <h3 style={{ fontSize: 18, fontWeight: 800 }}>🏋️ Mi información de entrenamiento</h3>
-            <p style={{ fontSize: 13, color: '#777', marginTop: 4 }}>
+            <h3 className="perfil__seccion">🏋️ Mi información de entrenamiento</h3>
+            <p className="perfil__nota">
               Mantén actualizados tu edad, peso, altura y objetivo.
             </p>
           </div>
           <div>
-            <label style={{ fontSize: 13, fontWeight: 600, color: '#555' }}>Edad (años)</label>
-            <input type="number" min="1" value={edad} onChange={(e) => setEdad(e.target.value)} style={inputStyle} />
+            <label className="perfil__etiqueta">Edad (años)</label>
+            <input className="perfil__entrada" type="number" min="1" value={edad}
+                   onChange={(e) => setEdad(e.target.value)} />
           </div>
           <div>
-            <label style={{ fontSize: 13, fontWeight: 600, color: '#555' }}>Peso (kg)</label>
-            <input type="number" value={peso} onChange={(e) => setPeso(e.target.value)} style={inputStyle} />
+            <label className="perfil__etiqueta">Peso (kg)</label>
+            <input className="perfil__entrada" type="number" value={peso}
+                   onChange={(e) => setPeso(e.target.value)} />
           </div>
           <div>
-            <label style={{ fontSize: 13, fontWeight: 600, color: '#555' }}>Altura (cm)</label>
-            <input type="number" value={altura} onChange={(e) => setAltura(e.target.value)} style={inputStyle} />
+            <label className="perfil__etiqueta">Altura (cm)</label>
+            <input className="perfil__entrada" type="number" value={altura}
+                   onChange={(e) => setAltura(e.target.value)} />
           </div>
           <div>
-            <label style={{ fontSize: 13, fontWeight: 600, color: '#555' }}>Objetivo de entrenamiento</label>
-            <input type="text" value={meta} onChange={(e) => setMeta(e.target.value)} placeholder="Ej: Ganar resistencia" style={inputStyle} />
+            <label className="perfil__etiqueta">Objetivo de entrenamiento</label>
+            <input className="perfil__entrada" type="text" value={meta}
+                   onChange={(e) => setMeta(e.target.value)} placeholder="Ej: Ganar resistencia" />
           </div>
-          <button type="submit" style={{ padding: 13, border: 'none', borderRadius: 12, background: RED, color: 'white', fontWeight: 800, cursor: 'pointer' }}>
-            Guardar perfil
-          </button>
+          <button className="perfil__guardar" type="submit">Guardar perfil</button>
         </form>
       ) : (
-        <div style={card}>
-          <p style={{ fontSize: 13, color: '#777', lineHeight: 1.7, margin: 0 }}>
+        <div className="perfil__tarjeta">
+          <p className="perfil__explicacion">
             Los entrenadores y administradores consultan aquí su nombre, documento de identidad
             y rol asignado. La información de entrenamiento (edad, peso, altura y objetivo) es
             exclusiva del perfil del estudiante.
@@ -227,13 +207,11 @@ export default function ProfileView({ user, showToast }) {
 
 function Dato({ label, valor, extra }) {
   return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, padding: '10px 0', borderBottom: '1px solid #F0F0F0' }}>
-      <span style={{ fontSize: 13, color: '#777' }}>{label}</span>
-      <span style={{ fontSize: 14, fontWeight: 700, textAlign: 'right', wordBreak: 'break-all' }}>
+    <div className="dato">
+      <span className="dato__etiqueta">{label}</span>
+      <span className="dato__valor">
         {valor || '—'}
-        {extra && (
-          <span style={{ display: 'block', fontSize: 11, fontWeight: 800, color: RED }}>{extra}</span>
-        )}
+        {extra && <span className="dato__extra">{extra}</span>}
       </span>
     </div>
   );
@@ -241,10 +219,10 @@ function Dato({ label, valor, extra }) {
 
 function Contador({ label, value, sub, alerta }) {
   return (
-    <div style={{ border: `1px solid ${alerta ? '#FCD34D' : '#eee'}`, background: alerta ? '#FFFBEB' : 'white', borderRadius: 12, padding: 14 }}>
-      <p style={{ fontSize: 28, fontWeight: 900, color: alerta ? '#B45309' : '#1A1A1A', lineHeight: 1 }}>{value}</p>
-      <p style={{ fontSize: 12, fontWeight: 700, color: '#555', marginTop: 6 }}>{label}</p>
-      <p style={{ fontSize: 11, color: '#999', marginTop: 2 }}>{sub}</p>
+    <div className={`contador${alerta ? ' contador--alerta' : ''}`}>
+      <p className="contador__valor">{value}</p>
+      <p className="contador__label">{label}</p>
+      <p className="contador__sub">{sub}</p>
     </div>
   );
 }

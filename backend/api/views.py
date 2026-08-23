@@ -1,46 +1,66 @@
+"""
+FUNCIONALIDADES DE ACCESO Y DE RESERVAS
+
+Este archivo expone la API: recibe la petición, aplica las reglas del gimnasio
+y devuelve la respuesta. No consulta MongoDB directamente ni define límites
+propios; para eso llama a las otras dos capas del backend:
+
+    reglas.py   -> los límites y cálculos del gimnasio
+    datos.py    -> las consultas a la base de datos
+    seguridad.py-> el tratamiento de las contraseñas
+
+REQUISITOS FUNCIONALES CUBIERTOS EN ESTE ARCHIVO
+    RF02  Inicio de sesión con el correo institucional y el documento
+    RF08  Reserva del estudiante para el día siguiente
+    RF12  El personal visualiza los bloques sin poder reservar
+    RF23  Notificación de reserva confirmada
+
+REQUISITOS FUNCIONALES IGNORADOS EN ESTE ARCHIVO
+    Son responsabilidad de otros integrantes del equipo o quedaron fuera del
+    alcance de las pruebas. El código sigue funcionando, pero no se diseñaron
+    escenarios ni casos de prueba para ellos.
+    RF01  Registro de usuarios
+    RF03  Asignación automática del rol según el dominio
+    RF06  Consulta de los bloques horarios disponibles
+    RF07  Cupos ocupados y disponibles de cada bloque
+    RF09  Una única reserva por estudiante y día
+    RF10  Consulta de las reservas hechas
+    RF16  Penalización al alcanzar cinco inasistencias
+    RF21  Creación de cuentas de administrador
+    RF22  Gestión de las cuentas de otros administradores
+    RF24  Cancelación de reservas
+    RF25  Notificación de cancelación
+"""
 from datetime import datetime
-from bson import ObjectId
+
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
-from .db import (
-    get_db, seed_slots, hash_password, verify_password, serialize,
-    add_business_days, ROLES, DOMINIOS_ROL, role_for_email,
-    fecha_reserva, formato_fecha_es, cancelaciones_restantes, alerta_cancelaciones,
-    normalizar_documento, inasistencias_restantes, alerta_inasistencias,
-    MAX_RESERVAS_POR_DIA, NO_SHOW_LIMITE, CANCELACION_LIMITE, PENALIZACION_DIAS_HABILES,
-    DOCUMENTO_MIN,
-)
+
+from . import datos, reglas
+from .seguridad import hash_password, verify_password
 
 
 # ══════════════════════════════════════════════════════════════════════════
 #  CASOS DE USO CRÍTICOS DEL SISTEMA
 #  --------------------------------------------------------------------------
-#  Este archivo concentra los 5 casos de uso críticos del sistema de reservas.
-#  Cada uno está marcado con un encabezado «CASO DE USO CRÍTICO #N» que explica
-#  la regla de negocio que protege y por qué es crítico. Son los flujos que,
-#  si fallan, comprometen la integridad de los datos o la seguridad:
+#  Son los flujos que, si fallan, comprometen la integridad de los datos o la
+#  seguridad del sistema:
 #
-#    CU-1  Registro con correo institucional      (seguridad / control de acceso)
-#    CU-2  Inicio de sesión y verificación de hash (seguridad / credenciales)
-#    CU-3  Consulta de cupos en tiempo real        (consistencia de lectura)
-#    CU-4  Crear reserva con descuento ATÓMICO     (concurrencia / no sobreventa)
-#    CU-5  Cancelar reserva y liberar cupo         (consistencia / no perder cupos)
+#    CU-1  Registro con correo institucional       (control de acceso)
+#    CU-2  Inicio de sesión y verificación del hash (credenciales)
+#    CU-3  Consulta de cupos en tiempo real         (consistencia de lectura)
+#    CU-4  Crear reserva con descuento ATÓMICO      (concurrencia)
+#    CU-5  Cancelar reserva y liberar cupo          (no perder cupos)
 # ══════════════════════════════════════════════════════════════════════════
-
-
-def _dominios_texto() -> str:
-    """'@soyudemedellin.edu.co (estudiante), @udem.edu.co (profesor), ...'"""
-    etiquetas = {'ESTUDIANTE': 'estudiante', 'ENTRENADOR': 'profesor', 'ADMIN': 'administrador'}
-    return ', '.join(f'{d} ({etiquetas[r]})' for d, r in DOMINIOS_ROL.items())
 
 
 def _perfil_sesion(user: dict) -> dict:
     """Datos de sesión que el frontend necesita para pintar la interfaz.
 
-    RF05 — Incluye siempre nombre, DOCUMENTO DE IDENTIDAD y rol asignado, que
-    es lo que consultan entrenadores y administradores en su perfil.
+    Incluye siempre nombre, documento de identidad y rol asignado, que es lo
+    que consultan entrenadores y administradores en su perfil.
     """
     return {
         'name':      user['name'],
@@ -49,31 +69,31 @@ def _perfil_sesion(user: dict) -> dict:
         'role':      user.get('role', 'ESTUDIANTE'),
         'estado':    user.get('estado', 'ACTIVO'),
         'es_principal': bool(user.get('es_principal')),
+        # Cancelaciones: solo informativo, no sanciona.
         'cancel_count':  user.get('cancel_count', 0),
+        # Inasistencias: son las que penalizan la cuenta.
         'no_show_count': user.get('no_show_count', 0),
-        'cancelaciones_restantes': cancelaciones_restantes(user),
-        'cancelacion_limite': CANCELACION_LIMITE,
-        # RF16/RF18 — inasistencias acumuladas y cuántas faltan para la penalización.
-        'inasistencias_restantes': inasistencias_restantes(user),
-        'no_show_limite': NO_SHOW_LIMITE,
-        'alerta_inasistencias': alerta_inasistencias(user),
-        'alerta': alerta_cancelaciones(user),
+        'inasistencias_restantes': reglas.inasistencias_restantes(user),
+        'no_show_limite': reglas.NO_SHOW_LIMITE,
+        'alerta_inasistencias': reglas.alerta_inasistencias(user),
     }
 
 
 def _leer_documento(data) -> str:
-    """RF01/RF02 — Toma el documento de identidad del cuerpo de la petición.
+    """Toma el documento de identidad del cuerpo de la petición.
 
     El campo se llama `documento`; se acepta `password` como alias porque el
     documento ES la contraseña con la que la persona inicia sesión.
     """
-    return normalizar_documento(data.get('documento') or data.get('password') or '')
+    return reglas.normalizar_documento(data.get('documento') or data.get('password') or '')
 
 
-# ──────────────────────────────────────────
-# AUTH
-# ──────────────────────────────────────────
+# ══════════════════════════════════════════════════════════════════════════
+#  AUTENTICACIÓN
+# ══════════════════════════════════════════════════════════════════════════
 
+# ── RF01 · [IGNORADO] Registro de usuarios ────────────────────────────────
+# ── RF03 · [IGNORADO] Asignación automática del rol según el dominio ──────
 @swagger_auto_schema(
     method='post',
     operation_description="Registro de usuarios. El rol se deduce del dominio del correo institucional.",
@@ -87,28 +107,22 @@ def _leer_documento(data) -> str:
         }
     ),
     responses={
-        201: openapi.Response('Registro exitoso.', openapi.Schema(type=openapi.TYPE_OBJECT, properties={'message': openapi.Schema(type=openapi.TYPE_STRING), 'role': openapi.Schema(type=openapi.TYPE_STRING)})),
-        400: openapi.Response('Datos inválidos.', openapi.Schema(type=openapi.TYPE_OBJECT, properties={'error': openapi.Schema(type=openapi.TYPE_STRING)})),
-        409: openapi.Response('Correo ya existe.', openapi.Schema(type=openapi.TYPE_OBJECT, properties={'error': openapi.Schema(type=openapi.TYPE_STRING)})),
+        201: openapi.Response('Registro exitoso.'),
+        400: openapi.Response('Datos inválidos.'),
+        409: openapi.Response('Correo ya existe.'),
     }
 )
 @api_view(['POST'])
 def register(request):
     # ╔══════════════════════════════════════════════════════════════════╗
-    # ║ CASO DE USO CRÍTICO #1 — REGISTRO CON CORREO INSTITUCIONAL          ║
-    # ║ Crítico porque es el control de acceso: solo miembros de la         ║
-    # ║ universidad pueden crear cuenta, la contraseña se almacena HASHEADA ║
-    # ║ (PBKDF2, nunca en claro) y el correo es único.                      ║
-    # ║ RN01 — El ROL SE DEDUCE DEL DOMINIO (tres tipos de correo):         ║
-    # ║   @soyudemedellin.edu.co -> ESTUDIANTE                              ║
-    # ║   @udem.edu.co           -> ENTRENADOR (profesor)                   ║
-    # ║   @udemedellin.edu.co    -> ADMIN                                   ║
-    # ║ El cliente NO puede elegir el rol: así nadie se auto-asigna         ║
-    # ║ privilegios de profesor o administrador al registrarse.             ║
+    # ║ CASO DE USO CRÍTICO #1 — REGISTRO CON CORREO INSTITUCIONAL       ║
+    # ║ Es el control de acceso: solo miembros de la universidad crean    ║
+    # ║ cuenta, la contraseña se almacena derivada (nunca en claro) y el  ║
+    # ║ correo es único. El ROL SE DEDUCE DEL DOMINIO, así nadie se       ║
+    # ║ auto-asigna privilegios de profesor o administrador.              ║
     # ╚══════════════════════════════════════════════════════════════════╝
-    db = get_db()
     name      = request.data.get('name', '').strip()
-    email     = request.data.get('email', '').strip().lower()
+    email     = reglas.normalizar_correo(request.data.get('email'))
     documento = _leer_documento(request.data)
 
     if not name or not email or not documento:
@@ -117,40 +131,39 @@ def register(request):
             status=400,
         )
 
-    # RF01 — El documento de identidad es además la contraseña (RF02).
-    if len(documento) < DOCUMENTO_MIN:
+    if len(documento) < reglas.DOCUMENTO_MIN:
         return Response(
-            {'error': f'El documento de identidad debe tener al menos {DOCUMENTO_MIN} caracteres.'},
+            {'error': f'El documento de identidad debe tener al menos {reglas.DOCUMENTO_MIN} caracteres.'},
             status=400,
         )
 
-    role = role_for_email(email)
+    role = reglas.role_for_email(email)
     if role is None:
         return Response(
-            {'error': f'Debes usar un correo institucional válido: {_dominios_texto()}.'},
+            {'error': f'Debes usar un correo institucional válido: {reglas.dominios_texto()}.'},
             status=400,
         )
 
-    if db.users.find_one({'email': email}):
+    if datos.buscar_usuario(email):
         return Response({'error': 'Ya existe una cuenta con este correo.'}, status=409)
 
-    if db.users.find_one({'documento': documento}):
+    if datos.buscar_usuario_por_documento(documento):
         return Response({'error': 'Ya existe una cuenta con este documento de identidad.'}, status=409)
 
-    # RF21 — El PRIMER administrador del sistema es el administrador principal:
-    # es quien puede crear y gestionar las cuentas de los demás administradores.
-    es_principal = role == 'ADMIN' and db.users.count_documents({'role': 'ADMIN'}) == 0
+    # El PRIMER administrador del sistema es el administrador principal: es
+    # quien puede crear y gestionar las cuentas de los demás administradores.
+    es_principal = role == 'ADMIN' and datos.contar_administradores() == 0
 
-    db.users.insert_one({
+    datos.crear_usuario({
         'name':       name,
         'email':      email,
-        'documento':  documento,         # RF01/RF11 — se busca al estudiante por él
-        'password':   hash_password(documento),   # RF02 — documento como contraseña
+        'documento':  documento,                # se busca al estudiante por él
+        'password':   hash_password(documento),  # el documento es la contraseña
         'role':       role,
-        'estado':     'ACTIVO',          # RN09: ACTIVO | PENALIZADO | INACTIVO
-        'es_principal': es_principal,    # RF21/RF22 — administrador principal
+        'estado':     'ACTIVO',                 # ACTIVO | PENALIZADO | INACTIVO
+        'es_principal': es_principal,
         'no_show_count': 0,
-        'cancel_count':  0,              # RN10: cancelaciones acumuladas
+        'cancel_count':  0,
         'penalizado_hasta': None,
         'created_at': datetime.utcnow(),
     })
@@ -163,6 +176,7 @@ def register(request):
     }, status=201)
 
 
+# ── RF02 · Inicio de sesión con el correo institucional y el documento ────
 @swagger_auto_schema(
     method='post',
     operation_description="Inicio de sesión y validación de credenciales.",
@@ -175,68 +189,63 @@ def register(request):
         }
     ),
     responses={
-        200: openapi.Response('Login exitoso.', openapi.Schema(type=openapi.TYPE_OBJECT, properties={'name': openapi.Schema(type=openapi.TYPE_STRING), 'email': openapi.Schema(type=openapi.TYPE_STRING)})),
-        401: openapi.Response('Credenciales incorrectas.', openapi.Schema(type=openapi.TYPE_OBJECT, properties={'error': openapi.Schema(type=openapi.TYPE_STRING)})),
+        200: openapi.Response('Login exitoso.'),
+        401: openapi.Response('Credenciales incorrectas.'),
     }
 )
 @api_view(['POST'])
 def login(request):
     # ╔══════════════════════════════════════════════════════════════════╗
-    # ║ CASO DE USO CRÍTICO #2 — INICIO DE SESIÓN                          ║
-    # ║ Crítico por seguridad: la verificación compara el hash PBKDF2       ║
-    # ║ almacenado (verify_password) sin exponer la contraseña, y devuelve  ║
-    # ║ un mensaje genérico ante correo o clave incorrectos para no revelar ║
-    # ║ si el correo existe (mitiga enumeración de usuarios).               ║
+    # ║ CASO DE USO CRÍTICO #2 — INICIO DE SESIÓN                        ║
+    # ║ La verificación compara el hash almacenado sin exponer la clave, ║
+    # ║ y devuelve un mensaje genérico ante correo o documento incorrectos║
+    # ║ para no revelar si el correo existe (evita enumerar cuentas).     ║
     # ╚══════════════════════════════════════════════════════════════════╝
-    db = get_db()
-    email     = request.data.get('email', '').strip().lower()
+    email     = reglas.normalizar_correo(request.data.get('email'))
     documento = _leer_documento(request.data)
 
-    user = db.users.find_one({'email': email})
+    user = datos.buscar_usuario(email)
     if not user or not verify_password(user['password'], documento):
         return Response({'error': 'Correo o documento de identidad incorrectos.'}, status=401)
 
-    # RF22 — A esta cuenta le retiraron el rol: ya no puede entrar al sistema.
+    # A esta cuenta le retiraron el rol: ya no puede entrar al sistema.
     if user.get('estado') == 'INACTIVO' or user.get('role') == 'SIN_ROL':
         return Response({'error': 'Tu cuenta fue desactivada por el administrador principal.'}, status=403)
 
-    # Se devuelve rol, estado y contadores para que el frontend muestre las
-    # herramientas de cada perfil y la alerta de cancelaciones (RN10).
     return Response(_perfil_sesion(user))
 
 
+# ── RF02 · Recuperación de la sesión al recargar la página ────────────────
 @swagger_auto_schema(
     method='get',
     operation_description="Devuelve la sesión actualizada de un usuario (se usa al recargar la página).",
     manual_parameters=[
         openapi.Parameter('email', openapi.IN_QUERY, description="Correo del usuario", type=openapi.TYPE_STRING, required=True),
     ],
-    responses={
-        200: openapi.Response('Sesión vigente.', openapi.Schema(type=openapi.TYPE_OBJECT)),
-        404: openapi.Response('Usuario no encontrado.', openapi.Schema(type=openapi.TYPE_OBJECT)),
-    }
+    responses={200: openapi.Response('Sesión vigente.'), 404: openapi.Response('Usuario no encontrado.')}
 )
 @api_view(['GET'])
 def session(request):
     """Rehidrata la sesión tras recargar la página.
 
-    El frontend guarda la sesión en localStorage; al recargar consulta este
-    endpoint para traer datos frescos (rol, estado, cancelaciones) en vez de
-    confiar ciegamente en lo guardado en el navegador.
+    El frontend guarda la sesión en el navegador; al recargar consulta este
+    recurso para traer datos frescos (rol, estado, contadores) en vez de
+    confiar ciegamente en lo guardado localmente.
     """
-    email = request.query_params.get('email', '').strip().lower()
+    email = reglas.normalizar_correo(request.query_params.get('email'))
     if not email:
         return Response({'error': 'Parámetro email requerido.'}, status=400)
-    user = get_db().users.find_one({'email': email})
+    user = datos.buscar_usuario(email)
     if not user:
         return Response({'error': 'Usuario no encontrado.'}, status=404)
     return Response(_perfil_sesion(user))
 
 
-# ──────────────────────────────────────────
-# ADMINISTRACIÓN DE USUARIOS
-# ──────────────────────────────────────────
+# ══════════════════════════════════════════════════════════════════════════
+#  ADMINISTRACIÓN DE USUARIOS
+# ══════════════════════════════════════════════════════════════════════════
 
+# ── RF21 · [IGNORADO] Creación de cuentas de administrador ───────────────
 @swagger_auto_schema(
     method='get',
     operation_description="Lista los usuarios del sistema (solo ADMIN).",
@@ -268,45 +277,40 @@ def session(request):
 )
 @api_view(['GET', 'POST'])
 def admin_users(request):
-    # ╔══════════════════════════════════════════════════════════════════╗
-    # ║ CASO DE USO — GESTIÓN DE USUARIOS POR EL ADMINISTRADOR              ║
-    # ║ Solo un ADMIN autenticado puede dar de alta cuentas, y es la única   ║
-    # ║ vía para crear NUEVOS ADMINISTRADORES. El rol sigue amarrado al      ║
-    # ║ dominio del correo (RN01): un admin no puede crear un administrador  ║
-    # ║ con un correo de estudiante.                                        ║
-    # ╚══════════════════════════════════════════════════════════════════╝
-    db = get_db()
+    """Solo un ADMIN autenticado da de alta cuentas, y es la única vía para
+    crear NUEVOS ADMINISTRADORES. El rol sigue amarrado al dominio del correo:
+    un admin no puede crear un administrador con un correo de estudiante.
+    """
     actor_email = (request.query_params.get('actor_email') if request.method == 'GET'
                    else request.data.get('actor_email', ''))
-    actor = db.users.find_one({'email': (actor_email or '').strip().lower()})
+    actor = datos.buscar_usuario(reglas.normalizar_correo(actor_email))
     if not actor or actor.get('role') != 'ADMIN':
         return Response({'error': 'Solo un administrador puede gestionar usuarios.'}, status=403)
 
     if request.method == 'GET':
-        rows = [{
+        return Response([{
             'name': u.get('name'), 'email': u['email'], 'role': u.get('role'),
-            'documento': u.get('documento', ''),          # RF05
+            'documento': u.get('documento', ''),
             'estado': u.get('estado'), 'cancel_count': u.get('cancel_count', 0),
             'no_show_count': u.get('no_show_count', 0),
-            'es_principal': bool(u.get('es_principal')),  # RF21/RF22
-        } for u in db.users.find().sort('role', 1)]
-        return Response(rows)
+            'es_principal': bool(u.get('es_principal')),
+        } for u in datos.listar_usuarios()])
 
     name      = request.data.get('name', '').strip()
-    email     = request.data.get('email', '').strip().lower()
+    email     = reglas.normalizar_correo(request.data.get('email'))
     documento = _leer_documento(request.data)
     if not name or not email or not documento:
         return Response({'error': 'Nombre, correo y documento de identidad son obligatorios.'}, status=400)
-    if len(documento) < DOCUMENTO_MIN:
+    if len(documento) < reglas.DOCUMENTO_MIN:
         return Response(
-            {'error': f'El documento de identidad debe tener al menos {DOCUMENTO_MIN} caracteres.'},
+            {'error': f'El documento de identidad debe tener al menos {reglas.DOCUMENTO_MIN} caracteres.'},
             status=400,
         )
 
-    role = role_for_email(email)
+    role = reglas.role_for_email(email)
     if role is None:
         return Response(
-            {'error': f'Debes usar un correo institucional válido: {_dominios_texto()}.'},
+            {'error': f'Debes usar un correo institucional válido: {reglas.dominios_texto()}.'},
             status=400,
         )
 
@@ -314,8 +318,8 @@ def admin_users(request):
     pedido = request.data.get('role')
     if pedido:
         pedido = pedido.strip().upper()
-        if pedido not in ROLES:
-            return Response({'error': f'Rol inválido. Use uno de: {", ".join(ROLES)}.'}, status=400)
+        if pedido not in reglas.ROLES:
+            return Response({'error': f'Rol inválido. Use uno de: {", ".join(reglas.ROLES)}.'}, status=400)
         if pedido != role:
             return Response(
                 {'error': f'El correo {email} corresponde al rol {role}, no a {pedido}. '
@@ -323,23 +327,23 @@ def admin_users(request):
                 status=400,
             )
 
-    # RF21 — Solo el ADMINISTRADOR PRINCIPAL crea cuentas con rol de administrador.
+    # Solo el ADMINISTRADOR PRINCIPAL crea cuentas con rol de administrador.
     if role == 'ADMIN' and not _es_principal(actor):
         return Response(
             {'error': 'Solo el administrador principal puede crear cuentas de administrador.'},
             status=403,
         )
 
-    if db.users.find_one({'email': email}):
+    if datos.buscar_usuario(email):
         return Response({'error': 'Ya existe una cuenta con este correo.'}, status=409)
-    if db.users.find_one({'documento': documento}):
+    if datos.buscar_usuario_por_documento(documento):
         return Response({'error': 'Ya existe una cuenta con este documento de identidad.'}, status=409)
 
-    db.users.insert_one({
+    datos.crear_usuario({
         'name':       name,
         'email':      email,
         'documento':  documento,
-        'password':   hash_password(documento),   # RF02 — documento como contraseña
+        'password':   hash_password(documento),
         'role':       role,
         'estado':     'ACTIVO',
         'es_principal': False,
@@ -353,10 +357,10 @@ def admin_users(request):
 
 
 def _es_principal(actor: dict) -> bool:
-    """RF21/RF22 — ¿El actor es el administrador principal del sistema?
+    """¿El actor es el administrador principal del sistema?
 
     Es principal quien tiene la marca `es_principal`. Para no dejar el sistema
-    sin administrador principal (por ejemplo, en instalaciones creadas antes de
+    sin administrador principal (por ejemplo en instalaciones creadas antes de
     que existiera la marca), si NINGÚN administrador la tiene se considera
     principal al administrador más antiguo.
     """
@@ -364,18 +368,18 @@ def _es_principal(actor: dict) -> bool:
         return False
     if actor.get('es_principal'):
         return True
-    db = get_db()
-    if db.users.count_documents({'role': 'ADMIN', 'es_principal': True}) > 0:
+    if datos.hay_administrador_principal():
         return False
-    primero = db.users.find_one({'role': 'ADMIN'}, sort=[('created_at', 1)])
+    primero = datos.administrador_mas_antiguo()
     return bool(primero and primero['email'] == actor['email'])
 
 
+# ── RF22 · [IGNORADO] Gestión de las cuentas de otros administradores ────
 @swagger_auto_schema(
     method='patch',
     operation_description=(
-        "RF22 — El administrador principal gestiona las cuentas de otros administradores. "
-        "Con accion='retirar' le quita el rol de administrador; con accion='restaurar' se lo devuelve."
+        "El administrador principal gestiona las cuentas de otros administradores. "
+        "Con accion='retirar' le quita el rol; con accion='restaurar' se lo devuelve."
     ),
     manual_parameters=[
         openapi.Parameter('user_email', openapi.IN_PATH, description="Correo de la cuenta a gestionar", type=openapi.TYPE_STRING, required=True),
@@ -397,23 +401,19 @@ def _es_principal(actor: dict) -> bool:
 )
 @api_view(['PATCH'])
 def admin_user_detail(request, user_email):
-    # ╔══════════════════════════════════════════════════════════════════╗
-    # ║ RF22 — GESTIÓN DE LAS CUENTAS DE OTROS ADMINISTRADORES             ║
-    # ║ Solo el ADMINISTRADOR PRINCIPAL puede retirar (o devolver) el rol   ║
-    # ║ de administrador. Retirar el rol deja la cuenta con rol SIN_ROL y   ║
-    # ║ estado INACTIVO, de modo que ya no puede iniciar sesión.            ║
-    # ║ El propio administrador principal NO puede ser retirado: el sistema ║
-    # ║ nunca queda sin administrador.                                      ║
-    # ╚══════════════════════════════════════════════════════════════════╝
-    db = get_db()
-    actor = db.users.find_one({'email': (request.data.get('actor_email') or '').strip().lower()})
+    """Solo el ADMINISTRADOR PRINCIPAL puede retirar (o devolver) el rol de
+    administrador. Retirarlo deja la cuenta con rol SIN_ROL y estado INACTIVO,
+    de modo que ya no puede iniciar sesión. El propio principal NO puede ser
+    retirado: el sistema nunca queda sin administrador.
+    """
+    actor = datos.buscar_usuario(reglas.normalizar_correo(request.data.get('actor_email')))
     if not _es_principal(actor):
         return Response(
             {'error': 'Solo el administrador principal puede gestionar las cuentas de administrador.'},
             status=403,
         )
 
-    objetivo = db.users.find_one({'email': (user_email or '').strip().lower()})
+    objetivo = datos.buscar_usuario(reglas.normalizar_correo(user_email))
     if not objetivo:
         return Response({'error': 'Cuenta no encontrada.'}, status=404)
 
@@ -427,27 +427,26 @@ def admin_user_detail(request, user_email):
             )
         if objetivo.get('role') != 'ADMIN':
             return Response({'error': 'La cuenta no tiene rol de administrador.'}, status=400)
-        db.users.update_one(
-            {'email': objetivo['email']},
-            {'$set': {'role': 'SIN_ROL', 'estado': 'INACTIVO',
-                      'admin_retirado_por': actor['email'],
-                      'admin_retirado_at': datetime.utcnow()}},
-        )
+        datos.actualizar_usuario(objetivo['email'], {
+            'role': 'SIN_ROL', 'estado': 'INACTIVO',
+            'admin_retirado_por': actor['email'],
+            'admin_retirado_at': datetime.utcnow(),
+        })
         return Response({
             'message': f"Se retiró el rol de administrador a {objetivo['email']}.",
             'role': 'SIN_ROL', 'estado': 'INACTIVO',
         })
 
     if accion == 'restaurar':
-        if role_for_email(objetivo['email']) != 'ADMIN':
+        if reglas.role_for_email(objetivo['email']) != 'ADMIN':
             return Response(
                 {'error': 'El correo de la cuenta no corresponde al dominio de administrador.'},
                 status=400,
             )
-        db.users.update_one(
-            {'email': objetivo['email']},
-            {'$set': {'role': 'ADMIN', 'estado': 'ACTIVO'},
-             '$unset': {'admin_retirado_por': '', 'admin_retirado_at': ''}},
+        datos.actualizar_usuario(
+            objetivo['email'],
+            {'role': 'ADMIN', 'estado': 'ACTIVO'},
+            quitar={'admin_retirado_por': '', 'admin_retirado_at': ''},
         )
         return Response({
             'message': f"Se restauró el rol de administrador a {objetivo['email']}.",
@@ -457,62 +456,55 @@ def admin_user_detail(request, user_email):
     return Response({'error': "Acción inválida. Use 'retirar' o 'restaurar'."}, status=400)
 
 
-# ──────────────────────────────────────────
-# SLOTS
-# ──────────────────────────────────────────
+# ══════════════════════════════════════════════════════════════════════════
+#  BLOQUES HORARIOS
+# ══════════════════════════════════════════════════════════════════════════
 
+# ── RF06 · [IGNORADO] Consulta de los bloques horarios disponibles ───────
+# ── RF07 · [IGNORADO] Cupos ocupados y disponibles de cada bloque ────────
+# ── RF12 · El personal visualiza los bloques y su disponibilidad ─────────
 @swagger_auto_schema(
     method='get',
     operation_description="Bloques horarios y cupos disponibles para la fecha de reserva (el día siguiente).",
-    responses={
-        200: openapi.Response('Disponibilidad del día siguiente.', openapi.Schema(
-            type=openapi.TYPE_OBJECT,
-            properties={
-                'fecha': openapi.Schema(type=openapi.TYPE_STRING, example='2026-08-17'),
-                'fecha_label': openapi.Schema(type=openapi.TYPE_STRING, example='lunes 17 de agosto de 2026'),
-                'slots': openapi.Schema(type=openapi.TYPE_ARRAY, items=openapi.Schema(type=openapi.TYPE_OBJECT)),
-            }
-        )),
-    }
+    responses={200: openapi.Response('Disponibilidad del día siguiente.')}
 )
 @api_view(['GET'])
 def get_slots(request):
     # ╔══════════════════════════════════════════════════════════════════╗
-    # ║ CASO DE USO CRÍTICO #3 — CONSULTA DE CUPOS EN TIEMPO REAL           ║
-    # ║ Crítico para la consistencia: el frontend muestra disponibilidad    ║
-    # ║ "en vivo" y decide qué bloques se pueden reservar a partir de este  ║
-    # ║ valor. Debe reflejar siempre el estado real de la colección slots.  ║
-    # ║ RN03 — La respuesta incluye la FECHA DE LA RESERVA (el día          ║
-    # ║ siguiente) para que la interfaz la muestre de forma explícita.      ║
+    # ║ CASO DE USO CRÍTICO #3 — CONSULTA DE CUPOS EN TIEMPO REAL        ║
+    # ║ El frontend decide qué bloques se pueden reservar a partir de     ║
+    # ║ este valor, así que debe reflejar el estado real de los bloques.  ║
+    # ║ La respuesta incluye la FECHA DE LA RESERVA (el día siguiente)    ║
+    # ║ para que la interfaz la muestre de forma explícita.               ║
     # ╚══════════════════════════════════════════════════════════════════╝
-    seed_slots()
-    db = get_db()
-    slots = [
+    datos.sembrar_bloques()
+    bloques = [
         {'id': s['slotId'], 'hour': s['hour'], 'available': s['available'], 'total': s['total']}
-        for s in db.slots.find({}, {'_id': 0}).sort('slotId', 1)
+        for s in datos.listar_bloques(sin_id=True)
     ]
-    fecha = fecha_reserva()
+    fecha = reglas.fecha_reserva()
     return Response({
         'fecha': fecha.isoformat(),
-        'fecha_label': formato_fecha_es(fecha),
-        'slots': slots,
+        'fecha_label': reglas.formato_fecha_es(fecha),
+        'slots': bloques,
     })
 
 
-# ──────────────────────────────────────────
-# RESERVATIONS
-# ──────────────────────────────────────────
+# ══════════════════════════════════════════════════════════════════════════
+#  RESERVAS
+# ══════════════════════════════════════════════════════════════════════════
 
+# ── RF08 · Reserva del estudiante para el día siguiente ──────────────────
+# ── RF23 · Notificación de reserva confirmada ────────────────────────────
+# ── RF09 · [IGNORADO] Una única reserva por estudiante y día ─────────────
+# ── RF10 · [IGNORADO] Consulta de las reservas hechas ────────────────────
 @swagger_auto_schema(
     method='get',
     operation_description="Lista las reservas activas de un estudiante.",
     manual_parameters=[
         openapi.Parameter('email', openapi.IN_QUERY, description="Correo del usuario", type=openapi.TYPE_STRING, required=True),
     ],
-    responses={
-        200: openapi.Response('Lista de reservas.', openapi.Schema(type=openapi.TYPE_ARRAY, items=openapi.Schema(type=openapi.TYPE_OBJECT))),
-        400: openapi.Response('Parámetro email requerido.', openapi.Schema(type=openapi.TYPE_OBJECT, properties={'error': openapi.Schema(type=openapi.TYPE_STRING)})),
-    }
+    responses={200: openapi.Response('Lista de reservas.'), 400: openapi.Response('Parámetro email requerido.')}
 )
 @swagger_auto_schema(
     method='post',
@@ -526,179 +518,142 @@ def get_slots(request):
         }
     ),
     responses={
-        201: openapi.Response('Reserva creada.', openapi.Schema(type=openapi.TYPE_OBJECT)),
-        400: openapi.Response('Datos inválidos.', openapi.Schema(type=openapi.TYPE_OBJECT, properties={'error': openapi.Schema(type=openapi.TYPE_STRING)})),
-        403: openapi.Response('Perfil sin permiso de reserva.', openapi.Schema(type=openapi.TYPE_OBJECT, properties={'error': openapi.Schema(type=openapi.TYPE_STRING)})),
-        404: openapi.Response('Horario no encontrado.', openapi.Schema(type=openapi.TYPE_OBJECT, properties={'error': openapi.Schema(type=openapi.TYPE_STRING)})),
-        409: openapi.Response('Sin cupos o ya reservó hoy.', openapi.Schema(type=openapi.TYPE_OBJECT, properties={'error': openapi.Schema(type=openapi.TYPE_STRING)})),
+        201: openapi.Response('Reserva creada.'),
+        400: openapi.Response('Datos inválidos.'),
+        403: openapi.Response('Perfil sin permiso de reserva.'),
+        404: openapi.Response('Horario no encontrado.'),
+        409: openapi.Response('Sin cupos o ya reservó hoy.'),
     }
 )
 @api_view(['GET', 'POST'])
 def reservations(request):
-    db = get_db()
-
     if request.method == 'GET':
-        email = request.query_params.get('email', '').lower()
+        email = reglas.normalizar_correo(request.query_params.get('email'))
         if not email:
             return Response({'error': 'Parámetro email requerido.'}, status=400)
         # Solo las ACTIVA: las canceladas o marcadas No-Show no se listan.
-        docs = [serialize(r) for r in db.reservations.find({'email': email, 'estado': 'ACTIVA'})]
-        return Response(docs)
+        return Response([datos.serialize(r) for r in datos.reservas_activas(email)])
 
     # ╔══════════════════════════════════════════════════════════════════╗
-    # ║ CASO DE USO CRÍTICO #4 — CREAR RESERVA (DESCUENTO ATÓMICO DE CUPO)  ║
-    # ║ El más crítico del sistema. Bajo concurrencia (varios estudiantes   ║
-    # ║ reservando el último cupo a la vez), un patrón "leer-luego-escribir" ║
-    # ║ permite SOBREVENTA: dos peticiones leen available=1, ambas crean la  ║
-    # ║ reserva y el cupo queda en -1.                                      ║
-    # ║ Solución: se descuenta con find_one_and_update CONDICIONAL          ║
-    # ║ (available > 0) en una sola operación atómica de MongoDB. Si el     ║
-    # ║ documento devuelto es None, no había cupo y se rechaza SIN crear     ║
-    # ║ reserva. La reserva solo se inserta DESPUÉS de ganar el cupo.       ║
-    # ║ Reglas aplicadas aquí:                                              ║
-    # ║   RN02 — Solo los ESTUDIANTES reservan (profesores y admins solo     ║
-    # ║          consultan el aforo).                                       ║
-    # ║   RN03 — La reserva es SIEMPRE para el día siguiente.                ║
-    # ║   RN05 — Una única reserva por día.                                  ║
-    # ║   RN09/RN10 — Bloqueo si el usuario está PENALIZADO.                 ║
+    # ║ CASO DE USO CRÍTICO #4 — CREAR RESERVA (DESCUENTO ATÓMICO)       ║
+    # ║ El más crítico del sistema. Con varios estudiantes reservando el  ║
+    # ║ último cupo a la vez, un patrón "leer-luego-escribir" permitiría  ║
+    # ║ SOBREVENTA. Por eso el cupo se descuenta con una única operación  ║
+    # ║ atómica condicional (datos.tomar_cupo) y la reserva solo se       ║
+    # ║ inserta DESPUÉS de haber ganado el cupo.                          ║
+    # ║ Reglas aplicadas aquí:                                            ║
+    # ║   Solo los ESTUDIANTES reservan; el personal solo consulta.       ║
+    # ║   La reserva es SIEMPRE para el día siguiente.                    ║
+    # ║   Una única reserva por día.                                      ║
+    # ║   Bloqueo si la cuenta está penalizada.                           ║
     # ╚══════════════════════════════════════════════════════════════════╝
-    email   = request.data.get('email', '').strip().lower()
+    email   = reglas.normalizar_correo(request.data.get('email'))
     slot_id = request.data.get('slotId')
 
     if not email or slot_id is None:
         return Response({'error': 'email y slotId son obligatorios.'}, status=400)
 
-    owner = db.users.find_one({'email': email})
+    owner = datos.buscar_usuario(email)
     if not owner:
         return Response({'error': 'El usuario de la reserva no existe.'}, status=404)
 
-    # RN02 — El gimnasio reserva cupos para estudiantes. Profesores y
-    # administradores usan el sistema únicamente para consultar el aforo.
+    # El gimnasio reserva cupos para estudiantes. Profesores y administradores
+    # usan el sistema únicamente para consultar el aforo.
     if owner.get('role') != 'ESTUDIANTE':
         return Response(
             {'error': 'Los profesores y administradores no reservan cupos: solo consultan el aforo.'},
             status=403,
         )
 
-    # RN09/RN10 — Un usuario PENALIZADO no puede crear reservas (sí consultar).
+    # Un usuario PENALIZADO no puede crear reservas (sí consultar).
     if owner.get('estado') == 'PENALIZADO':
-        hasta = owner.get('penalizado_hasta')
-        if hasta and hasta > datetime.utcnow():
+        if reglas.penalizacion_vigente(owner):
             return Response({'error': 'Tu cuenta está penalizada. No puedes reservar por ahora.'}, status=403)
         # Penalización vencida: se reactiva la cuenta y se reinician contadores.
-        db.users.update_one(
-            {'email': email},
-            {'$set': {'estado': 'ACTIVO', 'no_show_count': 0, 'cancel_count': 0, 'penalizado_hasta': None}},
-        )
+        datos.actualizar_usuario(email, {
+            'estado': 'ACTIVO', 'no_show_count': 0, 'penalizado_hasta': None,
+        })
 
-    slot = db.slots.find_one({'slotId': slot_id})
+    slot = datos.buscar_bloque(slot_id)
     if not slot:
         return Response({'error': 'Horario no encontrado.'}, status=404)
 
-    fecha = fecha_reserva()
+    fecha = reglas.fecha_reserva()
     fecha_iso = fecha.isoformat()
-    fecha_label = formato_fecha_es(fecha)
+    fecha_label = reglas.formato_fecha_es(fecha)
 
-    # RN05 — UNA SOLA RESERVA POR DÍA. Se cuenta sobre la fecha de la reserva
-    # (el día siguiente), no sobre el total histórico de reservas activas.
-    del_dia = db.reservations.count_documents(
-        {'email': email, 'estado': 'ACTIVA', 'reserva_date': fecha_iso}
-    )
-    if del_dia >= MAX_RESERVAS_POR_DIA:
+    # UNA SOLA RESERVA POR DÍA. Se cuenta sobre la fecha de la reserva (el día
+    # siguiente), no sobre el total histórico de reservas activas.
+    del_dia = datos.contar_reservas(
+        {'email': email, 'estado': 'ACTIVA', 'reserva_date': fecha_iso})
+    if del_dia >= reglas.MAX_RESERVAS_POR_DIA:
         aviso = (f'Ya tienes una reserva para el {fecha_label}. '
                  'Solo se permite una reserva por día: cancela la actual si quieres cambiar de horario.')
         return Response({'error': aviso, 'notificacion': aviso, 'tipo': 'RESERVA_DUPLICADA'}, status=409)
 
-    # Descuento ATÓMICO: solo descuenta si todavía queda cupo (available > 0).
-    claimed = db.slots.find_one_and_update(
-        {'slotId': slot_id, 'available': {'$gt': 0}},
-        {'$inc': {'available': -1}},
-    )
-    if claimed is None:
+    # Descuento ATÓMICO: solo descuenta si todavía queda cupo.
+    if datos.tomar_cupo(slot_id) is None:
         # Otro estudiante tomó el último cupo entre la lectura y este punto.
         return Response({'error': 'No hay cupos disponibles en este horario.'}, status=409)
 
-    now = datetime.utcnow()
-    result = db.reservations.insert_one({
+    nueva = datos.crear_reserva({
         'email':        email,
         'slotId':       slot_id,
         'hour':         slot['hour'],
-        'reserva_date': fecha_iso,        # RN03 — fecha efectiva: el día siguiente
-        'date':         fecha_label,      # etiqueta legible para la interfaz
-        'estado':       'ACTIVA',         # ACTIVA | CANCELADA | NO_SHOW | COMPLETADA
+        'reserva_date': fecha_iso,    # fecha efectiva: el día siguiente
+        'date':         fecha_label,  # etiqueta legible para la interfaz
+        'estado':       'ACTIVA',     # ACTIVA | CANCELADA | NO_SHOW | COMPLETADA
         'created_by':   email,
-        'created_at':   now,
+        'created_at':   datetime.utcnow(),
     })
 
-    new_res = serialize(db.reservations.find_one({'_id': result.inserted_id}))
-    new_res['notificacion'] = (
-        f"Reserva confirmada para las {slot['hour']} del {fecha_label}."
-    )
-    new_res['tipo'] = 'RESERVA_CONFIRMADA'
-    return Response(new_res, status=201)
+    respuesta = datos.serialize(nueva)
+    # Notificación de confirmación que muestra la aplicación.
+    respuesta['notificacion'] = f"Reserva confirmada para las {slot['hour']} del {fecha_label}."
+    respuesta['tipo'] = 'RESERVA_CONFIRMADA'
+    return Response(respuesta, status=201)
 
 
+# ── RF24 · [IGNORADO] Cancelación de reservas ────────────────────────────
+# ── RF25 · [IGNORADO] Notificación de cancelación ────────────────────────
 @swagger_auto_schema(
     method='delete',
-    operation_description="Cancela reserva y libera cupo inmediatamente. Suma al contador de cancelaciones (RN10).",
+    operation_description="Cancela reserva y libera cupo inmediatamente. Suma al contador de cancelaciones.",
     manual_parameters=[
-        openapi.Parameter('reservation_id', openapi.IN_PATH, description="ID de la reserva (ObjectId)", type=openapi.TYPE_STRING, required=True),
+        openapi.Parameter('reservation_id', openapi.IN_PATH, description="ID de la reserva", type=openapi.TYPE_STRING, required=True),
     ],
     responses={
-        200: openapi.Response('Reserva cancelada.', openapi.Schema(type=openapi.TYPE_OBJECT, properties={'message': openapi.Schema(type=openapi.TYPE_STRING)})),
-        400: openapi.Response('ID inválido.', openapi.Schema(type=openapi.TYPE_OBJECT, properties={'error': openapi.Schema(type=openapi.TYPE_STRING)})),
-        404: openapi.Response('Reserva no encontrada.', openapi.Schema(type=openapi.TYPE_OBJECT, properties={'error': openapi.Schema(type=openapi.TYPE_STRING)})),
+        200: openapi.Response('Reserva cancelada.'),
+        400: openapi.Response('ID inválido.'),
+        404: openapi.Response('Reserva no encontrada.'),
     }
 )
 @api_view(['DELETE'])
 def cancel_reservation(request, reservation_id):
     # ╔══════════════════════════════════════════════════════════════════╗
-    # ║ CASO DE USO CRÍTICO #5 — CANCELAR RESERVA Y LIBERAR CUPO            ║
-    # ║ Crítico para no "perder" cupos: el cupo solo se devuelve (+1) si la  ║
-    # ║ reserva estaba ACTIVA y esta operación la pasó a CANCELADA. Se usa    ║
-    # ║ find_one_and_update CONDICIONAL (estado='ACTIVA') como guardia: una   ║
-    # ║ doble cancelación no vuelve a sumar el cupo (no dejaría available>total).║
-    # ║ RN10 — Cada cancelación suma al contador del estudiante. Al llegar a  ║
-    # ║ CANCELACION_LIMITE la cuenta queda PENALIZADA; antes de eso la        ║
-    # ║ respuesta devuelve la alerta que la app muestra en pantalla.          ║
+    # ║ CASO DE USO CRÍTICO #5 — CANCELAR RESERVA Y LIBERAR CUPO         ║
+    # ║ El cupo solo se devuelve si la reserva estaba ACTIVA y esta        ║
+    # ║ operación la pasó a CANCELADA. La transición atómica actúa como   ║
+    # ║ guardia: una doble cancelación no vuelve a sumar el cupo.          ║
     # ╚══════════════════════════════════════════════════════════════════╝
-    db = get_db()
-    try:
-        oid = ObjectId(reservation_id)
-    except Exception:
+    oid = datos.a_object_id(reservation_id)
+    if oid is None:
         return Response({'error': 'ID de reserva inválido.'}, status=400)
 
-    # Transición atómica ACTIVA -> CANCELADA. Devuelve el doc previo o None.
-    reservation = db.reservations.find_one_and_update(
-        {'_id': oid, 'estado': 'ACTIVA'},
-        {'$set': {'estado': 'CANCELADA', 'cancelled_at': datetime.utcnow()}},
-    )
+    reservation = datos.cambiar_estado_reserva(
+        oid, 'ACTIVA', {'estado': 'CANCELADA', 'cancelled_at': datetime.utcnow()})
     if reservation is None:
         # O no existe, o ya no estaba activa (cancelada / no-show).
-        if db.reservations.find_one({'_id': oid}):
+        if datos.buscar_reserva(oid):
             return Response({'error': 'La reserva ya no está activa.'}, status=409)
         return Response({'error': 'Reserva no encontrada.'}, status=404)
 
-    db.slots.update_one({'slotId': reservation['slotId']}, {'$inc': {'available': 1}})
+    datos.devolver_cupo(reservation['slotId'])
 
-    # RN10 — Contador de cancelaciones del estudiante.
-    owner = db.users.find_one_and_update(
-        {'email': reservation['email']},
-        {'$inc': {'cancel_count': 1}},
-        return_document=True,
-    )
-    penalizado = False
-    if owner and owner.get('cancel_count', 0) >= CANCELACION_LIMITE:
-        hasta = add_business_days(datetime.utcnow(), PENALIZACION_DIAS_HABILES)
-        db.users.update_one(
-            {'email': reservation['email']},
-            {'$set': {'estado': 'PENALIZADO', 'penalizado_hasta': hasta}},
-        )
-        penalizado = True
-
-    # RF12 — al liberar el cupo, mueve al primero de la lista de espera.
-    from .features import pop_next_in_waitlist
-    pop_next_in_waitlist(reservation['slotId'])
+    # Contador de cancelaciones del estudiante. Es SOLO INFORMATIVO: cancelar
+    # no suma inasistencias ni penaliza la cuenta, porque avisar a tiempo
+    # devuelve el cupo para que otra persona lo aproveche.
+    owner = datos.sumar_a_contador(reservation['email'], 'cancel_count')
 
     return Response({
         'message': 'Reserva cancelada. Cupo liberado.',
@@ -706,18 +661,17 @@ def cancel_reservation(request, reservation_id):
                         f"del {reservation.get('date', '')}. El cupo quedó liberado.",
         'tipo': 'RESERVA_CANCELADA',
         'cancel_count': (owner or {}).get('cancel_count', 0),
-        'cancelaciones_restantes': cancelaciones_restantes(owner),
-        'cancelacion_limite': CANCELACION_LIMITE,
-        'penalizado': penalizado,
-        'alerta': alerta_cancelaciones(owner),
+        # Las inasistencias no cambian al cancelar: son cosas distintas.
+        'no_show_count': (owner or {}).get('no_show_count', 0),
     })
 
 
+# ── RF16 · [IGNORADO] Penalización al alcanzar cinco inasistencias ───────
 @swagger_auto_schema(
     method='post',
-    operation_description="El entrenador/admin marca una inasistencia (No-Show). Suma al contador y, al llegar al límite, penaliza al usuario (RN09).",
+    operation_description="El entrenador o administrador marca una inasistencia y, al llegar al límite, penaliza la cuenta.",
     manual_parameters=[
-        openapi.Parameter('reservation_id', openapi.IN_PATH, description="ID de la reserva (ObjectId)", type=openapi.TYPE_STRING, required=True),
+        openapi.Parameter('reservation_id', openapi.IN_PATH, description="ID de la reserva", type=openapi.TYPE_STRING, required=True),
     ],
     request_body=openapi.Schema(
         type=openapi.TYPE_OBJECT,
@@ -725,39 +679,41 @@ def cancel_reservation(request, reservation_id):
         properties={'actor_email': openapi.Schema(type=openapi.TYPE_STRING, example='profesor@udem.edu.co')},
     ),
     responses={
-        200: openapi.Response('No-Show registrado.', openapi.Schema(type=openapi.TYPE_OBJECT)),
-        403: openapi.Response('Sin permisos.', openapi.Schema(type=openapi.TYPE_OBJECT)),
-        404: openapi.Response('Reserva no encontrada.', openapi.Schema(type=openapi.TYPE_OBJECT)),
+        200: openapi.Response('Inasistencia registrada.'),
+        403: openapi.Response('Sin permisos.'),
+        404: openapi.Response('Reserva no encontrada.'),
     }
 )
 @api_view(['POST'])
 def mark_no_show(request, reservation_id):
-    # ╔══════════════════════════════════════════════════════════════════╗
-    # ║ CASO DE USO — RN09: POLÍTICA DE INASISTENCIA Y PENALIZACIÓN         ║
-    # ║ Solo ENTRENADOR/ADMIN. Marca la reserva como NO_SHOW, incrementa el  ║
-    # ║ contador del usuario y, al alcanzar NO_SHOW_LIMITE inasistencias,    ║
-    # ║ cambia su estado a PENALIZADO por N días hábiles.                    ║
-    # ╚══════════════════════════════════════════════════════════════════╝
-    db = get_db()
-    actor_email = request.data.get('actor_email', '').strip().lower()
-    actor = db.users.find_one({'email': actor_email})
-    if not actor or actor.get('role') not in ('ENTRENADOR', 'ADMIN'):
+    """Solo ENTRENADOR o ADMIN. Marca la reserva como NO_SHOW, incrementa el
+    contador de la persona y, al alcanzar el límite, penaliza su cuenta.
+    """
+    actor = datos.buscar_usuario(reglas.normalizar_correo(request.data.get('actor_email')))
+    if not reglas.es_staff(actor):
         return Response({'error': 'Solo un profesor o administrador puede registrar inasistencias.'}, status=403)
 
-    try:
-        oid = ObjectId(reservation_id)
-    except Exception:
+    oid = datos.a_object_id(reservation_id)
+    if oid is None:
         return Response({'error': 'ID de reserva inválido.'}, status=400)
 
     # ACTIVA -> NO_SHOW de forma atómica (no se devuelve el cupo: se desperdició).
-    reservation = db.reservations.find_one_and_update(
-        {'_id': oid, 'estado': 'ACTIVA'},
-        {'$set': {'estado': 'NO_SHOW', 'no_show_at': datetime.utcnow()}},
-    )
+    # Solo si la jornada de la reserva ya llegó: mientras sea para mañana, el
+    # estudiante todavía no ha tenido ocasión de presentarse.
+    hoy = reglas.hoy_local().isoformat()
+    reservation = datos.cambiar_estado_reserva(
+        oid, 'ACTIVA', {'estado': 'NO_SHOW', 'no_show_at': datetime.utcnow()},
+        condiciones={'reserva_date': {'$lte': hoy}})
     if reservation is None:
+        pendiente = datos.buscar_reserva(oid)
+        if pendiente and pendiente.get('estado') == 'ACTIVA':
+            return Response(
+                {'error': f"La reserva es para el {pendiente.get('date')}. "
+                          'La inasistencia solo puede registrarse el día de la reserva.'},
+                status=409,
+            )
         return Response({'error': 'Reserva no encontrada o ya no está activa.'}, status=404)
 
-    # RF16 — Suma la inasistencia y penaliza al llegar a CINCO (5).
     # La lógica vive en attendance.py para que el registro individual y el
     # procesamiento general de la jornada apliquen exactamente la misma regla.
     from .attendance import aplicar_inasistencia
@@ -766,7 +722,7 @@ def mark_no_show(request, reservation_id):
     return Response({
         'message': 'Inasistencia registrada.',
         'no_show_count': (owner or {}).get('no_show_count', 0),
-        'no_show_limite': NO_SHOW_LIMITE,
-        'inasistencias_restantes': inasistencias_restantes(owner),
+        'no_show_limite': reglas.NO_SHOW_LIMITE,
+        'inasistencias_restantes': reglas.inasistencias_restantes(owner),
         'penalizado': penalizado,
     })

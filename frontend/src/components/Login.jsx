@@ -1,9 +1,14 @@
+/*
+ * PANTALLA DE ACCESO Y REGISTRO
+ *
+ * Solo estructura y comportamiento. La presentación vive en
+ * src/styles/login.css.
+ */
 import { useState } from 'react';
 import { authApi } from '../services/api';
+import '../styles/login.css';
 
-const RED = '#CC0000';
-
-// RN01 — Tres tipos de correo institucional: el dominio determina el rol.
+// Tres tipos de correo institucional: el dominio determina el rol.
 const DOMINIOS = [
   { dominio: '@soyudemedellin.edu.co', etiqueta: 'Estudiante' },
   { dominio: '@udem.edu.co',           etiqueta: 'Entrenador' },
@@ -13,22 +18,13 @@ const DOMINIOS = [
 const rolDeCorreo = (email) =>
   DOMINIOS.find((d) => email.trim().toLowerCase().endsWith(d.dominio))?.etiqueta ?? null;
 
-const inputStyle = {
-  width: '100%',
-  padding: '12px 16px',
-  border: '1.5px solid #E5E7EB',
-  borderRadius: 10,
-  fontSize: 14,
-  color: '#1A1A1A',
-  backgroundColor: '#FAFAFA',
-  transition: 'border-color 0.2s, box-shadow 0.2s',
-};
+const CARACTERISTICAS = ['Reservas en línea', 'Horarios en tiempo real', 'Aforo actualizado'];
 
 export default function Login({ onLogin }) {
   const [tab, setTab]               = useState('login');
   const [email, setEmail]           = useState('');
-  // RF01/RF02 — El documento de identidad es el dato de registro y, a la vez,
-  // la contraseña con la que se inicia sesión.
+  // El documento de identidad es el dato de registro y, a la vez, la
+  // contraseña con la que se inicia sesión.
   const [documento, setDocumento]   = useState('');
   const [name, setName]             = useState('');
   const [error, setError]           = useState('');
@@ -64,26 +60,19 @@ export default function Login({ onLogin }) {
 
   if (registered) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', backgroundColor: '#F4F4F6', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-        <div style={{ backgroundColor: 'white', borderRadius: 22, padding: '48px 40px', maxWidth: 440, width: '100%', textAlign: 'center', boxShadow: '0 8px 40px rgba(0,0,0,0.1)', animation: 'scaleIn 0.3s ease' }}>
-          <div style={{ width: 80, height: 80, borderRadius: '50%', backgroundColor: '#dcfce7', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px', fontSize: 40 }}>
-            ✅
-          </div>
-          <h2 style={{ fontSize: 24, fontWeight: 900, color: '#1A1A1A', marginBottom: 10 }}>
-            ¡Registro exitoso!
-          </h2>
-          <p style={{ color: '#555', fontSize: 15, lineHeight: 1.7, marginBottom: 8 }}>
+      <div className="registro-ok">
+        <div className="registro-ok__tarjeta">
+          <div className="registro-ok__icono">✅</div>
+          <h2 className="registro-ok__titulo">¡Registro exitoso!</h2>
+          <p className="registro-ok__texto">
             Tu cuenta ha sido creada correctamente, <strong>{name}</strong>.
           </p>
-          <p style={{ color: '#888', fontSize: 14, lineHeight: 1.7, marginBottom: 32 }}>
-            Ya puedes iniciar sesión con tu correo <strong style={{ color: RED }}>{email}</strong> y tu
+          <p className="registro-ok__detalle">
+            Ya puedes iniciar sesión con tu correo{' '}
+            <strong className="registro-ok__correo">{email}</strong> y tu
             documento de identidad como contraseña.
           </p>
-          <button onClick={handleGoToLogin} style={{
-            width: '100%', padding: 15, backgroundColor: RED, color: 'white',
-            border: 'none', borderRadius: 12, fontWeight: 800, fontSize: 15,
-            cursor: 'pointer', boxShadow: '0 4px 16px rgba(204,0,0,0.35)',
-          }}>
+          <button className="acceso__enviar" onClick={handleGoToLogin}>
             Ir a iniciar sesión →
           </button>
         </div>
@@ -92,125 +81,90 @@ export default function Login({ onLogin }) {
   }
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex' }}>
-      {/* Panel izquierdo decorativo */}
-      <div style={{
-        flex: 1,
-        background: `linear-gradient(145deg, ${RED} 0%, #990000 100%)`,
-        display: 'flex',
-        flexDirection: 'column',
-        justifyContent: 'center',
-        alignItems: 'center',
-        padding: 60,
-        '@media(max-width:768px)': { display: 'none' },
-      }}
-        className="left-panel"
-      >
-        <div style={{ textAlign: 'center', color: 'white', animation: 'fadeUp 0.6s ease' }}>
+    <div className="acceso">
+      {/* Columna izquierda — presentación del sistema */}
+      <div className="acceso__presentacion">
+        <div className="acceso__presentacion-contenido">
           <img
+            className="acceso__logo-grande"
             src="/logo-udem.png"
             alt="Universidad de Medellín"
-            style={{ width: 220, marginBottom: 28, filter: 'drop-shadow(0 4px 16px rgba(0,0,0,0.25))' }}
           />
-          <p style={{ fontSize: 17, opacity: 0.88, maxWidth: 300, lineHeight: 1.7 }}>
+          <p className="acceso__lema">
             Sistema de reserva de cupos para la comunidad universitaria de Medellín
           </p>
-          <div style={{ marginTop: 48, display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
-            {['Reservas en línea', 'Horarios en tiempo real', 'Aforo actualizado'].map(f => (
-              <span key={f} style={{
-                backgroundColor: 'rgba(255,255,255,0.18)',
-                border: '1px solid rgba(255,255,255,0.3)',
-                padding: '8px 16px', borderRadius: 24, fontSize: 13, fontWeight: 500,
-              }}>{f}</span>
+          <div className="acceso__caracteristicas">
+            {CARACTERISTICAS.map(f => (
+              <span key={f} className="acceso__caracteristica">{f}</span>
             ))}
           </div>
-          <div style={{ marginTop: 60, padding: '20px 32px', backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: 16, border: '1px solid rgba(255,255,255,0.2)' }}>
-            <p style={{ fontSize: 13, opacity: 0.85, lineHeight: 1.7, margin: 0 }}>
-              "Gestiona tu tiempo en el gimnasio de forma fácil y sin filas."
-            </p>
+          <div className="acceso__cita">
+            <p>"Gestiona tu tiempo en el gimnasio de forma fácil y sin filas."</p>
           </div>
         </div>
       </div>
 
-      {/* Panel derecho — formulario */}
-      <div style={{
-        flex: 1,
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        padding: '40px 24px',
-        backgroundColor: '#F4F4F6',
-      }}>
-        <div style={{ width: '100%', maxWidth: 420, animation: 'fadeUp 0.4s ease' }}>
-
-          {/* Logo */}
-          <div style={{ textAlign: 'center', marginBottom: 32 }}>
-            <img src="/logo-udem.png" alt="Universidad de Medellín" style={{ width: 180 }} />
+      {/* Columna derecha — formulario */}
+      <div className="acceso__formulario">
+        <div className="acceso__caja">
+          <div className="acceso__logo-caja">
+            <img src="/logo-udem.png" alt="Universidad de Medellín" />
           </div>
 
-          <div style={{ backgroundColor: 'white', borderRadius: 22, padding: '36px 32px', boxShadow: '0 8px 40px rgba(0,0,0,0.1)' }}>
-            <h2 style={{ color: '#1A1A1A', fontSize: 24, fontWeight: 800, marginBottom: 6 }}>
+          <div className="acceso__tarjeta">
+            <h2 className="acceso__titulo">
               {tab === 'login' ? 'Bienvenido de nuevo' : 'Crear cuenta'}
             </h2>
-            <p style={{ color: '#888', fontSize: 14, marginBottom: 28 }}>
+            <p className="acceso__descripcion">
               {tab === 'login'
                 ? 'Ingresa con tu correo institucional y tu documento de identidad'
                 : 'Regístrate con tu nombre, correo institucional y documento de identidad'}
             </p>
 
-            {/* Tabs */}
-            <div style={{ display: 'flex', backgroundColor: '#F4F4F6', borderRadius: 12, padding: 4, marginBottom: 28 }}>
+            <div className="acceso__pestanas">
               {[
                 { id: 'login',    label: 'Iniciar sesión' },
                 { id: 'register', label: 'Registrarse' },
               ].map(t => (
-                <button key={t.id} onClick={() => { setTab(t.id); setError(''); }} style={{
-                  flex: 1, padding: '10px 0', border: 'none', borderRadius: 9, cursor: 'pointer',
-                  backgroundColor: tab === t.id ? 'white' : 'transparent',
-                  color: tab === t.id ? RED : '#888',
-                  fontWeight: tab === t.id ? 700 : 400,
-                  fontSize: 14,
-                  boxShadow: tab === t.id ? '0 2px 8px rgba(0,0,0,0.1)' : 'none',
-                  transition: 'all 0.2s',
-                }}>
+                <button
+                  key={t.id}
+                  className={`acceso__pestana${tab === t.id ? ' acceso__pestana--activa' : ''}`}
+                  onClick={() => { setTab(t.id); setError(''); }}
+                >
                   {t.label}
                 </button>
               ))}
             </div>
 
-            <form onSubmit={handleSubmit} noValidate style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <form className="acceso__campos" onSubmit={handleSubmit} noValidate>
               {tab === 'register' && (
                 <div>
-                  <label style={{ display: 'block', fontSize: 13, color: '#555', marginBottom: 6, fontWeight: 600 }}>
-                    Nombre completo
-                  </label>
+                  <label className="acceso__etiqueta">Nombre completo</label>
                   <input
+                    className="acceso__entrada"
                     type="text"
                     value={name}
                     onChange={e => setName(e.target.value)}
                     placeholder="Ej: María García"
-                    style={inputStyle}
                     required
                   />
                 </div>
               )}
 
               <div>
-                <label style={{ display: 'block', fontSize: 13, color: '#555', marginBottom: 6, fontWeight: 600 }}>
-                  Correo institucional
-                </label>
+                <label className="acceso__etiqueta">Correo institucional</label>
                 <input
+                  className="acceso__entrada"
                   type="text"
                   value={email}
                   onChange={e => setEmail(e.target.value)}
                   placeholder="nombre@soyudemedellin.edu.co"
-                  style={inputStyle}
                   autoCapitalize="none"
                   autoCorrect="off"
                 />
-                {/* RN01 — se avisa en vivo qué rol otorga el dominio escrito */}
+                {/* Se avisa en vivo qué rol otorga el dominio escrito */}
                 {tab === 'register' && email.trim() !== '' && (
-                  <p style={{ fontSize: 12, marginTop: 6, color: rolDeCorreo(email) ? '#15803D' : '#991B1B' }}>
+                  <p className={`acceso__pista acceso__pista--${rolDeCorreo(email) ? 'ok' : 'error'}`}>
                     {rolDeCorreo(email)
                       ? `✓ Entrarás como ${rolDeCorreo(email).toUpperCase()}`
                       : '⚠ Ese dominio no es institucional'}
@@ -218,21 +172,19 @@ export default function Login({ onLogin }) {
                 )}
               </div>
 
-              {/* RF01/RF02 — Documento de identidad: dato de registro y contraseña */}
+              {/* Documento de identidad: dato de registro y contraseña */}
               <div>
-                <label style={{ display: 'block', fontSize: 13, color: '#555', marginBottom: 6, fontWeight: 600 }}>
-                  Documento de identidad
-                </label>
+                <label className="acceso__etiqueta">Documento de identidad</label>
                 <input
+                  className="acceso__entrada"
                   type="password"
                   value={documento}
                   onChange={e => setDocumento(e.target.value)}
                   placeholder="Ej: 1001234567"
-                  style={inputStyle}
                   inputMode="numeric"
                   required
                 />
-                <p style={{ fontSize: 12, color: '#888', marginTop: 6 }}>
+                <p className="acceso__nota">
                   {tab === 'login'
                     ? 'Tu documento de identidad es tu contraseña.'
                     : 'Con este documento iniciarás sesión (mínimo 6 caracteres).'}
@@ -240,27 +192,19 @@ export default function Login({ onLogin }) {
               </div>
 
               {error && (
-                <div style={{ backgroundColor: '#fee2e2', border: '1px solid #fca5a5', borderRadius: 10, padding: '10px 14px' }}>
-                  <p style={{ color: '#991b1b', fontSize: 13, margin: 0 }}>⚠ {error}</p>
+                <div className="acceso__error">
+                  <p>⚠ {error}</p>
                 </div>
               )}
 
-              <button type="submit" disabled={submitting} style={{
-                width: '100%', padding: 15, backgroundColor: RED, color: 'white',
-                border: 'none', borderRadius: 12, fontWeight: 800, fontSize: 15,
-                cursor: submitting ? 'not-allowed' : 'pointer', marginTop: 4,
-                boxShadow: '0 4px 16px rgba(204,0,0,0.35)',
-                opacity: submitting ? 0.7 : 1,
-              }}>
+              <button className="acceso__enviar" type="submit" disabled={submitting}>
                 {submitting ? 'Cargando...' : tab === 'login' ? 'Ingresar →' : 'Crear cuenta →'}
               </button>
 
-              <div style={{ padding: '12px 16px', backgroundColor: '#FFF8F0', borderRadius: 10, border: '1px solid #FFD9A0' }}>
-                <p style={{ fontSize: 12, color: '#92400e', margin: 0, marginBottom: 8, textAlign: 'center', fontWeight: 700 }}>
-                  🔒 Tres tipos de correo institucional
-                </p>
+              <div className="acceso__dominios">
+                <p className="acceso__dominios-titulo">🔒 Tres tipos de correo institucional</p>
                 {DOMINIOS.map(d => (
-                  <p key={d.dominio} style={{ fontSize: 12, color: '#92400e', margin: 0, textAlign: 'center', lineHeight: 1.7 }}>
+                  <p key={d.dominio} className="acceso__dominio">
                     <strong>{d.dominio}</strong> → {d.etiqueta}
                   </p>
                 ))}

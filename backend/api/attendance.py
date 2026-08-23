@@ -1,95 +1,105 @@
 """
-Asistencia, inasistencias, penalizaciones y reportes del sistema.
+FUNCIONALIDADES DE ASISTENCIA, INASISTENCIAS Y REPORTES
 
-  RF11 / P11 / HU11  Buscar la reserva de un estudiante por su DOCUMENTO
-  RF13 / P13 / HU12  Registrar la asistencia del estudiante
-  RF14 / P14 / HU13-HU15  Estudiantes con reserva y sin asistencia registrada
-  RF15 / P15 / HU14-HU16  Procesar de forma GENERAL las inasistencias
-  RF16 / P16         Penalización al alcanzar CINCO (5) inasistencias
-  RF18 / P18 / HU08  Reporte personal de inasistencias y penalizaciones
-  RF19 / P19 / HU17-HU18  Reporte GENERAL DIARIO del gimnasio
+Este archivo expone la API de la jornada del gimnasio. No consulta MongoDB
+directamente ni define límites propios: llama a `datos.py` para leer y escribir
+y a `reglas.py` para saber cuándo corresponde penalizar una cuenta.
+
+REQUISITOS FUNCIONALES CUBIERTOS EN ESTE ARCHIVO
+    RF18  Reporte personal de inasistencias y penalizaciones
+
+REQUISITOS FUNCIONALES IGNORADOS EN ESTE ARCHIVO
+    Son responsabilidad de otros integrantes del equipo o quedaron fuera del
+    alcance de las pruebas. El código sigue funcionando, pero no se diseñaron
+    escenarios ni casos de prueba para ellos.
+    RF11  Búsqueda del estudiante por su documento de identidad
+    RF13  Registro de la asistencia del estudiante
+    RF14  Estudiantes con reserva y sin asistencia registrada
+    RF15  Procesamiento general de las inasistencias de la jornada
+    RF16  Penalización al alcanzar cinco inasistencias
+    RF19  Reporte general diario del gimnasio
 """
-from datetime import datetime
+from datetime import date as _date, datetime
 
-from bson import ObjectId
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 
-from .db import (
-    get_db, add_business_days, hoy_local, formato_fecha_es, normalizar_documento,
-    inasistencias_restantes, alerta_inasistencias, cancelaciones_restantes,
-    NO_SHOW_LIMITE, CANCELACION_LIMITE, PENALIZACION_DIAS_HABILES,
-)
-
-ROLES_STAFF = ('ENTRENADOR', 'ADMIN')
+from . import datos, reglas
 
 
 def _actor_staff(email: str):
-    """Devuelve el ENTRENADOR/ADMIN que ejecuta la acción, o None si no lo es."""
-    user = get_db().users.find_one({'email': (email or '').strip().lower()})
-    return user if user and user.get('role') in ROLES_STAFF else None
+    """Devuelve el ENTRENADOR o ADMIN que ejecuta la acción, o None si no lo es."""
+    user = datos.buscar_usuario(reglas.normalizar_correo(email))
+    return user if reglas.es_staff(user) else None
 
 
 def _fecha_jornada(request) -> str:
-    """Fecha ISO de la jornada consultada. Por defecto, HOY."""
+    """Fecha de la jornada consultada. Por defecto, HOY."""
     pedida = (request.query_params.get('fecha') if request.method == 'GET'
               else request.data.get('fecha'))
-    return (pedida or '').strip() or hoy_local().isoformat()
+    return (pedida or '').strip() or reglas.hoy_local().isoformat()
 
 
 def _fecha_label(fecha_iso: str) -> str:
+    """Convierte '2026-08-20' en 'jueves 20 de agosto de 2026'."""
     try:
         y, m, d = (int(x) for x in fecha_iso.split('-'))
-        from datetime import date as _date
-        return formato_fecha_es(_date(y, m, d))
+        return reglas.formato_fecha_es(_date(y, m, d))
     except Exception:
         return fecha_iso
 
 
 def aplicar_inasistencia(email: str):
-    """RF16 — Suma una inasistencia y penaliza al llegar al límite de CINCO (5).
+    """Suma una inasistencia y penaliza la cuenta al llegar al límite.
 
-    Devuelve (usuario_actualizado, penalizado_ahora).
+    Es la única puerta por la que se registra una inasistencia, para que el
+    registro individual y el procesamiento general de la jornada apliquen
+    exactamente la misma regla. Devuelve (usuario_actualizado, penalizado_ahora).
     """
-    db = get_db()
-    owner = db.users.find_one_and_update(
-        {'email': email}, {'$inc': {'no_show_count': 1}}, return_document=True,
-    )
+    owner = datos.sumar_a_contador(email, 'no_show_count')
     if not owner:
         return None, False
     penalizado = False
-    if owner.get('no_show_count', 0) >= NO_SHOW_LIMITE and owner.get('estado') != 'PENALIZADO':
-        hasta = add_business_days(datetime.utcnow(), PENALIZACION_DIAS_HABILES)
-        db.users.update_one(
-            {'email': email},
-            {'$set': {'estado': 'PENALIZADO', 'penalizado_hasta': hasta,
-                      'penalizado_at': datetime.utcnow()}},
-        )
+    if reglas.alcanza_limite_inasistencias(owner) and owner.get('estado') != 'PENALIZADO':
+        datos.actualizar_usuario(email, {
+            'estado': 'PENALIZADO',
+            'penalizado_hasta': reglas.fin_de_penalizacion(),
+            'penalizado_at': datetime.utcnow(),
+        })
         owner['estado'] = 'PENALIZADO'
         penalizado = True
     return owner, penalizado
 
 
+def _reserva_futura(filtro: dict):
+    """Busca la reserva que el filtro descartó por ser de una jornada futura."""
+    sin_fecha = {k: v for k, v in filtro.items() if k != 'reserva_date'}
+    hoy = reglas.hoy_local().isoformat()
+    futuras = datos.listar_reservas({**sin_fecha, 'reserva_date': {'$gt': hoy}}, 'reserva_date', 1)
+    return futuras[0] if futuras else None
+
+
 def _fila_estudiante(user: dict) -> dict:
+    """Los datos del estudiante que ve el personal del gimnasio."""
     return {
         'name': user.get('name'),
         'email': user.get('email'),
         'documento': user.get('documento', ''),
         'estado': user.get('estado', 'ACTIVO'),
         'no_show_count': user.get('no_show_count', 0),
-        'inasistencias_restantes': inasistencias_restantes(user),
-        'no_show_limite': NO_SHOW_LIMITE,
+        'inasistencias_restantes': reglas.inasistencias_restantes(user),
+        'no_show_limite': reglas.NO_SHOW_LIMITE,
     }
 
 
-# ── RF11 / HU11 — BUSCAR AL ESTUDIANTE POR SU DOCUMENTO DE IDENTIDAD ────────
+# ── RF11 · [IGNORADO] Búsqueda del estudiante por su documento ───────────
 @api_view(['GET'])
 def student_lookup(request):
     """El entrenador busca a un estudiante por su documento y ve su reserva.
 
     Parámetros: ?documento=1001234567&actor_email=coach@udem.edu.co
     Devuelve los datos del estudiante y sus reservas ACTIVAS (con la del día
-    de la jornada marcada), para poder registrarle la asistencia (RF13).
+    de la jornada marcada), para poder registrarle la asistencia.
     """
     if not _actor_staff(request.query_params.get('actor_email')):
         return Response(
@@ -97,25 +107,26 @@ def student_lookup(request):
             status=403,
         )
 
-    documento = normalizar_documento(request.query_params.get('documento'))
+    documento = reglas.normalizar_documento(request.query_params.get('documento'))
     if not documento:
         return Response({'error': 'Debes indicar el documento de identidad.'}, status=400)
 
-    db = get_db()
-    student = db.users.find_one({'documento': documento, 'role': 'ESTUDIANTE'})
+    student = datos.buscar_estudiante_por_documento(documento)
     if not student:
         return Response(
             {'error': f'No hay ningún estudiante registrado con el documento {documento}.'},
             status=404,
         )
 
-    hoy = hoy_local().isoformat()
+    hoy = reglas.hoy_local().isoformat()
     reservas = [{
         'id': str(r['_id']), 'slotId': r['slotId'], 'hour': r['hour'],
         'date': r.get('date'), 'reserva_date': r.get('reserva_date'),
         'estado': r.get('estado'),
         'es_de_hoy': r.get('reserva_date') == hoy,
-    } for r in db.reservations.find({'email': student['email'], 'estado': 'ACTIVA'}).sort('reserva_date', 1)]
+        # La recepción necesita saber si ya puede marcar la asistencia.
+        'se_puede_registrar': reglas.jornada_ya_llegada(r.get('reserva_date')),
+    } for r in datos.reservas_activas_ordenadas(student['email'])]
 
     return Response({
         'estudiante': _fila_estudiante(student),
@@ -125,7 +136,7 @@ def student_lookup(request):
     })
 
 
-# ── RF13 / HU12 — REGISTRAR LA ASISTENCIA DEL ESTUDIANTE ───────────────────
+# ── RF13 · [IGNORADO] Registro de la asistencia del estudiante ───────────
 @api_view(['POST'])
 def register_attendance(request):
     """Registra la asistencia de un estudiante que TIENE una reserva.
@@ -140,37 +151,43 @@ def register_attendance(request):
             status=403,
         )
 
-    db = get_db()
-    filtro = {'estado': 'ACTIVA'}
+    # La jornada de la reserva tiene que haber llegado: si la reserva es para
+    # mañana, el estudiante todavía no ha podido presentarse.
+    hoy = reglas.hoy_local().isoformat()
+    filtro = {'estado': 'ACTIVA', 'reserva_date': {'$lte': hoy}}
     reservation_id = request.data.get('reservation_id')
 
     if reservation_id:
-        try:
-            filtro['_id'] = ObjectId(reservation_id)
-        except Exception:
+        oid = datos.a_object_id(reservation_id)
+        if oid is None:
             return Response({'error': 'ID de reserva inválido.'}, status=400)
+        filtro['_id'] = oid
     else:
-        documento = normalizar_documento(request.data.get('documento'))
+        documento = reglas.normalizar_documento(request.data.get('documento'))
         if not documento:
             return Response(
                 {'error': 'Debes indicar el documento de identidad o el id de la reserva.'},
                 status=400,
             )
-        student = db.users.find_one({'documento': documento, 'role': 'ESTUDIANTE'})
+        student = datos.buscar_estudiante_por_documento(documento)
         if not student:
             return Response(
                 {'error': f'No hay ningún estudiante registrado con el documento {documento}.'},
                 status=404,
             )
         filtro['email'] = student['email']
-        filtro['reserva_date'] = _fecha_jornada(request)
 
-    reserva = db.reservations.find_one_and_update(
-        filtro,
-        {'$set': {'estado': 'COMPLETADA', 'completed_at': datetime.utcnow(),
-                  'asistencia_registrada_por': actor['email']}},
-    )
+    reserva = datos.marcar_asistencia(filtro, actor['email'])
     if reserva is None:
+        # Se distingue entre «no hay reserva» y «la reserva todavía no toca»,
+        # que son dos situaciones muy distintas para quien está en recepción.
+        futura = _reserva_futura(filtro)
+        if futura:
+            return Response(
+                {'error': f"La reserva de este estudiante es para el {futura.get('date')}. "
+                          'La asistencia solo puede registrarse el día de la reserva.'},
+                status=409,
+            )
         return Response(
             {'error': 'El estudiante no tiene una reserva activa para registrar asistencia.'},
             status=404,
@@ -185,7 +202,7 @@ def register_attendance(request):
     })
 
 
-# ── RF14 / HU13 / HU15 — ESTUDIANTES SIN ASISTENCIA REGISTRADA ─────────────
+# ── RF14 · [IGNORADO] Estudiantes sin asistencia registrada ─────────────
 @api_view(['GET'])
 def pending_attendance(request):
     """Reservas de la jornada que siguen ACTIVAS: nadie les registró asistencia.
@@ -201,12 +218,10 @@ def pending_attendance(request):
         )
 
     fecha = _fecha_jornada(request)
-    db = get_db()
     pendientes = []
-    for r in db.reservations.find(
-        {'estado': 'ACTIVA', 'reserva_date': {'$lte': fecha}}
-    ).sort('reserva_date', 1):
-        student = db.users.find_one({'email': r['email']}) or {}
+    for r in datos.listar_reservas(
+            {'estado': 'ACTIVA', 'reserva_date': {'$lte': fecha}}, 'reserva_date', 1):
+        student = datos.buscar_usuario(r['email']) or {}
         pendientes.append({
             'id': str(r['_id']),
             'name': student.get('name', r['email']),
@@ -217,26 +232,27 @@ def pending_attendance(request):
             'date': r.get('date'),
             'reserva_date': r.get('reserva_date'),
             'no_show_count': student.get('no_show_count', 0),
-            'inasistencias_restantes': inasistencias_restantes(student),
+            'inasistencias_restantes': reglas.inasistencias_restantes(student),
         })
 
     return Response({
         'fecha': fecha,
         'fecha_label': _fecha_label(fecha),
-        'no_show_limite': NO_SHOW_LIMITE,
+        'no_show_limite': reglas.NO_SHOW_LIMITE,
         'total': len(pendientes),
         'pendientes': pendientes,
     })
 
 
-# ── RF15 / HU14 / HU16 — PROCESAR DE FORMA GENERAL LAS INASISTENCIAS ───────
+# ── RF15 · [IGNORADO] Procesamiento general de las inasistencias ────────
+# ── RF16 · [IGNORADO] Penalización al alcanzar cinco inasistencias ──────
 @api_view(['POST'])
 def process_no_shows(request):
     """Cierra la jornada: toda reserva sin asistencia queda como inasistencia.
 
     Cuerpo: {actor_email, fecha?}. Marca NO_SHOW cada reserva ACTIVA de la
     jornada, suma la inasistencia a cada estudiante y aplica la penalización
-    a quienes lleguen a CINCO (5) inasistencias (RF16).
+    a quienes lleguen al límite establecido.
     """
     actor = _actor_staff(request.data.get('actor_email'))
     if not actor:
@@ -245,19 +261,16 @@ def process_no_shows(request):
             status=403,
         )
 
-    fecha = _fecha_jornada(request)
-    db = get_db()
+    # Nunca se cierra una jornada futura: esas reservas todavía se pueden
+    # cumplir, así que marcarlas como inasistencia sería injusto.
+    fecha = reglas.limitar_a_hoy(_fecha_jornada(request))
     procesados, penalizados = [], []
 
     while True:
-        # Se toma una reserva a la vez con find_one_and_update: la transición
-        # ACTIVA -> NO_SHOW es atómica, así dos entrenadores que cierren la
-        # jornada al mismo tiempo no cuentan dos veces la misma inasistencia.
-        reserva = db.reservations.find_one_and_update(
-            {'estado': 'ACTIVA', 'reserva_date': {'$lte': fecha}},
-            {'$set': {'estado': 'NO_SHOW', 'no_show_at': datetime.utcnow(),
-                      'procesado_por': actor['email']}},
-        )
+        # Se toma una reserva a la vez de forma atómica: dos entrenadores que
+        # cierren la jornada al mismo tiempo no cuentan dos veces la misma
+        # inasistencia.
+        reserva = datos.tomar_reserva_pendiente(fecha, actor['email'])
         if reserva is None:
             break
 
@@ -269,7 +282,7 @@ def process_no_shows(request):
             'hour': reserva['hour'],
             'date': reserva.get('date'),
             'no_show_count': (owner or {}).get('no_show_count', 0),
-            'inasistencias_restantes': inasistencias_restantes(owner),
+            'inasistencias_restantes': reglas.inasistencias_restantes(owner),
             'penalizado': penalizado,
         })
         if penalizado:
@@ -287,28 +300,27 @@ def process_no_shows(request):
         'fecha_label': _fecha_label(fecha),
         'total_procesadas': len(procesados),
         'total_penalizados': len(penalizados),
-        'no_show_limite': NO_SHOW_LIMITE,
+        'no_show_limite': reglas.NO_SHOW_LIMITE,
         'procesados': procesados,
     })
 
 
-# ── RF18 / HU08 — REPORTE PERSONAL DE INASISTENCIAS Y PENALIZACIONES ───────
+# ── RF18 · Reporte personal de inasistencias y penalizaciones ───────────
 @api_view(['GET'])
 def personal_report(request):
     """Lo que el estudiante ve de sí mismo: inasistencias y penalizaciones."""
-    email = request.query_params.get('email', '').strip().lower()
+    email = reglas.normalizar_correo(request.query_params.get('email'))
     if not email:
         return Response({'error': 'Parámetro email requerido.'}, status=400)
 
-    db = get_db()
-    user = db.users.find_one({'email': email})
+    user = datos.buscar_usuario(email)
     if not user:
         return Response({'error': 'Usuario no encontrado.'}, status=404)
 
     inasistencias = [{
         'id': str(r['_id']), 'hour': r['hour'], 'date': r.get('date'),
         'reserva_date': r.get('reserva_date'),
-    } for r in db.reservations.find({'email': email, 'estado': 'NO_SHOW'}).sort('reserva_date', -1)]
+    } for r in datos.listar_reservas({'email': email, 'estado': 'NO_SHOW'}, 'reserva_date', -1)]
 
     penalizado_hasta = user.get('penalizado_hasta')
     return Response({
@@ -316,36 +328,34 @@ def personal_report(request):
         'email': email,
         'documento': user.get('documento', ''),
         'estado': user.get('estado', 'ACTIVO'),
-        # RF16/RF18 — inasistencias y cuántas faltan para la penalización.
+        # Inasistencias acumuladas y cuántas faltan para la penalización.
         'no_show_count': user.get('no_show_count', 0),
-        'no_show_limite': NO_SHOW_LIMITE,
-        'inasistencias_restantes': inasistencias_restantes(user),
-        'alerta_inasistencias': alerta_inasistencias(user),
+        'no_show_limite': reglas.NO_SHOW_LIMITE,
+        'inasistencias_restantes': reglas.inasistencias_restantes(user),
+        'alerta_inasistencias': reglas.alerta_inasistencias(user),
         'penalizado': user.get('estado') == 'PENALIZADO',
         'penalizado_hasta': penalizado_hasta.isoformat() if penalizado_hasta else None,
-        # Contexto de cancelaciones (RN10).
+        # Cancelaciones: se informan aparte porque NO son inasistencias ni
+        # penalizan la cuenta.
         'cancel_count': user.get('cancel_count', 0),
-        'cancelacion_limite': CANCELACION_LIMITE,
-        'cancelaciones_restantes': cancelaciones_restantes(user),
         'inasistencias': inasistencias,
-        'total_asistencias': db.reservations.count_documents({'email': email, 'estado': 'COMPLETADA'}),
-        'total_cancelaciones': db.reservations.count_documents({'email': email, 'estado': 'CANCELADA'}),
+        'total_asistencias': datos.contar_reservas({'email': email, 'estado': 'COMPLETADA'}),
+        'total_cancelaciones': datos.contar_reservas({'email': email, 'estado': 'CANCELADA'}),
     })
 
 
-# ── RF19 / HU17 / HU18 — REPORTE GENERAL DIARIO DEL GIMNASIO ───────────────
+# ── RF19 · [IGNORADO] Reporte general diario del gimnasio ───────────────
 def build_daily_report(fecha_iso: str) -> dict:
     """Totales del día: asistencias, cancelaciones e inasistencias.
 
-    Lo usan tanto la consulta en pantalla (RF19) como el PDF (RF20).
+    Lo usan tanto la consulta en pantalla como la exportación a PDF.
     """
-    db = get_db()
     del_dia = {'reserva_date': fecha_iso}
 
     def _detalle(estado):
         filas = []
-        for r in db.reservations.find({**del_dia, 'estado': estado}).sort('hour', 1):
-            u = db.users.find_one({'email': r['email']}) or {}
+        for r in datos.listar_reservas({**del_dia, 'estado': estado}, 'hour', 1):
+            u = datos.buscar_usuario(r['email']) or {}
             filas.append({
                 'name': u.get('name', r['email']), 'email': r['email'],
                 'documento': u.get('documento', ''), 'hour': r['hour'],
@@ -364,26 +374,25 @@ def build_daily_report(fecha_iso: str) -> dict:
         'cancel_count': u.get('cancel_count', 0),
         'penalizado_hasta': (u['penalizado_hasta'].date().isoformat()
                              if u.get('penalizado_hasta') else None),
-    } for u in db.users.find({'role': 'ESTUDIANTE', 'estado': 'PENALIZADO'}).sort('name', 1)]
+    } for u in datos.listar_estudiantes_penalizados()]
 
-    # Ocupación por bloque horario del día (RF07 aplicado al reporte).
+    # Ocupación por bloque horario del día.
     bloques = []
-    for s in db.slots.find().sort('slotId', 1):
-        reservados = db.reservations.count_documents(
-            {**del_dia, 'slotId': s['slotId'], 'estado': {'$in': ['ACTIVA', 'COMPLETADA', 'NO_SHOW']}}
-        )
+    for s in datos.listar_bloques():
+        reservados = datos.contar_reservas(
+            {**del_dia, 'slotId': s['slotId'], 'estado': {'$in': ['ACTIVA', 'COMPLETADA', 'NO_SHOW']}})
         bloques.append({
             'slotId': s['slotId'], 'hour': s['hour'], 'total': s['total'],
             'reservados': reservados,
-            'asistencias': db.reservations.count_documents({**del_dia, 'slotId': s['slotId'], 'estado': 'COMPLETADA'}),
-            'inasistencias': db.reservations.count_documents({**del_dia, 'slotId': s['slotId'], 'estado': 'NO_SHOW'}),
+            'asistencias': datos.contar_reservas({**del_dia, 'slotId': s['slotId'], 'estado': 'COMPLETADA'}),
+            'inasistencias': datos.contar_reservas({**del_dia, 'slotId': s['slotId'], 'estado': 'NO_SHOW'}),
         })
 
     return {
         'fecha': fecha_iso,
         'fecha_label': _fecha_label(fecha_iso),
         'totales': {
-            'reservas': db.reservations.count_documents(del_dia),
+            'reservas': datos.contar_reservas(del_dia),
             'asistencias': len(asistencias),
             'cancelaciones': len(cancelaciones),
             'inasistencias': len(inasistencias),
@@ -396,13 +405,13 @@ def build_daily_report(fecha_iso: str) -> dict:
         'pendientes': pendientes,
         'penalizados': penalizados,
         'bloques': bloques,
-        'no_show_limite': NO_SHOW_LIMITE,
+        'no_show_limite': reglas.NO_SHOW_LIMITE,
     }
 
 
 @api_view(['GET'])
 def daily_report(request):
-    """Reporte general diario para entrenadores y administradores (RF19)."""
+    """Reporte general diario para entrenadores y administradores."""
     if not _actor_staff(request.query_params.get('actor_email')):
         return Response(
             {'error': 'Solo un entrenador o administrador puede consultar el reporte general.'},
