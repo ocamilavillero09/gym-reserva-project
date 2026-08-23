@@ -142,20 +142,21 @@ export default function ProfileView({ user, showToast }) {
         </div>
       )}
 
-      {/* Cancelaciones acumuladas. Es solo informativo: cancelar no penaliza
-          la cuenta ni cuenta como inasistencia. */}
+      {/* Cancelaciones acumuladas. NO hay límite y NO penalizan: el contador
+          está solo para que el estudiante vea su propia actividad. */}
       {esEstudiante && datos && (
         <div className="perfil__tarjeta">
           <h3 className="perfil__seccion">📊 Mis cancelaciones</h3>
           <p className="perfil__nota">
-            Cancelar a tiempo devuelve el cupo a otro compañero y no penaliza tu cuenta.
-            Este contador es solo informativo.
+            Puedes cancelar <strong>las veces que necesites</strong>: no hay límite y
+            cancelar nunca penaliza tu cuenta. Avisar a tiempo devuelve el cupo para que
+            otro compañero lo aproveche. Lo único que penaliza es no presentarte.
           </p>
           <div className="perfil__contadores">
             <Contador
               label="Veces que he cancelado"
               value={datos.cancel_count}
-              sub="no afectan a tu cuenta"
+              sub="sin límite"
             />
             <Contador
               label="Inasistencias"

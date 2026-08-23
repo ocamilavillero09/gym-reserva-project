@@ -630,7 +630,8 @@ def reservations(request):
 # ── RF25 · [IGNORADO] Notificación de cancelación ────────────────────────
 @swagger_auto_schema(
     method='delete',
-    operation_description="Cancela reserva y libera cupo inmediatamente. Suma al contador de cancelaciones.",
+    operation_description=("Cancela la reserva y libera el cupo de inmediato. Cancelar no tiene "
+                           "límite ni penaliza: el contador es solo informativo."),
     manual_parameters=[
         openapi.Parameter('reservation_id', openapi.IN_PATH, description="ID de la reserva", type=openapi.TYPE_STRING, required=True),
     ],

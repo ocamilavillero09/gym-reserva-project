@@ -1057,6 +1057,24 @@ class RF25NotificacionDeCancelacion(BaseGimnasio):
         self.assertEqual(cuenta['cancel_count'], 5)
         self.assertEqual(cuenta['estado'], 'ACTIVO')
 
+    def test_cancelar_no_tiene_limite(self):
+        """Cancelar es ilimitado: se cancela doce veces seguidas y la cuenta
+        sigue intacta, sin inasistencias y sin sanción."""
+        self.cancelar(self.reserva['id'])
+        for i in range(11):
+            reserva = self.reservar(ESTUDIANTE, (i % 6) + 1).data
+            self.assertEqual(reserva.get('estado'), 'ACTIVA', f'no pudo reservar la vez {i + 2}')
+            self.cancelar(reserva['id'])
+        cuenta = self.usuario(ESTUDIANTE)
+        self.assertEqual(cuenta['cancel_count'], 12)
+        self.assertEqual(cuenta.get('no_show_count', 0), 0)
+        self.assertEqual(cuenta['estado'], 'ACTIVO')
+
+    def test_ninguna_regla_mira_el_contador_de_cancelaciones(self):
+        """No existe límite de cancelaciones en las reglas del gimnasio."""
+        self.assertFalse(hasattr(reglas, 'CANCELACION_LIMITE'))
+        self.assertFalse(hasattr(reglas, 'alcanza_limite_cancelaciones'))
+
     def test_tras_cancelar_cinco_veces_todavia_puede_reservar(self):
         self.cancelar(self.reserva['id'])
         for slot in (2, 3, 4, 5):

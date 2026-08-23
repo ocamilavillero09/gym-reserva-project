@@ -234,15 +234,10 @@ def alcanza_limite_inasistencias(user: dict) -> bool:
 #     otra persona lo aproveche. Es el comportamiento que el gimnasio quiere
 #     fomentar, así que NO acumula sanción de ningún tipo.
 #
-# Por eso aquí no hay ni límite ni alerta de cancelaciones: el contador
-# `cancel_count` existe solo como información para el estudiante y para el
-# reporte del personal.
+# Por eso aquí no hay NADA: ni límite, ni alerta, ni función de cálculo. Se
+# puede cancelar cuantas veces haga falta. El campo `cancel_count` del usuario
+# solo lleva la cuenta para mostrarla, y ninguna regla la mira.
 # ──────────────────────────────────────────────────────────────────────────
-def cancelaciones(user: dict) -> int:
-    """Cuántas veces ha cancelado el usuario. Es solo informativo."""
-    return (user or {}).get('cancel_count', 0)
-
-
 def penalizacion_vigente(user: dict) -> bool:
     """True si la cuenta está penalizada y la sanción todavía no ha vencido."""
     if (user or {}).get('estado') != 'PENALIZADO':

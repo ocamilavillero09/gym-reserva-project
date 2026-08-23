@@ -227,7 +227,8 @@ export default function App() {
             onLogout={handleLogout}
           />
 
-          {/* RN10 — alerta de cancelaciones, siempre visible para el estudiante */}
+          {/* Aviso de inasistencias, siempre visible para el estudiante.
+              Las cancelaciones no generan aviso: no hay límite ni sanción. */}
           {!staff && <PenaltyAlert user={user} />}
 
           {/* Los profesores y administradores NO reservan: solo ven el aforo. */}
