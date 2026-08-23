@@ -9,25 +9,24 @@ propios; para eso llama a las otras dos capas del backend:
     datos.py    -> las consultas a la base de datos
     seguridad.py-> el tratamiento de las contraseñas
 
-REQUISITOS FUNCIONALES CUBIERTOS EN ESTE ARCHIVO
-    RF02  Inicio de sesión con el correo institucional y el documento
+REQUISITOS EN USO EN ESTE ARCHIVO (con pruebas en tests.py)
+    RF01  Registro de usuarios con nombre, correo institucional y documento
+    RF02  Inicio de sesión con el documento de identidad como contraseña
+    RF03  Asignación automática del rol según el dominio del correo
     RF08  Reserva del estudiante para el día siguiente
-    RF12  El personal visualiza los bloques sin poder reservar
-    RF23  Notificación de reserva confirmada
-
-REQUISITOS FUNCIONALES IGNORADOS EN ESTE ARCHIVO
-    Son responsabilidad de otros integrantes del equipo o quedaron fuera del
-    alcance de las pruebas. El código sigue funcionando, pero no se diseñaron
-    escenarios ni casos de prueba para ellos.
-    RF01  Registro de usuarios
-    RF03  Asignación automática del rol según el dominio
-    RF06  Consulta de los bloques horarios disponibles
-    RF07  Cupos ocupados y disponibles de cada bloque
     RF09  Una única reserva por estudiante y día
     RF10  Consulta de las reservas hechas
     RF16  Penalización al alcanzar cinco inasistencias
+
+REQUISITOS IGNORADOS EN ESTE ARCHIVO
+    Están implementados y funcionan, pero quedaron fuera del alcance acordado
+    con el equipo: no se diseñaron escenarios ni casos de prueba para ellos.
+    RF06  Consulta de los bloques horarios disponibles
+    RF07  Cupos ocupados y disponibles de cada bloque
+    RF12  El personal visualiza los bloques sin poder reservar
     RF21  Creación de cuentas de administrador
     RF22  Gestión de las cuentas de otros administradores
+    RF23  Notificación de reserva confirmada
     RF24  Cancelación de reservas
     RF25  Notificación de cancelación
 """
@@ -92,8 +91,11 @@ def _leer_documento(data) -> str:
 #  AUTENTICACIÓN
 # ══════════════════════════════════════════════════════════════════════════
 
-# ── RF01 · [IGNORADO] Registro de usuarios ────────────────────────────────
-# ── RF03 · [IGNORADO] Asignación automática del rol según el dominio ──────
+# ── RF01 · Registro de usuarios ────────────────────────────────
+# ── RF03 · Asignación automática del rol según el dominio ──────
+#
+# El registro público solo crea ESTUDIANTES y ENTRENADORES. Los administradores
+# los da de alta el administrador principal desde su panel (RF21).
 @swagger_auto_schema(
     method='post',
     operation_description="Registro de usuarios. El rol se deduce del dominio del correo institucional.",
@@ -144,15 +146,22 @@ def register(request):
             status=400,
         )
 
+    # Las cuentas de administrador NO se crean desde el formulario de registro:
+    # solo el administrador principal puede darlas de alta. De lo contrario
+    # cualquiera con un correo del dominio de administración se concedería a sí
+    # mismo el mando del sistema.
+    if role == 'ADMIN':
+        return Response(
+            {'error': 'Las cuentas de administrador no se crean desde el registro. '
+                      'Pídele al administrador principal que cree la tuya.'},
+            status=403,
+        )
+
     if datos.buscar_usuario(email):
         return Response({'error': 'Ya existe una cuenta con este correo.'}, status=409)
 
     if datos.buscar_usuario_por_documento(documento):
         return Response({'error': 'Ya existe una cuenta con este documento de identidad.'}, status=409)
-
-    # El PRIMER administrador del sistema es el administrador principal: es
-    # quien puede crear y gestionar las cuentas de los demás administradores.
-    es_principal = role == 'ADMIN' and datos.contar_administradores() == 0
 
     datos.crear_usuario({
         'name':       name,
@@ -161,7 +170,7 @@ def register(request):
         'password':   hash_password(documento),  # el documento es la contraseña
         'role':       role,
         'estado':     'ACTIVO',                 # ACTIVO | PENALIZADO | INACTIVO
-        'es_principal': es_principal,
+        'es_principal': False,                  # solo la cuenta de arranque lo es
         'no_show_count': 0,
         'cancel_count':  0,
         'penalizado_hasta': None,
@@ -172,7 +181,7 @@ def register(request):
         'message': 'Registro exitoso.',
         'role': role,
         'documento': documento,
-        'es_principal': es_principal,
+        'es_principal': False,
     }, status=201)
 
 
@@ -462,7 +471,7 @@ def admin_user_detail(request, user_email):
 
 # ── RF06 · [IGNORADO] Consulta de los bloques horarios disponibles ───────
 # ── RF07 · [IGNORADO] Cupos ocupados y disponibles de cada bloque ────────
-# ── RF12 · El personal visualiza los bloques y su disponibilidad ─────────
+# ── RF12 · [IGNORADO] El personal visualiza los bloques y su disponibilidad ─────────
 @swagger_auto_schema(
     method='get',
     operation_description="Bloques horarios y cupos disponibles para la fecha de reserva (el día siguiente).",
@@ -478,11 +487,16 @@ def get_slots(request):
     # ║ para que la interfaz la muestre de forma explícita.               ║
     # ╚══════════════════════════════════════════════════════════════════╝
     datos.sembrar_bloques()
-    bloques = [
-        {'id': s['slotId'], 'hour': s['hour'], 'available': s['available'], 'total': s['total']}
-        for s in datos.listar_bloques(sin_id=True)
-    ]
     fecha = reglas.fecha_reserva()
+    # La disponibilidad se calcula PARA ESA FECHA: lo que se reservó otros días
+    # no resta cupos a esta jornada.
+    ocupados = datos.ocupados_del_dia(fecha.isoformat())
+    bloques = [{
+        'id': s['slotId'],
+        'hour': s['hour'],
+        'total': s['total'],
+        'available': s['total'] - ocupados.get(s['slotId'], 0),
+    } for s in datos.listar_bloques(sin_id=True)]
     return Response({
         'fecha': fecha.isoformat(),
         'fecha_label': reglas.formato_fecha_es(fecha),
@@ -495,9 +509,9 @@ def get_slots(request):
 # ══════════════════════════════════════════════════════════════════════════
 
 # ── RF08 · Reserva del estudiante para el día siguiente ──────────────────
-# ── RF23 · Notificación de reserva confirmada ────────────────────────────
-# ── RF09 · [IGNORADO] Una única reserva por estudiante y día ─────────────
-# ── RF10 · [IGNORADO] Consulta de las reservas hechas ────────────────────
+# ── RF23 · [IGNORADO] Notificación de reserva confirmada ────────────────────────────
+# ── RF09 · Una única reserva por estudiante y día ─────────────
+# ── RF10 · Consulta de las reservas hechas ────────────────────
 @swagger_auto_schema(
     method='get',
     operation_description="Lista las reservas activas de un estudiante.",
@@ -535,12 +549,12 @@ def reservations(request):
         return Response([datos.serialize(r) for r in datos.reservas_activas(email)])
 
     # ╔══════════════════════════════════════════════════════════════════╗
-    # ║ CASO DE USO CRÍTICO #4 — CREAR RESERVA (DESCUENTO ATÓMICO)       ║
-    # ║ El más crítico del sistema. Con varios estudiantes reservando el  ║
-    # ║ último cupo a la vez, un patrón "leer-luego-escribir" permitiría  ║
-    # ║ SOBREVENTA. Por eso el cupo se descuenta con una única operación  ║
-    # ║ atómica condicional (datos.tomar_cupo) y la reserva solo se       ║
-    # ║ inserta DESPUÉS de haber ganado el cupo.                          ║
+    # ║ CASO DE USO CRÍTICO #4 — CREAR RESERVA SIN SOBREVENTA            ║
+    # ║ El más crítico del sistema. El aforo NO se guarda en un contador   ║
+    # ║ aparte: se cuenta sobre las reservas de esa fecha, así nunca puede ║
+    # ║ discrepar de la realidad ni arrastrarse de un día a otro. Contra   ║
+    # ║ la sobreventa se comprueba después de insertar si la reserva cabe  ║
+    # ║ (datos.reserva_dentro_del_aforo) y, si no, se deshace.             ║
     # ║ Reglas aplicadas aquí:                                            ║
     # ║   Solo los ESTUDIANTES reservan; el personal solo consulta.       ║
     # ║   La reserva es SIEMPRE para el día siguiente.                    ║
@@ -591,9 +605,9 @@ def reservations(request):
                  'Solo se permite una reserva por día: cancela la actual si quieres cambiar de horario.')
         return Response({'error': aviso, 'notificacion': aviso, 'tipo': 'RESERVA_DUPLICADA'}, status=409)
 
-    # Descuento ATÓMICO: solo descuenta si todavía queda cupo.
-    if datos.tomar_cupo(slot_id) is None:
-        # Otro estudiante tomó el último cupo entre la lectura y este punto.
+    # El aforo se mide sobre las reservas de ESA FECHA, no sobre un contador
+    # aparte: lo reservado otros días no ocupa cupos de esta jornada.
+    if datos.ocupacion_de_bloque(slot_id, fecha_iso) >= slot['total']:
         return Response({'error': 'No hay cupos disponibles en este horario.'}, status=409)
 
     nueva = datos.crear_reserva({
@@ -607,6 +621,13 @@ def reservations(request):
         'created_at':   datetime.utcnow(),
     })
 
+    # Si varias peticiones entraron a la vez pudieron colarse más reservas de
+    # las que caben. Todas aplican el mismo desempate —se quedan las primeras
+    # por orden de creación—, así que sobreviven exactamente las que caben.
+    if not datos.reserva_dentro_del_aforo(nueva['_id'], slot_id, fecha_iso, slot['total']):
+        datos.eliminar_reserva(nueva['_id'])
+        return Response({'error': 'No hay cupos disponibles en este horario.'}, status=409)
+
     respuesta = datos.serialize(nueva)
     # Notificación de confirmación que muestra la aplicación.
     respuesta['notificacion'] = f"Reserva confirmada para las {slot['hour']} del {fecha_label}."
@@ -618,7 +639,8 @@ def reservations(request):
 # ── RF25 · [IGNORADO] Notificación de cancelación ────────────────────────
 @swagger_auto_schema(
     method='delete',
-    operation_description="Cancela reserva y libera cupo inmediatamente. Suma al contador de cancelaciones.",
+    operation_description=("Cancela la reserva y libera el cupo de inmediato. Cancelar no tiene "
+                           "límite ni penaliza: el contador es solo informativo."),
     manual_parameters=[
         openapi.Parameter('reservation_id', openapi.IN_PATH, description="ID de la reserva", type=openapi.TYPE_STRING, required=True),
     ],
@@ -640,6 +662,8 @@ def cancel_reservation(request, reservation_id):
     if oid is None:
         return Response({'error': 'ID de reserva inválido.'}, status=400)
 
+    # Al pasar a CANCELADA la reserva deja de contar para el aforo de su día:
+    # el cupo queda libre sin tocar ningún contador.
     reservation = datos.cambiar_estado_reserva(
         oid, 'ACTIVA', {'estado': 'CANCELADA', 'cancelled_at': datetime.utcnow()})
     if reservation is None:
@@ -647,8 +671,6 @@ def cancel_reservation(request, reservation_id):
         if datos.buscar_reserva(oid):
             return Response({'error': 'La reserva ya no está activa.'}, status=409)
         return Response({'error': 'Reserva no encontrada.'}, status=404)
-
-    datos.devolver_cupo(reservation['slotId'])
 
     # Contador de cancelaciones del estudiante. Es SOLO INFORMATIVO: cancelar
     # no suma inasistencias ni penaliza la cuenta, porque avisar a tiempo
@@ -666,7 +688,7 @@ def cancel_reservation(request, reservation_id):
     })
 
 
-# ── RF16 · [IGNORADO] Penalización al alcanzar cinco inasistencias ───────
+# ── RF16 · Penalización al alcanzar cinco inasistencias ───────
 @swagger_auto_schema(
     method='post',
     operation_description="El entrenador o administrador marca una inasistencia y, al llegar al límite, penaliza la cuenta.",

@@ -5,18 +5,17 @@ Este archivo expone la API de la jornada del gimnasio. No consulta MongoDB
 directamente ni define límites propios: llama a `datos.py` para leer y escribir
 y a `reglas.py` para saber cuándo corresponde penalizar una cuenta.
 
-REQUISITOS FUNCIONALES CUBIERTOS EN ESTE ARCHIVO
-    RF18  Reporte personal de inasistencias y penalizaciones
-
-REQUISITOS FUNCIONALES IGNORADOS EN ESTE ARCHIVO
-    Son responsabilidad de otros integrantes del equipo o quedaron fuera del
-    alcance de las pruebas. El código sigue funcionando, pero no se diseñaron
-    escenarios ni casos de prueba para ellos.
+REQUISITOS EN USO EN ESTE ARCHIVO (con pruebas en tests.py)
     RF11  Búsqueda del estudiante por su documento de identidad
     RF13  Registro de la asistencia del estudiante
+    RF16  Penalización al alcanzar cinco inasistencias
+    RF18  Reporte personal de inasistencias y penalizaciones
+
+REQUISITOS IGNORADOS EN ESTE ARCHIVO
+    Están implementados y funcionan, pero quedaron fuera del alcance acordado
+    con el equipo: no se diseñaron escenarios ni casos de prueba para ellos.
     RF14  Estudiantes con reserva y sin asistencia registrada
     RF15  Procesamiento general de las inasistencias de la jornada
-    RF16  Penalización al alcanzar cinco inasistencias
     RF19  Reporte general diario del gimnasio
 """
 from datetime import date as _date, datetime
@@ -92,7 +91,7 @@ def _fila_estudiante(user: dict) -> dict:
     }
 
 
-# ── RF11 · [IGNORADO] Búsqueda del estudiante por su documento ───────────
+# ── RF11 · Búsqueda del estudiante por su documento ───────────
 @api_view(['GET'])
 def student_lookup(request):
     """El entrenador busca a un estudiante por su documento y ve su reserva.
@@ -136,7 +135,7 @@ def student_lookup(request):
     })
 
 
-# ── RF13 · [IGNORADO] Registro de la asistencia del estudiante ───────────
+# ── RF13 · Registro de la asistencia del estudiante ───────────
 @api_view(['POST'])
 def register_attendance(request):
     """Registra la asistencia de un estudiante que TIENE una reserva.
@@ -245,7 +244,7 @@ def pending_attendance(request):
 
 
 # ── RF15 · [IGNORADO] Procesamiento general de las inasistencias ────────
-# ── RF16 · [IGNORADO] Penalización al alcanzar cinco inasistencias ──────
+# ── RF16 · Penalización al alcanzar cinco inasistencias ──────
 @api_view(['POST'])
 def process_no_shows(request):
     """Cierra la jornada: toda reserva sin asistencia queda como inasistencia.

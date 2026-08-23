@@ -7,16 +7,18 @@
  *
  *     cd frontend && npm test
  *
- * REQUISITOS CUBIERTOS
+ * REQUISITOS QUE SE PRUEBAN AQUÍ
  *     RF01/RF02  Registro e inicio de sesión
+ *     RF03       El rol lo decide el dominio del correo
  *     RF04/RF05  Perfil del estudiante y del personal
- *     RF08       Reserva para el día siguiente
+ *     RF08/RF09  Reserva para el día siguiente y su límite diario
  *     RF10       Consulta de las reservas hechas
  *     RF11/RF13  Búsqueda por documento y registro de asistencia
- *     RF12       Consulta del aforo por el personal
  *     RF17       Historial
  *     RF18       Reporte personal
- *     RF25       Cancelación de la reserva
+ *
+ * Los demás requisitos quedaron fuera del alcance de pruebas acordado con el
+ * equipo; en el código aparecen marcados como [IGNORADO].
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
@@ -182,16 +184,6 @@ describe('RF11 y RF13 — Búsqueda por documento y registro de asistencia', () 
   });
 });
 
-// ── RF12 · Aforo para el personal ─────────────────────────────────────────
-describe('RF12 — El personal consulta el aforo', () => {
-  it('pide el reporte de ocupación', async () => {
-    responderCon([{ slotId: 1, available: 19, total: 20 }]);
-    const r = await reportsApi.occupancy();
-    expect(urlPedida()).toBe(`${BASE}/reports/occupancy/`);
-    expect(r[0].available).toBe(19);
-  });
-});
-
 // ── RF17 · Historial ──────────────────────────────────────────────────────
 describe('RF17 — Historial del estudiante', () => {
   it('pide el historial del correo indicado', async () => {
@@ -208,42 +200,6 @@ describe('RF18 — Reporte personal de inasistencias', () => {
     const r = await reportsApi.personal('ana@soyudemedellin.edu.co');
     expect(urlPedida()).toContain('/reports/personal/?email=');
     expect(r.no_show_limite).toBe(5);
-  });
-
-  it('el reporte diario se pide sin usar la copia en caché', async () => {
-    responderCon({ totales: {} });
-    await reportsApi.daily('coach@udem.edu.co');
-    expect(opciones().cache).toBe('no-store');
-  });
-});
-
-// ── RF25 · Cancelación ────────────────────────────────────────────────────
-describe('RF25 — Cancelación de la reserva', () => {
-  it('cancela con DELETE sobre la reserva indicada', async () => {
-    responderCon({ tipo: 'RESERVA_CANCELADA', notificacion: 'Cancelaste tu reserva.' });
-    await reservationsApi.cancel('abc123');
-    expect(urlPedida()).toBe(`${BASE}/reservations/abc123/`);
-    expect(opciones().method).toBe('DELETE');
-  });
-
-  it('devuelve el aviso de cancelación', async () => {
-    responderCon({ tipo: 'RESERVA_CANCELADA', notificacion: 'El cupo quedó liberado.' });
-    const r = await reservationsApi.cancel('abc123');
-    expect(r.tipo).toBe('RESERVA_CANCELADA');
-    expect(r.notificacion).toContain('liberado');
-  });
-
-  it('cancelar no informa de ninguna penalización', async () => {
-    responderCon({ tipo: 'RESERVA_CANCELADA', cancel_count: 5, no_show_count: 0 });
-    const r = await reservationsApi.cancel('abc123');
-    expect(r.no_show_count).toBe(0);
-    expect(r.penalizado).toBeUndefined();
-  });
-
-  it('propaga el error si la reserva ya no está activa', async () => {
-    responderCon({ error: 'La reserva ya no está activa.' }, { ok: false, status: 409 });
-    await expect(reservationsApi.cancel('abc123'))
-      .rejects.toThrow('La reserva ya no está activa.');
   });
 });
 

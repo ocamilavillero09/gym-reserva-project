@@ -4,16 +4,16 @@ PERFIL, HISTORIAL Y AFORO
 Como el resto del backend, este archivo no consulta MongoDB directamente ni
 define límites propios: se apoya en `datos.py` y en `reglas.py`.
 
-REQUISITOS FUNCIONALES CUBIERTOS EN ESTE ARCHIVO
-    RF07  Cupos ocupados y disponibles de cada bloque  (occupancy_report)
-    RF12  El personal visualiza los bloques y su disponibilidad (occupancy_report)
+REQUISITOS EN USO EN ESTE ARCHIVO (con pruebas en tests.py)
+    RF04  Perfil del estudiante: edad, peso, altura y objetivo   (user_profile)
+    RF05  Perfil de entrenadores y administradores               (user_profile)
     RF17  Historial de reservas, cancelaciones y asistencias (reservation_history)
 
-REQUISITOS FUNCIONALES IGNORADOS EN ESTE ARCHIVO
-    Están implementados y funcionan, pero no se diseñaron escenarios ni casos
-    de prueba para ellos porque son responsabilidad de otros integrantes.
-    RF04  Perfil del estudiante: edad, peso, altura y objetivo
-    RF05  Perfil de entrenadores y administradores
+REQUISITOS IGNORADOS EN ESTE ARCHIVO
+    Están implementados y funcionan, pero quedaron fuera del alcance acordado
+    con el equipo: no se diseñaron escenarios ni casos de prueba para ellos.
+    RF07  Cupos ocupados y disponibles de cada bloque      (occupancy_report)
+    RF12  El personal visualiza los bloques y su disponibilidad (occupancy_report)
 """
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
@@ -21,7 +21,7 @@ from rest_framework.response import Response
 from . import datos, reglas
 
 
-# ── RF17 · [IGNORADO] Historial de reservas, cancelaciones y asistencias ─
+# ── RF17 · Historial de reservas, cancelaciones y asistencias ─
 @api_view(['GET'])
 def reservation_history(request):
     """Historial completo del estudiante.
@@ -45,8 +45,8 @@ def reservation_history(request):
     } for r in datos.listar_reservas(filtro)])
 
 
-# ── RF04 · [IGNORADO] Perfil del estudiante ──────────────────────────────
-# ── RF05 · [IGNORADO] Perfil de entrenadores y administradores ───────────
+# ── RF04 · Perfil del estudiante ──────────────────────────────
+# ── RF05 · Perfil de entrenadores y administradores ───────────
 @api_view(['GET', 'PUT'])
 def user_profile(request):
     if request.method == 'GET':
@@ -63,9 +63,12 @@ def user_profile(request):
         # El estudiante gestiona edad, peso, altura y objetivo de entrenamiento.
         # El nombre, el correo, el documento y el rol NO se editan desde aquí:
         # identifican a la persona.
-        cambios = {campo: request.data.get(campo)
-                   for campo in ('edad', 'peso', 'altura', 'meta')
-                   if campo in request.data}
+        enviados = {campo: request.data.get(campo)
+                    for campo in ('edad', 'peso', 'altura', 'meta')
+                    if campo in request.data}
+        cambios, error = reglas.validar_datos_entrenamiento(enviados)
+        if error:
+            return Response({'error': error}, status=400)
         if cambios:
             datos.actualizar_usuario(email, cambios)
             user = datos.buscar_usuario(email)
@@ -90,17 +93,25 @@ def user_profile(request):
     })
 
 
-# ── RF07 · Cupos ocupados y disponibles de cada bloque ───────────────────
-# ── RF12 · El personal consulta el aforo del gimnasio ────────────────────
+# ── RF07 · [IGNORADO] Cupos ocupados y disponibles de cada bloque ───────────────────
+# ── RF12 · [IGNORADO] El personal consulta el aforo del gimnasio ────────────────────
 @api_view(['GET'])
 def occupancy_report(request):
-    """Ocupación de cada bloque horario para entrenadores y administradores."""
+    """Ocupación de cada bloque horario para entrenadores y administradores.
+
+    Se informa de la jornada que se está reservando (el día siguiente), no del
+    acumulado histórico: cada día arranca con el gimnasio entero disponible.
+    """
+    fecha = (request.query_params.get('fecha') or '').strip() or reglas.fecha_reserva().isoformat()
+    ocupados = datos.ocupados_del_dia(fecha)
     data = []
     for s in datos.listar_bloques():
-        reservados = datos.contar_reservas({'slotId': s['slotId'], 'estado': 'ACTIVA'})
+        reservados = ocupados.get(s['slotId'], 0)
         data.append({
             'slotId': s['slotId'], 'hour': s['hour'], 'total': s['total'],
-            'available': s['available'], 'reservados': reservados,
+            'fecha': fecha,
+            'available': s['total'] - reservados,
+            'reservados': reservados,
             'ocupacion_pct': round((reservados / s['total']) * 100) if s['total'] else 0,
         })
     return Response(data)

@@ -225,6 +225,12 @@
   line-height: 1.7;
 }
 
+.acceso__dominio--nota {
+  margin-top: 8px;
+  font-style: italic;
+  opacity: 0.85;
+}
+
 /* ── Registro completado ──────────────────────────────────────────────── */
 .registro-ok {
   min-height: 100vh;
