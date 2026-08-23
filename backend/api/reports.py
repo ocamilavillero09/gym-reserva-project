@@ -18,6 +18,13 @@ from rest_framework.decorators import api_view
 
 
 # ── RF20 · [IGNORADO] Reporte general diario en PDF ────────────────────────────────
+#
+# QUÉ LE TOCA A CADA REQUISITO
+#   RF19 · LOS DATOS. Qué contiene el reporte de la jornada —asistencias,
+#          inasistencias y totales— los arma attendance.build_daily_report.
+#   RF20 · EL DOCUMENTO. Lo único que hace este archivo: tomar esos mismos datos
+#          y componerlos en un PDF imprimible. Al reutilizar la consulta de
+#          RF19, el papel y la pantalla nunca se contradicen.
 @api_view(['GET'])
 def daily_pdf(request):
     """Genera el reporte general diario en PDF para imprimirlo.
@@ -54,7 +61,8 @@ def daily_pdf(request):
         Spacer(1, 0.5 * cm),
     ]
 
-    # Totales del día (RF20).
+    # RF19 · Los totales que se maquetan vienen de build_daily_report, el mismo
+    # cálculo que alimenta la consulta en pantalla.
     resumen = Table([
         ['Asistencias', 'Cancelaciones', 'Inasistencias', 'Estudiantes penalizados'],
         [t['asistencias'], t['cancelaciones'], t['inasistencias'], t['estudiantes_penalizados']],

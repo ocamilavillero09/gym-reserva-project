@@ -17,6 +17,10 @@ REQUISITOS IGNORADOS EN ESTE ARCHIVO
     RF14  Estudiantes con reserva y sin asistencia registrada
     RF15  Procesamiento general de las inasistencias de la jornada
     RF19  Reporte general diario del gimnasio
+
+`process_no_shows` atiende a dos requisitos a la vez: RF15 recorre la jornada y
+RF16 decide qué pasa con cada inasistencia. Sobre la función se detalla qué le
+toca a cada uno.
 """
 from datetime import date as _date, datetime
 
@@ -245,6 +249,15 @@ def pending_attendance(request):
 
 # ── RF15 · [IGNORADO] Procesamiento general de las inasistencias ────────
 # ── RF16 · Penalización al alcanzar cinco inasistencias ──────
+#
+# QUÉ LE TOCA A CADA REQUISITO
+#   RF15 · EL RECORRIDO. Cerrar la jornada: tomar una a una las reservas que
+#          quedaron ACTIVAS ese día —nadie registró su asistencia— y marcarlas
+#          como NO_SHOW. Es el bucle de abajo.
+#   RF16 · LA CONSECUENCIA. Qué ocurre con cada inasistencia: se suma al
+#          contador del estudiante y, al llegar al límite de cinco, la cuenta
+#          queda penalizada. Esa parte vive en `aplicar_inasistencia`, que se
+#          llama desde aquí y también desde el marcado individual (views.mark_no_show).
 @api_view(['POST'])
 def process_no_shows(request):
     """Cierra la jornada: toda reserva sin asistencia queda como inasistencia.
@@ -266,13 +279,14 @@ def process_no_shows(request):
     procesados, penalizados = [], []
 
     while True:
-        # Se toma una reserva a la vez de forma atómica: dos entrenadores que
-        # cierren la jornada al mismo tiempo no cuentan dos veces la misma
+        # RF15 · Se toma una reserva a la vez de forma atómica: dos entrenadores
+        # que cierren la jornada al mismo tiempo no cuentan dos veces la misma
         # inasistencia.
         reserva = datos.tomar_reserva_pendiente(fecha, actor['email'])
         if reserva is None:
             break
 
+        # RF16 · Suma la inasistencia y penaliza la cuenta si llegó al límite.
         owner, penalizado = aplicar_inasistencia(reserva['email'])
         procesados.append({
             'email': reserva['email'],

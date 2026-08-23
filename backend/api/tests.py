@@ -26,7 +26,7 @@ REQUISITOS QUE SE PRUEBAN AQUÍ
     RF25  Notificación de cancelación de reserva
 
 FUERA DEL ALCANCE DE ESTAS PRUEBAS
-    RF06, RF07, RF12, RF14, RF15, RF19, RF20, RF21, RF22, RF23 y RF24
+    RF06, RF07, RF14, RF15, RF19, RF20, RF21, RF22, RF23 y RF24
     están implementados y funcionan, pero quedaron fuera del alcance acordado
     con el equipo: no se diseñaron escenarios ni casos de prueba para ellos.
     En el código aparecen marcados como [IGNORADO].
@@ -635,6 +635,68 @@ class RF11BuscarPorDocumento(BaseGimnasio):
     def test_acepta_el_documento_escrito_con_puntos(self):
         resp = self.buscar('1.001.234.567', ENTRENADOR)
         self.assertEqual(resp.status_code, 200)
+
+
+# ══════════════════════════════════════════════════════════════════════════
+#  RF12 — EL PERSONAL VISUALIZA LOS BLOQUES SIN PODER RESERVAR
+# ══════════════════════════════════════════════════════════════════════════
+class RF12PersonalNoReserva(BaseGimnasio):
+
+    def setUp(self):
+        super().setUp()
+        self.registrar(ESTUDIANTE, DOC_ESTUDIANTE)
+        self.registrar(ENTRENADOR, DOC_ENTRENADOR)
+        self.registrar_admin()
+        self.sembrar_bloques()
+
+    def test_el_entrenador_consulta_los_bloques_establecidos(self):
+        resp = self.client.get('/api/slots/')
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(len(resp.data['slots']), 6)
+
+    def test_la_disponibilidad_de_cada_bloque_es_coherente(self):
+        resp = self.client.get('/api/slots/')
+        for bloque in resp.data['slots']:
+            self.assertGreaterEqual(bloque['available'], 0)
+            self.assertLessEqual(bloque['available'], bloque['total'])
+
+    def test_el_entrenador_consulta_el_reporte_de_ocupacion(self):
+        resp = self.client.get(f'/api/reports/occupancy/?actor_email={ENTRENADOR}')
+        self.assertEqual(resp.status_code, 200)
+
+    def test_el_administrador_ve_el_mismo_aforo_que_el_entrenador(self):
+        del_entrenador = self.client.get(
+            f'/api/reports/occupancy/?actor_email={ENTRENADOR}').data
+        del_administrador = self.client.get(
+            f'/api/reports/occupancy/?actor_email={ADMIN}').data
+        self.assertEqual(del_entrenador, del_administrador)
+
+    def test_el_entrenador_no_puede_reservar(self):
+        resp = self.reservar(ENTRENADOR, 1)
+        self.assertEqual(resp.status_code, 403)
+
+    def test_el_administrador_no_puede_reservar(self):
+        resp = self.reservar(ADMIN, 1)
+        self.assertEqual(resp.status_code, 403)
+
+    def test_el_intento_del_personal_no_consume_cupos(self):
+        antes = self.cupos_libres(1)
+        self.reservar(ENTRENADOR, 1)
+        self.reservar(ADMIN, 1)
+        self.assertEqual(self.cupos_libres(1), antes)
+
+    def test_el_estudiante_si_puede_reservar_ese_bloque(self):
+        self.reservar(ENTRENADOR, 1)
+        resp = self.reservar(ESTUDIANTE, 1)
+        self.assertEqual(resp.status_code, 201)
+
+    def test_el_aforo_refleja_la_reserva_al_instante(self):
+        antes = self.client.get(
+            f'/api/reports/occupancy/?actor_email={ENTRENADOR}').data[0]['available']
+        self.reservar(ESTUDIANTE, 1)
+        despues = self.client.get(
+            f'/api/reports/occupancy/?actor_email={ENTRENADOR}').data[0]['available']
+        self.assertEqual(despues, antes - 1)
 
 
 # ══════════════════════════════════════════════════════════════════════════

@@ -16,6 +16,7 @@ REQUISITOS EN USO EN ESTE ARCHIVO (con pruebas en tests.py)
     RF08  Reserva del estudiante para el día siguiente
     RF09  Una única reserva por estudiante y día
     RF10  Consulta de las reservas hechas
+    RF12  El personal visualiza los bloques sin poder reservar
     RF16  Penalización al alcanzar cinco inasistencias
     RF25  Notificación de cancelación de reserva
 
@@ -24,11 +25,19 @@ REQUISITOS IGNORADOS EN ESTE ARCHIVO
     con el equipo: no se diseñaron escenarios ni casos de prueba para ellos.
     RF06  Consulta de los bloques horarios disponibles
     RF07  Cupos ocupados y disponibles de cada bloque
-    RF12  El personal visualiza los bloques sin poder reservar
     RF21  Creación de cuentas de administrador
     RF22  Gestión de las cuentas de otros administradores
     RF23  Notificación de reserva confirmada
     RF24  Cancelación de reservas
+
+FUNCIONES QUE ATIENDEN A VARIOS REQUISITOS
+    Cuando dos requisitos comparten una función es porque comparten los datos y
+    se diferencian en un punto concreto. Sobre cada una se detalla qué le toca a
+    cada requisito, y las líneas correspondientes van marcadas con su RF.
+    register          RF01 el formulario · RF03 el rol según el dominio
+    get_slots         RF06 la lista · RF07 el cupo libre · RF12 quién consulta
+    reservations      RF10 consultar · RF08 reservar · RF09 una al día · RF23 el aviso
+    cancel_reservation  RF24 anular y liberar el cupo · RF25 el aviso de cancelación
 """
 from datetime import datetime
 
@@ -94,6 +103,16 @@ def _leer_documento(data) -> str:
 # ── RF01 · Registro de usuarios ────────────────────────────────
 # ── RF03 · Asignación automática del rol según el dominio ──────
 #
+# QUÉ LE TOCA A CADA REQUISITO
+#   RF01 · EL FORMULARIO. Recibe nombre, correo institucional y documento de
+#          identidad —que hace también de contraseña— y comprueba que no falte
+#          ninguno, que el documento llegue a la longitud mínima y que el correo
+#          no esté ya registrado. La contraseña se guarda derivada, nunca en claro.
+#   RF03 · EL ROL. No viene en el formulario: se deduce del dominio del correo
+#          con reglas.role_for_email(). Un correo que no sea de la universidad
+#          se rechaza aquí mismo. Es lo que impide que alguien se auto-asigne
+#          privilegios de profesor o de administrador.
+#
 # El registro público solo crea ESTUDIANTES y ENTRENADORES. Los administradores
 # los da de alta el administrador principal desde su panel (RF21).
 @swagger_auto_schema(
@@ -123,6 +142,7 @@ def register(request):
     # ║ correo es único. El ROL SE DEDUCE DEL DOMINIO, así nadie se       ║
     # ║ auto-asigna privilegios de profesor o administrador.              ║
     # ╚══════════════════════════════════════════════════════════════════╝
+    # RF01 · Los tres datos del formulario de registro.
     name      = request.data.get('name', '').strip()
     email     = reglas.normalizar_correo(request.data.get('email'))
     documento = _leer_documento(request.data)
@@ -139,6 +159,8 @@ def register(request):
             status=400,
         )
 
+    # RF03 · El dominio del correo decide el rol. Si no es institucional, no hay
+    # rol que asignar y el registro no continúa.
     role = reglas.role_for_email(email)
     if role is None:
         return Response(
@@ -471,7 +493,16 @@ def admin_user_detail(request, user_email):
 
 # ── RF06 · [IGNORADO] Consulta de los bloques horarios disponibles ───────
 # ── RF07 · [IGNORADO] Cupos ocupados y disponibles de cada bloque ────────
-# ── RF12 · [IGNORADO] El personal visualiza los bloques y su disponibilidad ─────────
+# ── RF12 · El personal visualiza los bloques y su disponibilidad ────────
+#
+# QUÉ LE TOCA A CADA REQUISITO
+#   RF06 · LA LISTA. Los bloques horarios del gimnasio y la fecha para la que se
+#          está reservando (siempre el día siguiente), con su etiqueta legible.
+#   RF07 · EL CUPO. El campo `available` de cada bloque: su total menos lo ya
+#          reservado PARA ESA FECHA.
+#   RF12 · EL PERSONAL. Entrenadores y administradores consultan esta misma
+#          respuesta para ver la disponibilidad, pero no pueden reservar; ese
+#          bloqueo está en `reservations`, no aquí.
 @swagger_auto_schema(
     method='get',
     operation_description="Bloques horarios y cupos disponibles para la fecha de reserva (el día siguiente).",
@@ -487,14 +518,17 @@ def get_slots(request):
     # ║ para que la interfaz la muestre de forma explícita.               ║
     # ╚══════════════════════════════════════════════════════════════════╝
     datos.sembrar_bloques()
+    # RF06 · La fecha de la jornada que se está reservando: el día siguiente.
     fecha = reglas.fecha_reserva()
     # La disponibilidad se calcula PARA ESA FECHA: lo que se reservó otros días
     # no resta cupos a esta jornada.
     ocupados = datos.ocupados_del_dia(fecha.isoformat())
     bloques = [{
+        # RF06 · Identidad del bloque horario.
         'id': s['slotId'],
         'hour': s['hour'],
         'total': s['total'],
+        # RF07 · Cupos que quedan libres en ese bloque para esa fecha.
         'available': s['total'] - ocupados.get(s['slotId'], 0),
     } for s in datos.listar_bloques(sin_id=True)]
     return Response({
@@ -509,9 +543,21 @@ def get_slots(request):
 # ══════════════════════════════════════════════════════════════════════════
 
 # ── RF08 · Reserva del estudiante para el día siguiente ──────────────────
-# ── RF23 · [IGNORADO] Notificación de reserva confirmada ────────────────────────────
 # ── RF09 · Una única reserva por estudiante y día ─────────────
 # ── RF10 · Consulta de las reservas hechas ────────────────────
+# ── RF23 · [IGNORADO] Notificación de reserva confirmada ────────────────────────────
+#
+# QUÉ LE TOCA A CADA REQUISITO
+# Una sola ruta con dos métodos: consultar y reservar.
+#   RF10 · GET.  Devuelve las reservas ACTIVAS del estudiante. Las canceladas y
+#          las marcadas como inasistencia no salen aquí (esas están en RF17).
+#   RF08 · POST. Crea la reserva, siempre para el DÍA SIGUIENTE, comprobando el
+#          aforo de ese bloque en esa fecha para no vender más cupos de los que
+#          hay. Solo reservan los estudiantes y solo si la cuenta no está penalizada.
+#   RF09 · POST. El control de «una sola reserva por día»: si el estudiante ya
+#          tiene una para esa jornada, se rechaza con 409.
+#   RF23 · POST. Los campos `notificacion` y `tipo` de la respuesta, que la
+#          aplicación muestra como aviso de reserva confirmada.
 @swagger_auto_schema(
     method='get',
     operation_description="Lista las reservas activas de un estudiante.",
@@ -541,6 +587,7 @@ def get_slots(request):
 )
 @api_view(['GET', 'POST'])
 def reservations(request):
+    # RF10 · Consulta de las reservas que ha hecho el estudiante.
     if request.method == 'GET':
         email = reglas.normalizar_correo(request.query_params.get('email'))
         if not email:
@@ -592,11 +639,12 @@ def reservations(request):
     if not slot:
         return Response({'error': 'Horario no encontrado.'}, status=404)
 
+    # RF08 · La reserva es siempre para el día siguiente: no se elige la fecha.
     fecha = reglas.fecha_reserva()
     fecha_iso = fecha.isoformat()
     fecha_label = reglas.formato_fecha_es(fecha)
 
-    # UNA SOLA RESERVA POR DÍA. Se cuenta sobre la fecha de la reserva (el día
+    # RF09 · UNA SOLA RESERVA POR DÍA. Se cuenta sobre la fecha de la reserva (el día
     # siguiente), no sobre el total histórico de reservas activas.
     del_dia = datos.contar_reservas(
         {'email': email, 'estado': 'ACTIVA', 'reserva_date': fecha_iso})
@@ -605,8 +653,8 @@ def reservations(request):
                  'Solo se permite una reserva por día: cancela la actual si quieres cambiar de horario.')
         return Response({'error': aviso, 'notificacion': aviso, 'tipo': 'RESERVA_DUPLICADA'}, status=409)
 
-    # El aforo se mide sobre las reservas de ESA FECHA, no sobre un contador
-    # aparte: lo reservado otros días no ocupa cupos de esta jornada.
+    # RF08 · El aforo se mide sobre las reservas de ESA FECHA, no sobre un
+    # contador aparte: lo reservado otros días no ocupa cupos de esta jornada.
     if datos.ocupacion_de_bloque(slot_id, fecha_iso) >= slot['total']:
         return Response({'error': 'No hay cupos disponibles en este horario.'}, status=409)
 
@@ -629,7 +677,7 @@ def reservations(request):
         return Response({'error': 'No hay cupos disponibles en este horario.'}, status=409)
 
     respuesta = datos.serialize(nueva)
-    # Notificación de confirmación que muestra la aplicación.
+    # RF23 · Notificación de confirmación que muestra la aplicación.
     respuesta['notificacion'] = f"Reserva confirmada para las {slot['hour']} del {fecha_label}."
     respuesta['tipo'] = 'RESERVA_CONFIRMADA'
     return Response(respuesta, status=201)
@@ -637,6 +685,14 @@ def reservations(request):
 
 # ── RF24 · [IGNORADO] Cancelación de reservas ────────────────────────────
 # ── RF25 · Notificación de cancelación ────────────────────────
+#
+# QUÉ LE TOCA A CADA REQUISITO
+#   RF24 · LA CANCELACIÓN. La reserva pasa de ACTIVA a CANCELADA y su cupo deja
+#          de contar para el aforo de ese día, con lo que queda libre al momento.
+#          Cancelar no tiene límite y no penaliza la cuenta.
+#   RF25 · EL AVISO. Los campos `notificacion` y `tipo` que se devuelven: dicen
+#          qué reserva se canceló —con su hora y su fecha— y confirman que el
+#          cupo quedó liberado. Es lo que la aplicación le muestra al estudiante.
 @swagger_auto_schema(
     method='delete',
     operation_description=("Cancela la reserva y libera el cupo de inmediato. Cancelar no tiene "
@@ -662,8 +718,8 @@ def cancel_reservation(request, reservation_id):
     if oid is None:
         return Response({'error': 'ID de reserva inválido.'}, status=400)
 
-    # Al pasar a CANCELADA la reserva deja de contar para el aforo de su día:
-    # el cupo queda libre sin tocar ningún contador.
+    # RF24 · Al pasar a CANCELADA la reserva deja de contar para el aforo de su
+    # día: el cupo queda libre sin tocar ningún contador.
     reservation = datos.cambiar_estado_reserva(
         oid, 'ACTIVA', {'estado': 'CANCELADA', 'cancelled_at': datetime.utcnow()})
     if reservation is None:
@@ -677,6 +733,7 @@ def cancel_reservation(request, reservation_id):
     # devuelve el cupo para que otra persona lo aproveche.
     owner = datos.sumar_a_contador(reservation['email'], 'cancel_count')
 
+    # RF25 · El aviso de cancelación: qué se canceló y que el cupo ya está libre.
     return Response({
         'message': 'Reserva cancelada. Cupo liberado.',
         'notificacion': f"Cancelaste tu reserva de las {reservation['hour']} "

@@ -14,6 +14,7 @@
  *     RF08/RF09  Reserva para el día siguiente y su límite diario
  *     RF10       Consulta de las reservas hechas
  *     RF11/RF13  Búsqueda por documento y registro de asistencia
+ *     RF12       Consulta del aforo por el personal
  *     RF17       Historial
  *     RF18       Reporte personal
  *     RF25       Notificación de cancelación de reserva
@@ -182,6 +183,16 @@ describe('RF11 y RF13 — Búsqueda por documento y registro de asistencia', () 
                  { ok: false, status: 409 });
     await expect(attendanceApi.register({ actor_email: 'coach@udem.edu.co' }))
       .rejects.toThrow(/solo puede registrarse el día de la reserva/);
+  });
+});
+
+// ── RF12 · Aforo para el personal ─────────────────────────────────────────
+describe('RF12 — El personal consulta el aforo', () => {
+  it('pide el reporte de ocupación', async () => {
+    responderCon([{ slotId: 1, available: 19, total: 20 }]);
+    const r = await reportsApi.occupancy();
+    expect(urlPedida()).toBe(`${BASE}/reports/occupancy/`);
+    expect(r[0].available).toBe(19);
   });
 });
 
