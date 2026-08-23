@@ -4,16 +4,14 @@ PERFIL, HISTORIAL Y AFORO
 Como el resto del backend, este archivo no consulta MongoDB directamente ni
 define límites propios: se apoya en `datos.py` y en `reglas.py`.
 
-REQUISITOS FUNCIONALES CUBIERTOS EN ESTE ARCHIVO
-    RF07  Cupos ocupados y disponibles de cada bloque  (occupancy_report)
+REQUISITOS FUNCIONALES QUE CUBRE ESTE ARCHIVO
+    RF04  Perfil del estudiante: edad, peso, altura y objetivo   (user_profile)
+    RF05  Perfil de entrenadores y administradores               (user_profile)
+    RF07  Cupos ocupados y disponibles de cada bloque      (occupancy_report)
     RF12  El personal visualiza los bloques y su disponibilidad (occupancy_report)
     RF17  Historial de reservas, cancelaciones y asistencias (reservation_history)
 
-REQUISITOS FUNCIONALES IGNORADOS EN ESTE ARCHIVO
-    Están implementados y funcionan, pero no se diseñaron escenarios ni casos
-    de prueba para ellos porque son responsabilidad de otros integrantes.
-    RF04  Perfil del estudiante: edad, peso, altura y objetivo
-    RF05  Perfil de entrenadores y administradores
+Todos ellos tienen escenarios y casos de prueba en `tests.py`.
 """
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
@@ -21,7 +19,7 @@ from rest_framework.response import Response
 from . import datos, reglas
 
 
-# ── RF17 · [IGNORADO] Historial de reservas, cancelaciones y asistencias ─
+# ── RF17 · Historial de reservas, cancelaciones y asistencias ─
 @api_view(['GET'])
 def reservation_history(request):
     """Historial completo del estudiante.
@@ -45,8 +43,8 @@ def reservation_history(request):
     } for r in datos.listar_reservas(filtro)])
 
 
-# ── RF04 · [IGNORADO] Perfil del estudiante ──────────────────────────────
-# ── RF05 · [IGNORADO] Perfil de entrenadores y administradores ───────────
+# ── RF04 · Perfil del estudiante ──────────────────────────────
+# ── RF05 · Perfil de entrenadores y administradores ───────────
 @api_view(['GET', 'PUT'])
 def user_profile(request):
     if request.method == 'GET':

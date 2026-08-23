@@ -9,24 +9,36 @@ Las pruebas no tocan la base de datos real: `setUp` sustituye la conexión de
 `datos.py` por una MongoDB en memoria (mongomock), así cada prueba arranca con
 el sistema vacío y no deja rastro.
 
-REQUISITOS CUBIERTOS
+REQUISITOS CUBIERTOS — LOS 25 DE LA ESPECIFICACIÓN
     RF01  Registro con nombre, correo institucional y documento
     RF02  Inicio de sesión con el documento como contraseña
     RF03  Asignación automática del rol según el dominio del correo
     RF04  Perfil del estudiante: edad, peso, altura y objetivo
     RF05  Perfil de entrenadores y administradores
+    RF06  Consulta de los bloques horarios disponibles
+    RF07  Cupos ocupados y disponibles de cada bloque
     RF08  Reserva del estudiante para el día siguiente
     RF09  Una única reserva por estudiante y día
     RF10  Consulta de las reservas hechas
     RF11  Búsqueda de la reserva por documento de identidad
     RF12  El personal visualiza los bloques sin poder reservar
     RF13  Registro de la asistencia del estudiante
+    RF14  Estudiantes con reserva y sin asistencia registrada
+    RF15  Procesamiento general de las inasistencias de la jornada
     RF16  Penalización al alcanzar cinco inasistencias
     RF17  Historial de reservas, cancelaciones y asistencias
     RF18  Reporte personal de inasistencias y penalizaciones
-    RF21  Creación de cuentas de administrador por el administrador principal
+    RF19  Reporte general diario del gimnasio
+    RF20  Reporte general diario en PDF
+    RF21  Creación de cuentas de administrador
+    RF22  Retiro y restauración del rol de administrador
     RF23  Notificación de reserva confirmada
+    RF24  Cancelación de reservas
     RF25  Notificación de cancelación de reserva
+
+RF06, RF07, RF09 y RF24 no tienen clase propia porque se comprueban dentro de
+la del requisito con el que van de la mano: los cupos y los bloques en RF12, el
+límite diario en RF09 y la cancelación en RF25.
 """
 from datetime import timedelta
 
@@ -1226,3 +1238,213 @@ class RF21CuentasDeAdministrador(BaseGimnasio):
             'role': 'ADMIN',
         }, format='json')
         self.assertEqual(resp.status_code, 400)
+
+
+# ══════════════════════════════════════════════════════════════════════════
+#  RF14 — ESTUDIANTES CON RESERVA Y SIN ASISTENCIA REGISTRADA
+# ══════════════════════════════════════════════════════════════════════════
+class RF14PendientesDeAsistencia(BaseGimnasio):
+
+    def setUp(self):
+        super().setUp()
+        self.registrar(ESTUDIANTE, DOC_ESTUDIANTE, 'Ana Gómez')
+        self.registrar(ENTRENADOR, DOC_ENTRENADOR)
+        self.registrar_admin()
+        self.sembrar_bloques()
+        self.reservar(ESTUDIANTE, 1)
+        self.hacer_que_llegue_la_jornada(ESTUDIANTE)
+
+    def pendientes(self, actor):
+        return self.client.get(f'/api/attendance/pending/?actor_email={actor}')
+
+    def test_el_entrenador_ve_a_quien_no_ha_registrado_asistencia(self):
+        resp = self.pendientes(ENTRENADOR)
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.data['total'], 1)
+        self.assertEqual(resp.data['pendientes'][0]['email'], ESTUDIANTE)
+
+    def test_el_administrador_tambien_los_ve(self):
+        self.assertEqual(self.pendientes(ADMIN).status_code, 200)
+
+    def test_la_lista_trae_el_documento_para_identificar_al_estudiante(self):
+        fila = self.pendientes(ENTRENADOR).data['pendientes'][0]
+        self.assertEqual(fila['documento'], DOC_ESTUDIANTE)
+        self.assertEqual(fila['name'], 'Ana Gómez')
+
+    def test_quien_ya_asistio_desaparece_de_la_lista(self):
+        self.client.post('/api/attendance/register/',
+                         {'actor_email': ENTRENADOR, 'documento': DOC_ESTUDIANTE}, format='json')
+        self.assertEqual(self.pendientes(ENTRENADOR).data['total'], 0)
+
+    def test_las_reservas_de_dias_futuros_no_aparecen(self):
+        """Su jornada todavía no ha llegado: nadie ha podido faltar aún."""
+        self.registrar(COMPANERA, DOC_COMPANERA)
+        self.reservar(COMPANERA, 2)            # queda fechada para mañana
+        correos = [p['email'] for p in self.pendientes(ENTRENADOR).data['pendientes']]
+        self.assertNotIn(COMPANERA, correos)
+
+    def test_un_estudiante_no_puede_consultar_la_lista(self):
+        self.assertEqual(self.pendientes(ESTUDIANTE).status_code, 403)
+
+
+# ══════════════════════════════════════════════════════════════════════════
+#  RF19 — REPORTE GENERAL DIARIO DEL GIMNASIO
+# ══════════════════════════════════════════════════════════════════════════
+class RF19ReporteGeneralDiario(BaseGimnasio):
+
+    def setUp(self):
+        super().setUp()
+        self.registrar(ESTUDIANTE, DOC_ESTUDIANTE, 'Ana Gómez')
+        self.registrar(COMPANERA, DOC_COMPANERA, 'Sara Ruiz')
+        self.registrar(ENTRENADOR, DOC_ENTRENADOR)
+        self.registrar_admin()
+        self.sembrar_bloques()
+
+    def diario(self, actor):
+        return self.client.get(f'/api/reports/daily/?actor_email={actor}')
+
+    def test_el_entrenador_consulta_el_reporte_del_dia(self):
+        resp = self.diario(ENTRENADOR)
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn('totales', resp.data)
+
+    def test_el_administrador_tambien_lo_consulta(self):
+        self.assertEqual(self.diario(ADMIN).status_code, 200)
+
+    def test_un_estudiante_no_accede_al_reporte_general(self):
+        self.assertEqual(self.diario(ESTUDIANTE).status_code, 403)
+
+    def test_cuenta_las_asistencias_de_la_jornada(self):
+        self.reservar(ESTUDIANTE, 1)
+        self.hacer_que_llegue_la_jornada(ESTUDIANTE)
+        self.client.post('/api/attendance/register/',
+                         {'actor_email': ENTRENADOR, 'documento': DOC_ESTUDIANTE}, format='json')
+        self.assertEqual(self.diario(ENTRENADOR).data['totales']['asistencias'], 1)
+
+    def test_cuenta_las_inasistencias_de_la_jornada(self):
+        self.reservar(ESTUDIANTE, 1)
+        self.hacer_que_llegue_la_jornada(ESTUDIANTE)
+        self.client.post('/api/attendance/process/',
+                         {'actor_email': ENTRENADOR}, format='json')
+        self.assertEqual(self.diario(ENTRENADOR).data['totales']['inasistencias'], 1)
+
+    def test_lista_a_los_estudiantes_penalizados(self):
+        for i in range(reglas.NO_SHOW_LIMITE):
+            self.reservar(ESTUDIANTE, (i % 6) + 1)
+            self.hacer_que_llegue_la_jornada(ESTUDIANTE)
+            self.client.post('/api/attendance/process/',
+                             {'actor_email': ENTRENADOR}, format='json')
+        resp = self.diario(ENTRENADOR)
+        self.assertEqual(resp.data['totales']['estudiantes_penalizados'], 1)
+        self.assertEqual(resp.data['penalizados'][0]['email'], ESTUDIANTE)
+
+    def test_el_reporte_informa_la_fecha_de_la_jornada(self):
+        resp = self.diario(ENTRENADOR)
+        self.assertEqual(resp.data['fecha'], reglas.hoy_local().isoformat())
+        self.assertTrue(resp.data['fecha_label'])
+
+
+# ══════════════════════════════════════════════════════════════════════════
+#  RF20 — REPORTE GENERAL DIARIO EN PDF
+# ══════════════════════════════════════════════════════════════════════════
+class RF20ReporteDiarioEnPdf(BaseGimnasio):
+
+    def setUp(self):
+        super().setUp()
+        self.registrar(ESTUDIANTE, DOC_ESTUDIANTE, 'Ana Gómez')
+        self.registrar(ENTRENADOR, DOC_ENTRENADOR)
+        self.registrar_admin()
+        self.sembrar_bloques()
+
+    def pdf(self, actor):
+        return self.client.get(f'/api/reports/daily.pdf?actor_email={actor}')
+
+    def test_el_entrenador_genera_el_pdf(self):
+        resp = self.pdf(ENTRENADOR)
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp['Content-Type'], 'application/pdf')
+
+    def test_el_administrador_tambien_lo_genera(self):
+        self.assertEqual(self.pdf(ADMIN).status_code, 200)
+
+    def test_el_archivo_es_un_pdf_de_verdad(self):
+        contenido = b''.join(self.pdf(ENTRENADOR).streaming_content) \
+            if hasattr(self.pdf(ENTRENADOR), 'streaming_content') else self.pdf(ENTRENADOR).content
+        self.assertTrue(contenido.startswith(b'%PDF'))
+
+    def test_el_pdf_se_llama_con_la_fecha_de_la_jornada(self):
+        resp = self.pdf(ENTRENADOR)
+        self.assertIn(reglas.hoy_local().isoformat(), resp['Content-Disposition'])
+
+    def test_un_estudiante_no_genera_el_pdf_general(self):
+        self.assertEqual(self.pdf(ESTUDIANTE).status_code, 403)
+
+    def test_el_pdf_se_genera_con_datos_de_la_jornada(self):
+        self.reservar(ESTUDIANTE, 1)
+        self.hacer_que_llegue_la_jornada(ESTUDIANTE)
+        self.client.post('/api/attendance/register/',
+                         {'actor_email': ENTRENADOR, 'documento': DOC_ESTUDIANTE}, format='json')
+        resp = self.pdf(ENTRENADOR)
+        self.assertEqual(resp.status_code, 200)
+        self.assertGreater(len(resp.content), 1000)   # el documento trae contenido
+
+
+# ══════════════════════════════════════════════════════════════════════════
+#  RF22 — RETIRO Y RESTAURACIÓN DEL ROL DE ADMINISTRADOR
+# ══════════════════════════════════════════════════════════════════════════
+class RF22RetiroDelRolDeAdministrador(BaseGimnasio):
+
+    OTRO_ADMIN, DOC_OTRO = 'suplente@udemedellin.edu.co', '3009998887'
+
+    def setUp(self):
+        super().setUp()
+        arranque.asegurar_administrador_principal()
+        self.principal = arranque.CORREO
+        self.registrar_admin(self.OTRO_ADMIN, self.DOC_OTRO, 'Admin Suplente')
+
+    def cambiar(self, actor, objetivo, accion):
+        return self.client.patch(f'/api/admin/users/{objetivo}/',
+                                 {'actor_email': actor, 'accion': accion}, format='json')
+
+    def test_el_principal_retira_el_rol_a_otro_administrador(self):
+        resp = self.cambiar(self.principal, self.OTRO_ADMIN, 'retirar')
+        self.assertEqual(resp.status_code, 200)
+        cuenta = self.usuario(self.OTRO_ADMIN)
+        self.assertEqual(cuenta['role'], 'SIN_ROL')
+        self.assertEqual(cuenta['estado'], 'INACTIVO')
+
+    def test_la_cuenta_sin_rol_ya_no_puede_entrar(self):
+        self.cambiar(self.principal, self.OTRO_ADMIN, 'retirar')
+        self.assertEqual(self.entrar(self.OTRO_ADMIN, self.DOC_OTRO).status_code, 403)
+
+    def test_el_principal_restaura_el_rol(self):
+        self.cambiar(self.principal, self.OTRO_ADMIN, 'retirar')
+        resp = self.cambiar(self.principal, self.OTRO_ADMIN, 'restaurar')
+        self.assertEqual(resp.status_code, 200)
+        cuenta = self.usuario(self.OTRO_ADMIN)
+        self.assertEqual(cuenta['role'], 'ADMIN')
+        self.assertEqual(cuenta['estado'], 'ACTIVO')
+
+    def test_el_principal_no_puede_retirarse_el_rol_a_si_mismo(self):
+        """El sistema nunca puede quedarse sin administrador principal."""
+        resp = self.cambiar(self.principal, self.principal, 'retirar')
+        self.assertEqual(resp.status_code, 400)
+        self.assertTrue(self.usuario(self.principal)['es_principal'])
+
+    def test_un_administrador_no_principal_no_retira_roles(self):
+        self.registrar_admin('tercero@udemedellin.edu.co', '3009998888', 'Tercero')
+        resp = self.cambiar(self.OTRO_ADMIN, 'tercero@udemedellin.edu.co', 'retirar')
+        self.assertEqual(resp.status_code, 403)
+
+    def test_no_se_retira_el_rol_a_quien_no_es_administrador(self):
+        self.registrar(ESTUDIANTE, DOC_ESTUDIANTE)
+        resp = self.cambiar(self.principal, ESTUDIANTE, 'retirar')
+        self.assertEqual(resp.status_code, 400)
+
+    def test_una_accion_que_no_existe_se_rechaza(self):
+        resp = self.cambiar(self.principal, self.OTRO_ADMIN, 'eliminar')
+        self.assertEqual(resp.status_code, 400)
+
+    def test_una_cuenta_inexistente_devuelve_no_encontrada(self):
+        resp = self.cambiar(self.principal, 'nadie@udemedellin.edu.co', 'retirar')
+        self.assertEqual(resp.status_code, 404)

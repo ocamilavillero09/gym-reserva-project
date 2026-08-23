@@ -9,27 +9,24 @@ propios; para eso llama a las otras dos capas del backend:
     datos.py    -> las consultas a la base de datos
     seguridad.py-> el tratamiento de las contraseñas
 
-REQUISITOS FUNCIONALES CUBIERTOS EN ESTE ARCHIVO
-    RF02  Inicio de sesión con el correo institucional y el documento
-    RF08  Reserva del estudiante para el día siguiente
-    RF12  El personal visualiza los bloques sin poder reservar
-    RF23  Notificación de reserva confirmada
-
-REQUISITOS FUNCIONALES IGNORADOS EN ESTE ARCHIVO
-    Son responsabilidad de otros integrantes del equipo o quedaron fuera del
-    alcance de las pruebas. El código sigue funcionando, pero no se diseñaron
-    escenarios ni casos de prueba para ellos.
-    RF01  Registro de usuarios
-    RF03  Asignación automática del rol según el dominio
+REQUISITOS FUNCIONALES QUE CUBRE ESTE ARCHIVO
+    RF01  Registro de usuarios con nombre, correo institucional y documento
+    RF02  Inicio de sesión con el documento de identidad como contraseña
+    RF03  Asignación automática del rol según el dominio del correo
     RF06  Consulta de los bloques horarios disponibles
     RF07  Cupos ocupados y disponibles de cada bloque
+    RF08  Reserva del estudiante para el día siguiente
     RF09  Una única reserva por estudiante y día
     RF10  Consulta de las reservas hechas
+    RF12  El personal visualiza los bloques sin poder reservar
     RF16  Penalización al alcanzar cinco inasistencias
     RF21  Creación de cuentas de administrador
     RF22  Gestión de las cuentas de otros administradores
+    RF23  Notificación de reserva confirmada
     RF24  Cancelación de reservas
     RF25  Notificación de cancelación
+
+Todos ellos tienen escenarios y casos de prueba en `tests.py`.
 """
 from datetime import datetime
 
@@ -92,8 +89,8 @@ def _leer_documento(data) -> str:
 #  AUTENTICACIÓN
 # ══════════════════════════════════════════════════════════════════════════
 
-# ── RF01 · [IGNORADO] Registro de usuarios ────────────────────────────────
-# ── RF03 · [IGNORADO] Asignación automática del rol según el dominio ──────
+# ── RF01 · Registro de usuarios ────────────────────────────────
+# ── RF03 · Asignación automática del rol según el dominio ──────
 #
 # El registro público solo crea ESTUDIANTES y ENTRENADORES. Los administradores
 # los da de alta el administrador principal desde su panel (RF21).
@@ -255,7 +252,7 @@ def session(request):
 #  ADMINISTRACIÓN DE USUARIOS
 # ══════════════════════════════════════════════════════════════════════════
 
-# ── RF21 · [IGNORADO] Creación de cuentas de administrador ───────────────
+# ── RF21 · Creación de cuentas de administrador ───────────────
 @swagger_auto_schema(
     method='get',
     operation_description="Lista los usuarios del sistema (solo ADMIN).",
@@ -384,7 +381,7 @@ def _es_principal(actor: dict) -> bool:
     return bool(primero and primero['email'] == actor['email'])
 
 
-# ── RF22 · [IGNORADO] Gestión de las cuentas de otros administradores ────
+# ── RF22 · Gestión de las cuentas de otros administradores ────
 @swagger_auto_schema(
     method='patch',
     operation_description=(
@@ -470,8 +467,8 @@ def admin_user_detail(request, user_email):
 #  BLOQUES HORARIOS
 # ══════════════════════════════════════════════════════════════════════════
 
-# ── RF06 · [IGNORADO] Consulta de los bloques horarios disponibles ───────
-# ── RF07 · [IGNORADO] Cupos ocupados y disponibles de cada bloque ────────
+# ── RF06 · Consulta de los bloques horarios disponibles ───────
+# ── RF07 · Cupos ocupados y disponibles de cada bloque ────────
 # ── RF12 · El personal visualiza los bloques y su disponibilidad ─────────
 @swagger_auto_schema(
     method='get',
@@ -511,8 +508,8 @@ def get_slots(request):
 
 # ── RF08 · Reserva del estudiante para el día siguiente ──────────────────
 # ── RF23 · Notificación de reserva confirmada ────────────────────────────
-# ── RF09 · [IGNORADO] Una única reserva por estudiante y día ─────────────
-# ── RF10 · [IGNORADO] Consulta de las reservas hechas ────────────────────
+# ── RF09 · Una única reserva por estudiante y día ─────────────
+# ── RF10 · Consulta de las reservas hechas ────────────────────
 @swagger_auto_schema(
     method='get',
     operation_description="Lista las reservas activas de un estudiante.",
@@ -636,8 +633,8 @@ def reservations(request):
     return Response(respuesta, status=201)
 
 
-# ── RF24 · [IGNORADO] Cancelación de reservas ────────────────────────────
-# ── RF25 · [IGNORADO] Notificación de cancelación ────────────────────────
+# ── RF24 · Cancelación de reservas ────────────────────────────
+# ── RF25 · Notificación de cancelación ────────────────────────
 @swagger_auto_schema(
     method='delete',
     operation_description=("Cancela la reserva y libera el cupo de inmediato. Cancelar no tiene "
@@ -689,7 +686,7 @@ def cancel_reservation(request, reservation_id):
     })
 
 
-# ── RF16 · [IGNORADO] Penalización al alcanzar cinco inasistencias ───────
+# ── RF16 · Penalización al alcanzar cinco inasistencias ───────
 @swagger_auto_schema(
     method='post',
     operation_description="El entrenador o administrador marca una inasistencia y, al llegar al límite, penaliza la cuenta.",
