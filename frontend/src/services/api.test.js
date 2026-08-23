@@ -16,6 +16,7 @@
  *     RF11/RF13  Búsqueda por documento y registro de asistencia
  *     RF17       Historial
  *     RF18       Reporte personal
+ *     RF25       Notificación de cancelación de reserva
  *
  * Los demás requisitos quedaron fuera del alcance de pruebas acordado con el
  * equipo; en el código aparecen marcados como [IGNORADO].
@@ -200,6 +201,36 @@ describe('RF18 — Reporte personal de inasistencias', () => {
     const r = await reportsApi.personal('ana@soyudemedellin.edu.co');
     expect(urlPedida()).toContain('/reports/personal/?email=');
     expect(r.no_show_limite).toBe(5);
+  });
+});
+
+// ── RF25 · Cancelación ────────────────────────────────────────────────────
+describe('RF25 — Cancelación de la reserva', () => {
+  it('cancela con DELETE sobre la reserva indicada', async () => {
+    responderCon({ tipo: 'RESERVA_CANCELADA', notificacion: 'Cancelaste tu reserva.' });
+    await reservationsApi.cancel('abc123');
+    expect(urlPedida()).toBe(`${BASE}/reservations/abc123/`);
+    expect(opciones().method).toBe('DELETE');
+  });
+
+  it('devuelve el aviso de cancelación', async () => {
+    responderCon({ tipo: 'RESERVA_CANCELADA', notificacion: 'El cupo quedó liberado.' });
+    const r = await reservationsApi.cancel('abc123');
+    expect(r.tipo).toBe('RESERVA_CANCELADA');
+    expect(r.notificacion).toContain('liberado');
+  });
+
+  it('cancelar no informa de ninguna penalización', async () => {
+    responderCon({ tipo: 'RESERVA_CANCELADA', cancel_count: 5, no_show_count: 0 });
+    const r = await reservationsApi.cancel('abc123');
+    expect(r.no_show_count).toBe(0);
+    expect(r.penalizado).toBeUndefined();
+  });
+
+  it('propaga el error si la reserva ya no está activa', async () => {
+    responderCon({ error: 'La reserva ya no está activa.' }, { ok: false, status: 409 });
+    await expect(reservationsApi.cancel('abc123'))
+      .rejects.toThrow('La reserva ya no está activa.');
   });
 });
 

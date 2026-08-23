@@ -17,6 +17,7 @@ REQUISITOS EN USO EN ESTE ARCHIVO (con pruebas en tests.py)
     RF09  Una única reserva por estudiante y día
     RF10  Consulta de las reservas hechas
     RF16  Penalización al alcanzar cinco inasistencias
+    RF25  Notificación de cancelación de reserva
 
 REQUISITOS IGNORADOS EN ESTE ARCHIVO
     Están implementados y funcionan, pero quedaron fuera del alcance acordado
@@ -28,7 +29,6 @@ REQUISITOS IGNORADOS EN ESTE ARCHIVO
     RF22  Gestión de las cuentas de otros administradores
     RF23  Notificación de reserva confirmada
     RF24  Cancelación de reservas
-    RF25  Notificación de cancelación
 """
 from datetime import datetime
 
@@ -636,7 +636,7 @@ def reservations(request):
 
 
 # ── RF24 · [IGNORADO] Cancelación de reservas ────────────────────────────
-# ── RF25 · [IGNORADO] Notificación de cancelación ────────────────────────
+# ── RF25 · Notificación de cancelación ────────────────────────
 @swagger_auto_schema(
     method='delete',
     operation_description=("Cancela la reserva y libera el cupo de inmediato. Cancelar no tiene "

@@ -23,9 +23,10 @@ REQUISITOS QUE SE PRUEBAN AQUÍ
     RF16  Penalización al alcanzar cinco inasistencias
     RF17  Historial de reservas, cancelaciones y asistencias
     RF18  Reporte personal de inasistencias y penalizaciones
+    RF25  Notificación de cancelación de reserva
 
 FUERA DEL ALCANCE DE ESTAS PRUEBAS
-    RF06, RF07, RF12, RF14, RF15, RF19, RF20, RF21, RF22, RF23, RF24 y RF25
+    RF06, RF07, RF12, RF14, RF15, RF19, RF20, RF21, RF22, RF23 y RF24
     están implementados y funcionan, pero quedaron fuera del alcance acordado
     con el equipo: no se diseñaron escenarios ni casos de prueba para ellos.
     En el código aparecen marcados como [IGNORADO].
@@ -925,3 +926,95 @@ class RF18ReportePersonal(BaseGimnasio):
     def test_exige_indicar_de_quien_es_el_reporte(self):
         resp = self.client.get('/api/reports/personal/')
         self.assertEqual(resp.status_code, 400)
+
+
+# ══════════════════════════════════════════════════════════════════════════
+#  RF25 — NOTIFICACIÓN DE CANCELACIÓN DE RESERVA
+# ══════════════════════════════════════════════════════════════════════════
+class RF25NotificacionDeCancelacion(BaseGimnasio):
+
+    def setUp(self):
+        super().setUp()
+        self.registrar(ESTUDIANTE, DOC_ESTUDIANTE)
+        self.sembrar_bloques()
+        self.reserva = self.reservar(ESTUDIANTE, 1).data
+
+    def test_la_cancelacion_devuelve_un_aviso(self):
+        resp = self.cancelar(self.reserva['id'])
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(resp.data['notificacion'])
+
+    def test_el_aviso_se_identifica_como_cancelacion(self):
+        resp = self.cancelar(self.reserva['id'])
+        self.assertEqual(resp.data['tipo'], 'RESERVA_CANCELADA')
+
+    def test_el_aviso_menciona_la_hora_de_la_reserva_cancelada(self):
+        resp = self.cancelar(self.reserva['id'])
+        self.assertIn(self.reserva['hour'], resp.data['notificacion'])
+
+    def test_el_aviso_informa_que_el_cupo_quedo_liberado(self):
+        resp = self.cancelar(self.reserva['id'])
+        self.assertIn('liberado', resp.data['notificacion'].lower())
+
+    def test_la_cancelacion_devuelve_el_cupo_al_bloque(self):
+        antes = self.cupos_libres(1)
+        self.cancelar(self.reserva['id'])
+        self.assertEqual(self.cupos_libres(1), antes + 1)
+
+    def test_cancelar_dos_veces_no_duplica_el_cupo(self):
+        self.cancelar(self.reserva['id'])
+        despues_de_la_primera = self.cupos_libres(1)
+        resp = self.cancelar(self.reserva['id'])
+        self.assertEqual(resp.status_code, 409)
+        self.assertEqual(self.cupos_libres(1), despues_de_la_primera)
+
+    def test_un_identificador_mal_formado_se_rechaza(self):
+        resp = self.cancelar('esto-no-es-un-identificador')
+        self.assertEqual(resp.status_code, 400)
+
+    # ── Cancelar NO es faltar ─────────────────────────────────────────────
+    def test_cancelar_no_suma_ninguna_inasistencia(self):
+        self.cancelar(self.reserva['id'])
+        self.assertEqual(self.usuario(ESTUDIANTE).get('no_show_count', 0), 0)
+
+    def test_las_cancelaciones_se_cuentan_aparte_de_las_inasistencias(self):
+        resp = self.cancelar(self.reserva['id'])
+        self.assertEqual(resp.data['cancel_count'], 1)
+        self.assertEqual(resp.data['no_show_count'], 0)
+
+    def test_cancelar_cinco_veces_no_penaliza_la_cuenta(self):
+        """Cancelar a tiempo devuelve el cupo a otra persona: es el
+        comportamiento que el gimnasio quiere, no una falta."""
+        self.cancelar(self.reserva['id'])
+        for slot in (2, 3, 4, 5):
+            reserva = self.reservar(ESTUDIANTE, slot).data
+            self.cancelar(reserva['id'])
+        cuenta = self.usuario(ESTUDIANTE)
+        self.assertEqual(cuenta['cancel_count'], 5)
+        self.assertEqual(cuenta['estado'], 'ACTIVO')
+
+    def test_cancelar_no_tiene_limite(self):
+        """Cancelar es ilimitado: se cancela doce veces seguidas y la cuenta
+        sigue intacta, sin inasistencias y sin sanción."""
+        self.cancelar(self.reserva['id'])
+        for i in range(11):
+            reserva = self.reservar(ESTUDIANTE, (i % 6) + 1).data
+            self.assertEqual(reserva.get('estado'), 'ACTIVA', f'no pudo reservar la vez {i + 2}')
+            self.cancelar(reserva['id'])
+        cuenta = self.usuario(ESTUDIANTE)
+        self.assertEqual(cuenta['cancel_count'], 12)
+        self.assertEqual(cuenta.get('no_show_count', 0), 0)
+        self.assertEqual(cuenta['estado'], 'ACTIVO')
+
+    def test_ninguna_regla_mira_el_contador_de_cancelaciones(self):
+        """No existe límite de cancelaciones en las reglas del gimnasio."""
+        self.assertFalse(hasattr(reglas, 'CANCELACION_LIMITE'))
+        self.assertFalse(hasattr(reglas, 'alcanza_limite_cancelaciones'))
+
+    def test_tras_cancelar_cinco_veces_todavia_puede_reservar(self):
+        self.cancelar(self.reserva['id'])
+        for slot in (2, 3, 4, 5):
+            reserva = self.reservar(ESTUDIANTE, slot).data
+            self.cancelar(reserva['id'])
+        resp = self.reservar(ESTUDIANTE, 6)
+        self.assertEqual(resp.status_code, 201)

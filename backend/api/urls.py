@@ -40,7 +40,7 @@ urlpatterns = [
     path('reservations/',               views.reservations,         name='reservations'),
     # RF17 — Historial (antes de las rutas con <reservation_id> para no colisionar)
     path('reservations/history/',       features.reservation_history, name='history'),
-    # RF24 · [IGNORADO] — Cancelación de la reserva · RF25 · [IGNORADO] — Notificación de cancelación
+    # RF24 · [IGNORADO] — Cancelación de la reserva · RF25 — Notificación de cancelación
     path('reservations/<str:reservation_id>/',         views.cancel_reservation, name='cancel-reservation'),
     # RF16 — Registro individual de una inasistencia
     path('reservations/<str:reservation_id>/no-show/', views.mark_no_show,       name='mark-no-show'),
