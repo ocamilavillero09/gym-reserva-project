@@ -1,0 +1,159 @@
+/*
+ * MI PERFIL
+ *
+ * Datos de la cuenta, reporte personal de inasistencias y penalizaciones,
+ * cancelaciones acumuladas e información de entrenamiento.
+ */
+@import './base.css';
+
+.perfil {
+  max-width: 620px;
+  margin: 0 auto;
+  padding: 36px 24px;
+  animation: fadeUp 0.4s ease;
+}
+
+.perfil__titulo    { font-size: 30px; font-weight: 900; margin-bottom: 4px; }
+.perfil__subtitulo { color: var(--texto-tenue); font-size: 15px; margin-bottom: 28px; }
+
+/* ── Tarjetas ─────────────────────────────────────────────────────────── */
+.perfil__tarjeta {
+  background-color: var(--superficie);
+  border: 1.5px solid transparent;
+  border-radius: 18px;
+  padding: 26px;
+  margin-bottom: 20px;
+  box-shadow: 0 2px 14px rgba(0, 0, 0, 0.07);
+}
+
+.perfil__tarjeta--alerta      { border-color: #f59e0b; }
+.perfil__tarjeta--penalizado  { border-color: #dc2626; }
+
+.perfil__seccion { font-size: 18px; font-weight: 800; margin-bottom: 16px; }
+.perfil__nota    { font-size: 13px; color: #777777; margin-bottom: 16px; }
+
+/* ── Filas de datos ───────────────────────────────────────────────────── */
+.dato {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.dato__etiqueta { font-size: 13px; color: #777777; }
+
+.dato__valor {
+  font-size: 14px;
+  font-weight: 700;
+  text-align: right;
+  word-break: break-all;
+}
+
+.dato__extra {
+  display: block;
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--rojo);
+}
+
+/* ── Contadores ───────────────────────────────────────────────────────── */
+.perfil__contadores {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 14px;
+}
+
+.contador {
+  border: 1px solid #eeeeee;
+  background-color: var(--superficie);
+  border-radius: var(--radio);
+  padding: 14px;
+}
+
+.contador--alerta {
+  border-color: #fcd34d;
+  background-color: #fffbeb;
+}
+
+.contador__valor  { font-size: 28px; font-weight: 900; line-height: 1; }
+.contador__label  { font-size: 12px; font-weight: 700; color: var(--texto-suave); margin-top: 6px; }
+.contador__sub    { font-size: 11px; color: var(--texto-tenue); margin-top: 2px; }
+
+.contador--alerta .contador__valor { color: #b45309; }
+
+/* ── Avisos del perfil ────────────────────────────────────────────────── */
+.perfil__aviso {
+  margin-top: 18px;
+  border-radius: var(--radio);
+  padding: 14px 16px;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.perfil__aviso--atencion {
+  background-color: #fff7ed;
+  border: 1.5px solid #f59e0b;
+  color: #78350f;
+}
+
+.perfil__aviso--bloqueado {
+  background-color: #fee2e2;
+  border: 1.5px solid #dc2626;
+  color: #991b1b;
+}
+
+/* ── Detalle de inasistencias ─────────────────────────────────────────── */
+.perfil__detalle        { margin-top: 18px; }
+.perfil__detalle-titulo { font-size: 13px; font-weight: 700; color: var(--texto-suave); margin-bottom: 8px; }
+
+.perfil__detalle-fila {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid #f0f0f0;
+  font-size: 13px;
+}
+
+.perfil__detalle-hora  { font-weight: 700; }
+.perfil__detalle-fecha { color: var(--texto-tenue); }
+
+/* ── Formulario de entrenamiento ──────────────────────────────────────── */
+.perfil__formulario {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.perfil__etiqueta {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--texto-suave);
+}
+
+.perfil__entrada {
+  width: 100%;
+  padding: 12px 16px;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 10px;
+  font-size: 14px;
+  font-family: inherit;
+  background-color: #fafafa;
+}
+
+.perfil__guardar {
+  padding: 13px;
+  border: none;
+  border-radius: var(--radio);
+  cursor: pointer;
+  background-color: var(--rojo);
+  color: #ffffff;
+  font-weight: 800;
+  font-family: inherit;
+}
+
+.perfil__explicacion {
+  font-size: 13px;
+  color: #777777;
+  line-height: 1.7;
+}

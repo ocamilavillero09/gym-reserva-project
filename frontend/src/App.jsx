@@ -1,3 +1,9 @@
+/*
+ * ARMAZÓN DE LA APLICACIÓN
+ *
+ * Estado de la sesión, navegación entre pantallas y llamadas al backend.
+ * Aquí no hay estilos: la presentación vive en src/styles/app.css.
+ */
 import { useCallback, useEffect, useState } from 'react';
 import Login from './components/Login';
 import Navbar from './components/Navbar';
@@ -7,7 +13,8 @@ import TrainerPanel from './components/TrainerPanel';
 import AdminPanel from './components/AdminPanel';
 import HistoryView from './components/HistoryView';
 import ProfileView from './components/ProfileView';
-import { authApi, slotsApi, reservationsApi, waitlistApi } from './services/api';
+import { authApi, slotsApi, reservationsApi } from './services/api';
+import './styles/app.css';
 
 // Clave de la sesión guardada en el navegador: gracias a esto, recargar la
 // página (F5) NO cierra la sesión.
@@ -24,57 +31,39 @@ const readStoredSession = () => {
 const isStaff = (u) => u?.role === 'ENTRENADOR' || u?.role === 'ADMIN';
 const defaultView = (u) => (isStaff(u) ? 'panel' : 'dashboard');
 
+const TOAST_CLASE = { success: 'exito', warning: 'atencion', info: 'info', error: 'error' };
+const TOAST_ICONO = { success: '\u2713', warning: '\u26A0', info: '\u2139', error: '\u2715' };
+
 function Toast({ message, type, onClose }) {
-  const styles = {
-    success: { bg: '#dcfce7', border: '#16a34a', text: '#15803d', icon: '✓' },
-    warning: { bg: '#fef9c3', border: '#ca8a04', text: '#92400e', icon: '⚠' },
-    info:    { bg: '#dbeafe', border: '#2563eb', text: '#1d4ed8', icon: 'ℹ' },
-    error:   { bg: '#fee2e2', border: '#dc2626', text: '#991b1b', icon: '✕' },
-  };
-  const c = styles[type] || styles.success;
+  const variante = TOAST_CLASE[type] || 'exito';
   return (
-    <div style={{
-      position: 'fixed', top: 20, right: 20, zIndex: 9999,
-      backgroundColor: c.bg, border: `1px solid ${c.border}`,
-      borderRadius: 14, padding: '16px 20px', maxWidth: 400,
-      boxShadow: '0 4px 24px rgba(0,0,0,0.15)',
-      display: 'flex', alignItems: 'flex-start', gap: 12,
-      animation: 'toastIn 0.3s ease',
-    }}>
-      <span style={{ fontSize: 18, color: c.border, flexShrink: 0, marginTop: 1 }}>{c.icon}</span>
-      <p style={{ margin: 0, color: c.text, fontSize: 14, lineHeight: 1.6, flex: 1 }}>{message}</p>
-      <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: c.text, fontSize: 20, lineHeight: 1, flexShrink: 0 }}>×</button>
+    <div className={`toast toast--${variante}`}>
+      <span className="toast__icono">{TOAST_ICONO[type] || TOAST_ICONO.success}</span>
+      <p className="toast__texto">{message}</p>
+      <button className="toast__cerrar" onClick={onClose}>×</button>
     </div>
   );
 }
 
 /**
- * RN10 — Alerta permanente dentro de la app: avisa al estudiante que está a
- * pocas cancelaciones de ser penalizado. El texto lo calcula el backend.
+ * Aviso permanente dentro de la app: avisa al estudiante que está a pocas
+ * INASISTENCIAS de ser penalizado. El texto lo calcula el backend.
+ *
+ * Las cancelaciones no aparecen aquí: cancelar no penaliza.
  */
 function PenaltyAlert({ user }) {
-  // RN10 (cancelaciones) y RF16/RF18 (inasistencias): se muestra el aviso más
-  // urgente que tenga el estudiante en ese momento.
-  const aviso = user?.alerta_inasistencias || user?.alerta;
+  const aviso = user?.alerta_inasistencias;
   if (!aviso) return null;
-  const bloqueado = user.estado === 'PENALIZADO'
-    || user.cancelaciones_restantes === 0
-    || user.inasistencias_restantes === 0;
+  const bloqueado = user.estado === 'PENALIZADO' || user.inasistencias_restantes === 0;
   return (
-    <div style={{
-      backgroundColor: bloqueado ? '#FEE2E2' : '#FFF7ED',
-      borderBottom: `2px solid ${bloqueado ? '#DC2626' : '#F59E0B'}`,
-      padding: '14px 24px',
-    }}>
-      <div style={{ maxWidth: 1100, margin: '0 auto', display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-        <span style={{ fontSize: 20, flexShrink: 0 }}>{bloqueado ? '🚫' : '⚠️'}</span>
+    <div className={`penalizacion penalizacion--${bloqueado ? 'bloqueado' : 'aviso'}`}>
+      <div className="penalizacion__contenido">
+        <span className="penalizacion__icono">{bloqueado ? '\u{1F6AB}' : '\u26A0\uFE0F'}</span>
         <div>
-          <p style={{ fontWeight: 800, fontSize: 14, color: bloqueado ? '#991B1B' : '#92400E', marginBottom: 2 }}>
-            {bloqueado ? 'Cuenta penalizada' : 'Aviso de penalización'}
+          <p className="penalizacion__titulo">
+            {bloqueado ? 'Cuenta penalizada' : 'Aviso de penalizaci\u00f3n'}
           </p>
-          <p style={{ fontSize: 13, color: bloqueado ? '#991B1B' : '#78350F', lineHeight: 1.6, margin: 0 }}>
-            {aviso}
-          </p>
+          <p className="penalizacion__texto">{aviso}</p>
         </div>
       </div>
     </div>
@@ -181,32 +170,14 @@ export default function App() {
     }
   };
 
-  const handleJoinWaitlist = async (slot) => {
-    try {
-      const r = await waitlistApi.join(slot.id, user.email);
-      showToast(`Estás en la lista de espera de las ${slot.hour} (posición ${r.posicion}).`, 'info');
-    } catch (err) {
-      showToast(err.message, 'warning');
-    }
-  };
-
   const handleCancel = async (id) => {
     try {
       const r = await reservationsApi.cancel(id);
       await refreshData(user.email);
       await refreshSession(user.email);
-      // RN10 — tras cancelar se informa el contador y, si aplica, la alerta.
-      if (r.penalizado) {
-        showToast(`Reserva cancelada. Llegaste a ${r.cancel_count} cancelaciones: tu cuenta quedó PENALIZADA.`, 'error');
-      } else if (r.alerta) {
-        showToast(r.alerta, 'warning');
-      } else {
-        // RF25 / P25 — Notificación de cancelación registrada.
-        showToast(
-          `${r.notificacion || 'Reserva cancelada.'} Llevas ${r.cancel_count} de ${r.cancelacion_limite} cancelaciones.`,
-          'info',
-        );
-      }
+      // RF25 — Notificación de cancelación registrada. Cancelar no penaliza ni
+      // suma inasistencias: el aviso es informativo.
+      showToast(r.notificacion || 'Reserva cancelada. El cupo quedó liberado.', 'success');
     } catch (err) {
       showToast(err.message, 'error');
     }
@@ -215,24 +186,12 @@ export default function App() {
   const staff = isStaff(user);
 
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: '#F4F4F6', fontFamily: "'Segoe UI', Arial, sans-serif" }}>
-      <style>{`
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        @keyframes toastIn { from { transform: translateX(110%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
-        @keyframes fadeUp  { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: translateY(0); } }
-        @keyframes scaleIn { from { opacity: 0; transform: scale(0.92); } to { opacity: 1; transform: scale(1); } }
-        button { transition: filter 0.15s, transform 0.1s; }
-        button:not(:disabled):hover  { filter: brightness(0.93); }
-        button:not(:disabled):active { transform: scale(0.97); }
-        input:focus { border-color: #CC0000 !important; box-shadow: 0 0 0 3px rgba(204,0,0,0.1); outline: none; }
-      `}</style>
+    <div className="app">
 
       {toast && <Toast {...toast} onClose={() => setToast(null)} />}
 
       {loading && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(255,255,255,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 8888 }}>
-          <div style={{ fontSize: 40 }}>⏳</div>
-        </div>
+        <div className="cargando"><div className="cargando__icono">⏳</div></div>
       )}
 
       {!user ? (
@@ -258,7 +217,6 @@ export default function App() {
               reservaFecha={reservaFecha}
               reservations={reservations}
               onReserve={handleReserve}
-              onJoinWaitlist={handleJoinWaitlist}
             />
           )}
           {!staff && view === 'my-reservations' && (
@@ -269,7 +227,7 @@ export default function App() {
               onNavigate={setView}
             />
           )}
-          {!staff && view === 'history' && <HistoryView user={user} showToast={showToast} />}
+          {!staff && view === 'history' && <HistoryView user={user} />}
 
           {view === 'profile' && <ProfileView user={user} showToast={showToast} />}
 

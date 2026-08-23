@@ -1,0 +1,120 @@
+/*
+ * ESTRUCTURA DE LA APLICACIÓN
+ *
+ * El armazón general, los avisos flotantes, la franja de penalización y la
+ * capa de carga. Las animaciones compartidas también viven aquí.
+ */
+@import './base.css';
+
+.app {
+  min-height: 100vh;
+  background-color: var(--fondo);
+}
+
+/* ── Animaciones compartidas ──────────────────────────────────────────── */
+@keyframes toastIn {
+  from { transform: translateX(110%); opacity: 0; }
+  to   { transform: translateX(0);    opacity: 1; }
+}
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(24px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.92); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+/* ── Aviso flotante ───────────────────────────────────────────────────── */
+.toast {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 9999;
+  max-width: 400px;
+  padding: 16px 20px;
+  border-radius: 14px;
+  border: 1px solid;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.15);
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  animation: toastIn 0.3s ease;
+}
+
+.toast__icono  { font-size: 18px; flex-shrink: 0; margin-top: 1px; }
+.toast__texto  { font-size: 14px; line-height: 1.6; flex: 1; }
+.toast__cerrar {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 20px;
+  line-height: 1;
+  flex-shrink: 0;
+  color: inherit;
+}
+
+.toast--exito     { background-color: #dcfce7; border-color: #16a34a; color: #15803d; }
+.toast--atencion  { background-color: #fef9c3; border-color: #ca8a04; color: #92400e; }
+.toast--info      { background-color: #dbeafe; border-color: #2563eb; color: #1d4ed8; }
+.toast--error     { background-color: #fee2e2; border-color: #dc2626; color: #991b1b; }
+
+.toast--exito    .toast__icono { color: #16a34a; }
+.toast--atencion .toast__icono { color: #ca8a04; }
+.toast--info     .toast__icono { color: #2563eb; }
+.toast--error    .toast__icono { color: #dc2626; }
+
+/* ── Franja de aviso de penalización ──────────────────────────────────── */
+.penalizacion {
+  padding: 14px 24px;
+  border-bottom: 2px solid;
+}
+
+.penalizacion--aviso     { background-color: #fff7ed; border-color: #f59e0b; }
+.penalizacion--bloqueado { background-color: #fee2e2; border-color: #dc2626; }
+
+.penalizacion__contenido {
+  max-width: var(--ancho-maximo);
+  margin: 0 auto;
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.penalizacion__icono  { font-size: 20px; flex-shrink: 0; }
+.penalizacion__titulo { font-size: 14px; font-weight: 800; margin-bottom: 2px; }
+.penalizacion__texto  { font-size: 13px; line-height: 1.6; }
+
+.penalizacion--aviso     .penalizacion__titulo { color: #92400e; }
+.penalizacion--aviso     .penalizacion__texto  { color: #78350f; }
+.penalizacion--bloqueado .penalizacion__titulo,
+.penalizacion--bloqueado .penalizacion__texto  { color: #991b1b; }
+
+/* ── Capa de carga ────────────────────────────────────────────────────── */
+.cargando {
+  position: fixed;
+  inset: 0;
+  z-index: 8888;
+  background-color: rgba(255, 255, 255, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cargando__icono { font-size: 40px; }
+
+/* ── Comportamiento común de botones y campos ─────────────────────────── */
+button {
+  transition: filter 0.15s, transform 0.1s;
+}
+
+button:not(:disabled):hover  { filter: brightness(0.93); }
+button:not(:disabled):active { transform: scale(0.97); }
+
+input:focus {
+  border-color: var(--rojo);
+  box-shadow: 0 0 0 3px rgba(204, 0, 0, 0.1);
+  outline: none;
+}

@@ -1,875 +1,974 @@
 """
-Pruebas unitarias del sistema de reservas.
+PRUEBAS UNITARIAS DEL BACKEND — GESTIÓN DE RESERVAS DEL GIMNASIO
 
-Cubren los casos de uso críticos (views.py) y las reglas de negocio vigentes:
+Cada clase cubre un requisito funcional y su nombre lo dice. Se ejecutan con:
 
-  RN01  Tres tipos de correo institucional -> rol (estudiante/profesor/admin)
-  RN02  Profesores y administradores no reservan: solo consultan el aforo
-  RN03  La reserva es siempre para el DÍA SIGUIENTE (y la fecha se expone)
-  RN05  Una única reserva por día
-  RN09  Penalización por inasistencias (No-Show)
-  RN10  Penalización por cancelaciones + alerta previa
+    cd backend && python manage.py test api
 
-Se usa `mongomock` para simular MongoDB en memoria.
+Las pruebas no tocan la base de datos real: `setUp` sustituye la conexión de
+`datos.py` por una MongoDB en memoria (mongomock), así cada prueba arranca con
+el sistema vacío y no deja rastro.
+
+REQUISITOS CUBIERTOS
+    RF01  Registro con nombre, correo institucional y documento
+    RF02  Inicio de sesión con el documento como contraseña
+    RF03  Asignación automática del rol según el dominio del correo
+    RF04  Perfil del estudiante: edad, peso, altura y objetivo
+    RF05  Perfil de entrenadores y administradores
+    RF08  Reserva del estudiante para el día siguiente
+    RF09  Una única reserva por estudiante y día
+    RF10  Consulta de las reservas hechas
+    RF11  Búsqueda de la reserva por documento de identidad
+    RF12  El personal visualiza los bloques sin poder reservar
+    RF13  Registro de la asistencia del estudiante
+    RF16  Penalización al alcanzar cinco inasistencias
+    RF17  Historial de reservas, cancelaciones y asistencias
+    RF18  Reporte personal de inasistencias y penalizaciones
+    RF23  Notificación de reserva confirmada
+    RF25  Notificación de cancelación de reserva
 """
-from datetime import date, timedelta
+from datetime import timedelta
 
 import mongomock
 from django.test import TestCase
 from rest_framework.test import APIClient
 
-from api import db as db_module
+from api import datos, reglas
 
-ESTUDIANTE = 'juan.perez@soyudemedellin.edu.co'
-PROFESOR   = 'coach@udem.edu.co'
-ADMIN      = 'jefe@udemedellin.edu.co'
-
-# RF01/RF02 — El documento de identidad identifica a la persona y es su contraseña.
-DOCUMENTOS = {
-    ESTUDIANTE: '1001234567',
-    PROFESOR:   '7009998881',
-    ADMIN:      '3005554442',
-}
+# ── Cuentas de ejemplo (el dominio del correo decide el rol) ───────────────
+ESTUDIANTE, DOC_ESTUDIANTE = 'ana.gomez@soyudemedellin.edu.co', '1001234567'
+COMPANERA, DOC_COMPANERA   = 'sara.ruiz@soyudemedellin.edu.co', '1009876543'
+ENTRENADOR, DOC_ENTRENADOR = 'coach@udem.edu.co',              '7001112223'
+ADMIN, DOC_ADMIN           = 'jefa@udemedellin.edu.co',        '3004445556'
 
 
-class GymApiTestCase(TestCase):
+class BaseGimnasio(TestCase):
+    """Cimientos comunes: base de datos en memoria y atajos de uso frecuente."""
+
     def setUp(self):
-        db_module._client = mongomock.MongoClient()
+        datos._client = mongomock.MongoClient()
         self.client = APIClient()
 
     def tearDown(self):
-        db_module._client = None
+        datos._client = None
 
-    # Helpers ----------------------------------------------------------------
-    def _documento(self, email: str) -> str:
-        """Documento de identidad único y estable por correo (RF01)."""
-        return DOCUMENTOS.get(email, '10' + str(abs(hash(email)) % 100_000_000).zfill(8))
+    # ── Atajos ────────────────────────────────────────────────────────────
+    def registrar(self, email, documento, nombre='Persona de prueba'):
+        return self.client.post('/api/auth/register/',
+                                {'name': nombre, 'email': email, 'documento': documento},
+                                format='json')
 
-    def _register(self, email=ESTUDIANTE, name='Juan Perez', documento=None):
-        return self.client.post(
-            '/api/auth/register/',
-            {'name': name, 'email': email, 'documento': documento or self._documento(email)},
-            format='json',
+    def entrar(self, email, documento):
+        return self.client.post('/api/auth/login/',
+                                {'email': email, 'documento': documento}, format='json')
+
+    def reservar(self, email, slot_id=1):
+        return self.client.post('/api/reservations/',
+                                {'email': email, 'slotId': slot_id}, format='json')
+
+    def cancelar(self, reserva_id):
+        return self.client.delete(f'/api/reservations/{reserva_id}/')
+
+    def usuario(self, email):
+        return datos.buscar_usuario(email)
+
+    def bloque(self, slot_id=1):
+        return datos.buscar_bloque(slot_id)
+
+    def sembrar_bloques(self):
+        """Los bloques se crean la primera vez que alguien los consulta."""
+        self.client.get('/api/slots/')
+
+    def hacer_que_llegue_la_jornada(self, email):
+        """Adelanta el reloj: mueve la reserva del estudiante al día de hoy.
+
+        Las reservas se crean SIEMPRE para el día siguiente, y la asistencia
+        solo puede registrarse el día de la reserva. Para probar la asistencia
+        sin esperar 24 horas, se retrasa la fecha de la reserva hasta hoy.
+        """
+        datos.get_db().reservations.update_many(
+            {'email': email, 'estado': 'ACTIVA'},
+            {'$set': {'reserva_date': reglas.hoy_local().isoformat()}},
         )
 
-    def _login(self, email, documento=None):
-        return self.client.post(
-            '/api/auth/login/',
-            {'email': email, 'documento': documento or self._documento(email)},
-            format='json',
-        )
 
-    def _reserve(self, email, slot_id):
-        return self.client.post('/api/reservations/', {'email': email, 'slotId': slot_id}, format='json')
+# ══════════════════════════════════════════════════════════════════════════
+#  RF01 — REGISTRO CON NOMBRE, CORREO INSTITUCIONAL Y DOCUMENTO
+# ══════════════════════════════════════════════════════════════════════════
+class RF01Registro(BaseGimnasio):
 
-    def _slot(self, slot_id):
-        return db_module.get_db().slots.find_one({'slotId': slot_id})
-
-    def _user(self, email):
-        return db_module.get_db().users.find_one({'email': email})
-
-    def _cancelar_n_veces(self, email, veces):
-        """Reserva y cancela N veces para acumular cancelaciones."""
-        for _ in range(veces):
-            rid = self._reserve(email, 1).data['id']
-            self.client.delete(f'/api/reservations/{rid}/')
-
-
-# ── CU-1 / RN01: REGISTRO Y TRES TIPOS DE CORREO ────────────────────────────
-class RegisterTests(GymApiTestCase):
-
-    def test_registro_guarda_password_hasheada(self):
-        resp = self._register()
+    def test_registro_valido_crea_la_cuenta(self):
+        resp = self.registrar(ESTUDIANTE, DOC_ESTUDIANTE, 'Ana Gómez')
         self.assertEqual(resp.status_code, 201)
-        user = self._user(ESTUDIANTE)
-        # RF01 — se guarda el documento de identidad de la persona...
-        self.assertEqual(user['documento'], DOCUMENTOS[ESTUDIANTE])
-        # ...y como contraseña solo su hash, nunca el valor en claro.
-        self.assertNotEqual(user['password'], DOCUMENTOS[ESTUDIANTE])
-        self.assertIn(':', user['password'])
-        self.assertEqual(user['estado'], 'ACTIVO')
-        self.assertEqual(user['cancel_count'], 0)
+        cuenta = self.usuario(ESTUDIANTE)
+        self.assertEqual(cuenta['name'], 'Ana Gómez')
+        self.assertEqual(cuenta['documento'], DOC_ESTUDIANTE)
 
-    def test_rn01_correo_de_estudiante_da_rol_estudiante(self):
-        self.assertEqual(self._register().data['role'], 'ESTUDIANTE')
-        self.assertEqual(self._user(ESTUDIANTE)['role'], 'ESTUDIANTE')
-
-    def test_rn01_correo_udem_da_rol_entrenador(self):
-        self.assertEqual(self._register(email=PROFESOR).data['role'], 'ENTRENADOR')
-
-    def test_rn01_correo_udemedellin_da_rol_admin(self):
-        self.assertEqual(self._register(email=ADMIN).data['role'], 'ADMIN')
-
-    def test_rn01_no_se_puede_elegir_el_rol_desde_el_cliente(self):
-        """Un correo de estudiante nunca produce un ADMIN, aunque lo pida."""
-        resp = self.client.post(
-            '/api/auth/register/',
-            {'name': 'Vivo', 'email': ESTUDIANTE, 'documento': DOCUMENTOS[ESTUDIANTE], 'role': 'ADMIN'},
-            format='json',
-        )
-        self.assertEqual(resp.status_code, 201)
-        self.assertEqual(self._user(ESTUDIANTE)['role'], 'ESTUDIANTE')
+    def test_la_contrasena_no_se_guarda_en_claro(self):
+        self.registrar(ESTUDIANTE, DOC_ESTUDIANTE)
+        guardada = self.usuario(ESTUDIANTE)['password']
+        self.assertNotEqual(guardada, DOC_ESTUDIANTE)
+        self.assertIn(':', guardada)  # formato 'sal:clave' derivado
 
     def test_rechaza_correo_no_institucional(self):
-        self.assertEqual(self._register(email='juan@gmail.com').status_code, 400)
+        resp = self.registrar('alguien@gmail.com', '1234567890')
+        self.assertEqual(resp.status_code, 400)
 
-    def test_rechaza_documento_corto(self):
-        self.assertEqual(self._register(documento='123').status_code, 400)
+    def test_rechaza_correo_repetido(self):
+        self.registrar(ESTUDIANTE, DOC_ESTUDIANTE)
+        resp = self.registrar(ESTUDIANTE, '9999999999')
+        self.assertEqual(resp.status_code, 409)
 
-    def test_rechaza_documento_duplicado(self):
-        """RF01 — Dos personas no pueden compartir el mismo documento."""
-        self._register()
-        otra = self._register(email='otra@soyudemedellin.edu.co', name='Otra',
-                              documento=DOCUMENTOS[ESTUDIANTE])
-        self.assertEqual(otra.status_code, 409)
+    def test_rechaza_documento_repetido(self):
+        self.registrar(ESTUDIANTE, DOC_ESTUDIANTE)
+        resp = self.registrar(COMPANERA, DOC_ESTUDIANTE)
+        self.assertEqual(resp.status_code, 409)
 
-    def test_rechaza_correo_duplicado(self):
-        self._register()
-        self.assertEqual(self._register().status_code, 409)
+    def test_rechaza_documento_demasiado_corto(self):
+        resp = self.registrar(ESTUDIANTE, '123')
+        self.assertEqual(resp.status_code, 400)
+
+    def test_rechaza_campos_vacios(self):
+        resp = self.client.post('/api/auth/register/',
+                                {'name': '', 'email': ESTUDIANTE, 'documento': DOC_ESTUDIANTE},
+                                format='json')
+        self.assertEqual(resp.status_code, 400)
 
 
-# ── CU-2: LOGIN Y SESIÓN PERSISTENTE ────────────────────────────────────────
-class LoginTests(GymApiTestCase):
+# ══════════════════════════════════════════════════════════════════════════
+#  RF02 — INICIO DE SESIÓN CON EL DOCUMENTO COMO CONTRASEÑA
+# ══════════════════════════════════════════════════════════════════════════
+class RF02InicioDeSesion(BaseGimnasio):
 
-    def test_login_devuelve_rol_estado_y_contadores(self):
-        self._register()
-        resp = self._login(ESTUDIANTE)
-        self.assertEqual(resp.status_code, 200)
-        self.assertEqual(resp.data['role'], 'ESTUDIANTE')
-        self.assertEqual(resp.data['documento'], DOCUMENTOS[ESTUDIANTE])
-        self.assertEqual(resp.data['estado'], 'ACTIVO')
-        self.assertEqual(resp.data['cancel_count'], 0)
-        self.assertEqual(resp.data['cancelaciones_restantes'], db_module.CANCELACION_LIMITE)
-        self.assertIsNone(resp.data['alerta'])
+    def setUp(self):
+        super().setUp()
+        self.registrar(ESTUDIANTE, DOC_ESTUDIANTE, 'Ana Gómez')
 
-    def test_login_documento_incorrecto(self):
-        """RF02 — El documento es la contraseña: uno distinto no entra."""
-        self._register()
-        resp = self._login(ESTUDIANTE, documento='9999999999')
-        self.assertEqual(resp.status_code, 401)
-
-    def test_login_usuario_inexistente(self):
-        resp = self._login('nadie@udem.edu.co', documento='1234567')
-        self.assertEqual(resp.status_code, 401)
-
-    def test_session_rehidrata_la_sesion_al_recargar(self):
-        """El frontend consulta este endpoint tras un F5 en vez de cerrar sesión."""
-        self._register()
-        resp = self.client.get(f'/api/auth/session/?email={ESTUDIANTE}')
+    def test_entra_con_credenciales_correctas(self):
+        resp = self.entrar(ESTUDIANTE, DOC_ESTUDIANTE)
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(resp.data['email'], ESTUDIANTE)
         self.assertEqual(resp.data['role'], 'ESTUDIANTE')
 
-    def test_session_de_usuario_inexistente(self):
-        self.assertEqual(self.client.get('/api/auth/session/?email=nadie@udem.edu.co').status_code, 404)
+    def test_no_entra_con_documento_incorrecto(self):
+        resp = self.entrar(ESTUDIANTE, '0000000000')
+        self.assertEqual(resp.status_code, 401)
+
+    def test_no_entra_un_correo_que_no_existe(self):
+        resp = self.entrar('fantasma@soyudemedellin.edu.co', DOC_ESTUDIANTE)
+        self.assertEqual(resp.status_code, 401)
+
+    def test_el_error_no_revela_si_el_correo_existe(self):
+        """Ambos rechazos deben decir exactamente lo mismo: si el mensaje
+        cambiara, cualquiera podría averiguar qué correos están registrados."""
+        con_documento_malo = self.entrar(ESTUDIANTE, '0000000000').data['error']
+        con_correo_inexistente = self.entrar('nadie@soyudemedellin.edu.co',
+                                             DOC_ESTUDIANTE).data['error']
+        self.assertEqual(con_documento_malo, con_correo_inexistente)
+
+    def test_acepta_el_documento_escrito_con_puntos(self):
+        resp = self.entrar(ESTUDIANTE, '1.001 234-567')
+        self.assertEqual(resp.status_code, 200)
+
+    def test_acepta_el_correo_en_mayusculas(self):
+        resp = self.entrar(ESTUDIANTE.upper(), DOC_ESTUDIANTE)
+        self.assertEqual(resp.status_code, 200)
+
+    def test_la_respuesta_no_devuelve_la_contrasena_guardada(self):
+        resp = self.entrar(ESTUDIANTE, DOC_ESTUDIANTE)
+        self.assertNotIn('password', resp.data)
+
+    def test_la_sesion_se_recupera_al_recargar_la_pagina(self):
+        resp = self.client.get(f'/api/auth/session/?email={ESTUDIANTE}')
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.data['email'], ESTUDIANTE)
 
 
-# ── GESTIÓN DE USUARIOS POR EL ADMINISTRADOR ────────────────────────────────
-class AdminUserTests(GymApiTestCase):
-    def setUp(self):
-        super().setUp()
-        self._register(email=ADMIN, name='Jefa')
+# ══════════════════════════════════════════════════════════════════════════
+#  RF03 — ASIGNACIÓN AUTOMÁTICA DEL ROL SEGÚN EL DOMINIO
+# ══════════════════════════════════════════════════════════════════════════
+class RF03RolSegunDominio(BaseGimnasio):
 
-    def _crear(self, actor, email, name='Nuevo', documento=None, role=None):
-        body = {'actor_email': actor, 'name': name, 'email': email,
-                'documento': documento or self._documento(email)}
-        if role:
-            body['role'] = role
-        return self.client.post('/api/admin/users/', body, format='json')
+    def test_dominio_de_estudiante_da_rol_estudiante(self):
+        resp = self.registrar(ESTUDIANTE, DOC_ESTUDIANTE)
+        self.assertEqual(resp.data['role'], 'ESTUDIANTE')
 
-    def test_admin_crea_otro_administrador(self):
-        resp = self._crear(ADMIN, 'nueva.admin@udemedellin.edu.co')
-        self.assertEqual(resp.status_code, 201)
+    def test_dominio_de_profesor_da_rol_entrenador(self):
+        resp = self.registrar(ENTRENADOR, DOC_ENTRENADOR)
+        self.assertEqual(resp.data['role'], 'ENTRENADOR')
+
+    def test_dominio_de_administracion_da_rol_admin(self):
+        resp = self.registrar(ADMIN, DOC_ADMIN)
         self.assertEqual(resp.data['role'], 'ADMIN')
-        self.assertEqual(self._user('nueva.admin@udemedellin.edu.co')['role'], 'ADMIN')
 
-    def test_admin_crea_profesor_y_estudiante(self):
-        self.assertEqual(self._crear(ADMIN, PROFESOR).data['role'], 'ENTRENADOR')
-        self.assertEqual(self._crear(ADMIN, ESTUDIANTE).data['role'], 'ESTUDIANTE')
-
-    def test_estudiante_no_puede_crear_usuarios(self):
-        self._register()
-        self.assertEqual(self._crear(ESTUDIANTE, 'otra@udemedellin.edu.co').status_code, 403)
-
-    def test_profesor_no_puede_crear_usuarios(self):
-        self._register(email=PROFESOR)
-        self.assertEqual(self._crear(PROFESOR, 'otra@udemedellin.edu.co').status_code, 403)
-
-    def test_rol_pedido_debe_coincidir_con_el_dominio(self):
-        resp = self._crear(ADMIN, ESTUDIANTE, role='ADMIN')
-        self.assertEqual(resp.status_code, 400)
-
-    def test_correo_no_institucional_rechazado(self):
-        self.assertEqual(self._crear(ADMIN, 'externo@gmail.com').status_code, 400)
-
-    def test_correo_duplicado(self):
-        self._crear(ADMIN, PROFESOR)
-        self.assertEqual(self._crear(ADMIN, PROFESOR).status_code, 409)
-
-    def test_admin_lista_usuarios(self):
-        self._crear(ADMIN, ESTUDIANTE)
-        resp = self.client.get(f'/api/admin/users/?actor_email={ADMIN}')
-        self.assertEqual(resp.status_code, 200)
-        self.assertEqual(len(resp.data), 2)
-
-
-# ── CU-3 / RN03: CONSULTA DE CUPOS Y FECHA DEL DÍA SIGUIENTE ────────────────
-class SlotsTests(GymApiTestCase):
-    def test_slots_se_siembran_y_devuelven(self):
-        resp = self.client.get('/api/slots/')
-        self.assertEqual(resp.status_code, 200)
-        self.assertEqual(len(resp.data['slots']), 6)
-        self.assertEqual(resp.data['slots'][0]['available'], 20)
-
-    def test_rn03_la_respuesta_expone_la_fecha_del_dia_siguiente(self):
-        resp = self.client.get('/api/slots/')
-        esperado = db_module.hoy_local() + timedelta(days=1)
-        self.assertEqual(resp.data['fecha'], esperado.isoformat())
-        # La etiqueta legible se muestra en la interfaz ("martes 18 de agosto de 2026").
-        self.assertIn(str(esperado.day), resp.data['fecha_label'])
-        self.assertIn('de', resp.data['fecha_label'])
-
-    def test_formato_fecha_en_espanol(self):
-        etiqueta = db_module.formato_fecha_es(date(2026, 8, 18))
-        self.assertEqual(etiqueta, 'martes 18 de agosto de 2026')
-
-
-# ── CU-4 / RN02 / RN05: CREAR RESERVA ───────────────────────────────────────
-class ReservationTests(GymApiTestCase):
-    def setUp(self):
-        super().setUp()
-        self._register()
-        self.client.get('/api/slots/')
-
-    def test_reserva_descuenta_cupo(self):
-        resp = self._reserve(ESTUDIANTE, 1)
+    def test_el_cliente_no_puede_elegir_su_rol(self):
+        """Aunque pida ser ADMIN, el dominio del correo manda."""
+        resp = self.client.post('/api/auth/register/', {
+            'name': 'Aprovechada', 'email': ESTUDIANTE,
+            'documento': DOC_ESTUDIANTE, 'role': 'ADMIN',
+        }, format='json')
         self.assertEqual(resp.status_code, 201)
-        self.assertEqual(resp.data['estado'], 'ACTIVA')
-        self.assertEqual(self._slot(1)['available'], 19)
+        self.assertEqual(resp.data['role'], 'ESTUDIANTE')
+        self.assertEqual(self.usuario(ESTUDIANTE)['role'], 'ESTUDIANTE')
 
-    def test_rn03_la_reserva_queda_fechada_para_manana(self):
-        resp = self._reserve(ESTUDIANTE, 1)
-        manana = db_module.hoy_local() + timedelta(days=1)
-        self.assertEqual(resp.data['reserva_date'], manana.isoformat())
-        self.assertEqual(resp.data['date'], db_module.formato_fecha_es(manana))
-
-    def test_rn05_solo_una_reserva_por_dia(self):
-        self.assertEqual(self._reserve(ESTUDIANTE, 1).status_code, 201)
-        # Un segundo bloque el mismo día se rechaza y no descuenta cupo.
-        resp = self._reserve(ESTUDIANTE, 2)
-        self.assertEqual(resp.status_code, 409)
-        self.assertIn('una reserva por día', resp.data['error'])
-        self.assertEqual(self._slot(2)['available'], 20)
-
-    def test_rn05_repetir_el_mismo_bloque_tambien_se_rechaza(self):
-        self._reserve(ESTUDIANTE, 1)
-        self.assertEqual(self._reserve(ESTUDIANTE, 1).status_code, 409)
-        self.assertEqual(self._slot(1)['available'], 19)
-
-    def test_rn05_tras_cancelar_puede_reservar_otro_bloque_del_dia(self):
-        rid = self._reserve(ESTUDIANTE, 1).data['id']
-        self.client.delete(f'/api/reservations/{rid}/')
-        self.assertEqual(self._reserve(ESTUDIANTE, 3).status_code, 201)
-
-    def test_rn02_el_profesor_no_puede_reservar(self):
-        self._register(email=PROFESOR, name='Coach')
-        resp = self._reserve(PROFESOR, 1)
-        self.assertEqual(resp.status_code, 403)
-        self.assertEqual(self._slot(1)['available'], 20)
-
-    def test_rn02_el_administrador_no_puede_reservar(self):
-        self._register(email=ADMIN, name='Jefa')
-        self.assertEqual(self._reserve(ADMIN, 1).status_code, 403)
-
-    def test_usuario_inexistente_no_reserva(self):
-        self.assertEqual(self._reserve('fantasma@soyudemedellin.edu.co', 1).status_code, 404)
-
-    def test_rechaza_sin_cupos(self):
-        db_module.get_db().slots.update_one({'slotId': 1}, {'$set': {'available': 0}})
-        self.assertEqual(self._reserve(ESTUDIANTE, 1).status_code, 409)
-
-    def test_rechaza_slot_inexistente(self):
-        self.assertEqual(self._reserve(ESTUDIANTE, 999).status_code, 404)
-
-    def test_descuento_atomico_no_sobrevende(self):
-        self._register(email='ana.gomez@soyudemedellin.edu.co', name='Ana Gomez')
-        db_module.get_db().slots.update_one({'slotId': 1}, {'$set': {'available': 1}})
-        r1 = self._reserve(ESTUDIANTE, 1)
-        r2 = self._reserve('ana.gomez@soyudemedellin.edu.co', 1)
-        self.assertEqual(sorted([r1.status_code, r2.status_code]), [201, 409])
-        self.assertEqual(self._slot(1)['available'], 0)
-
-    def test_solo_muestra_activas(self):
-        r = self._reserve(ESTUDIANTE, 1)
-        self.client.delete(f"/api/reservations/{r.data['id']}/")
-        listado = self.client.get(f'/api/reservations/?email={ESTUDIANTE}')
-        self.assertEqual(len(listado.data), 0)  # la cancelada no aparece
-
-
-# ── CU-5 / RN10: CANCELAR, CONTADOR Y ALERTA ────────────────────────────────
-class CancelTests(GymApiTestCase):
-    def setUp(self):
-        super().setUp()
-        self._register()
-        self.client.get('/api/slots/')
-        self.rid = self._reserve(ESTUDIANTE, 1).data['id']
-
-    def test_cancelar_libera_cupo(self):
-        self.assertEqual(self._slot(1)['available'], 19)
-        resp = self.client.delete(f'/api/reservations/{self.rid}/')
-        self.assertEqual(resp.status_code, 200)
-        self.assertEqual(self._slot(1)['available'], 20)
-
-    def test_doble_cancelacion_no_suma_cupo_ni_contador(self):
-        self.client.delete(f'/api/reservations/{self.rid}/')
-        resp = self.client.delete(f'/api/reservations/{self.rid}/')
-        self.assertEqual(resp.status_code, 409)          # ya no está activa
-        self.assertEqual(self._slot(1)['available'], 20)
-        self.assertEqual(self._user(ESTUDIANTE)['cancel_count'], 1)
-
-    def test_id_invalido(self):
-        self.assertEqual(self.client.delete('/api/reservations/no-es-objectid/').status_code, 400)
-
-    def test_rn10_cada_cancelacion_suma_al_contador(self):
-        resp = self.client.delete(f'/api/reservations/{self.rid}/')
-        self.assertEqual(resp.data['cancel_count'], 1)
-        self.assertEqual(resp.data['cancelaciones_restantes'], db_module.CANCELACION_LIMITE - 1)
-        self.assertFalse(resp.data['penalizado'])
-        self.assertIsNone(resp.data['alerta'])           # aún lejos del límite
-
-    def test_rn10_alerta_cuando_faltan_dos_cancelaciones(self):
-        """Con 3 de 5 cancelaciones la app avisa que faltan 2 para la penalización."""
-        self.client.delete(f'/api/reservations/{self.rid}/')          # 1
-        self._cancelar_n_veces(ESTUDIANTE, 2)                          # 2 y 3
-        user = self._user(ESTUDIANTE)
-        self.assertEqual(user['cancel_count'], 3)
-        alerta = db_module.alerta_cancelaciones(user)
-        self.assertIsNotNone(alerta)
-        self.assertIn('2 cancelaciones de ser penalizado', alerta)
-        self.assertEqual(user['estado'], 'ACTIVO')                     # todavía no penalizado
-
-    def test_rn10_quinta_cancelacion_penaliza_y_bloquea(self):
-        self.client.delete(f'/api/reservations/{self.rid}/')           # 1
-        self._cancelar_n_veces(ESTUDIANTE, 3)                          # 2, 3 y 4
-        rid = self._reserve(ESTUDIANTE, 1).data['id']
-        resp = self.client.delete(f'/api/reservations/{rid}/')         # 5 -> penaliza
-        self.assertTrue(resp.data['penalizado'])
-        self.assertEqual(resp.data['cancelaciones_restantes'], 0)
-        self.assertEqual(self._user(ESTUDIANTE)['estado'], 'PENALIZADO')
-        # Penalizado: no puede volver a reservar.
-        self.assertEqual(self._reserve(ESTUDIANTE, 2).status_code, 403)
-
-
-# ── RN09: NO-SHOW Y PENALIZACIÓN ────────────────────────────────────────────
-class NoShowTests(GymApiTestCase):
-    def setUp(self):
-        super().setUp()
-        self._register(email=PROFESOR, name='Coach')
-        self._register(email=ESTUDIANTE, name='Estudiante')
-        self.client.get('/api/slots/')
-
-    def _no_show(self, rid):
-        return self.client.post(f'/api/reservations/{rid}/no-show/',
-                                {'actor_email': PROFESOR}, format='json')
-
-    def test_solo_el_profesor_marca_no_show(self):
-        rid = self._reserve(ESTUDIANTE, 1).data['id']
-        resp = self.client.post(f'/api/reservations/{rid}/no-show/',
-                                {'actor_email': ESTUDIANTE}, format='json')
-        self.assertEqual(resp.status_code, 403)
-
-    def test_rf16_cinco_no_show_penaliza_y_bloquea_reserva(self):
-        for _ in range(db_module.NO_SHOW_LIMITE):
-            rid = self._reserve(ESTUDIANTE, 1).data['id']
-            self._no_show(rid)
-        self.assertEqual(self._user(ESTUDIANTE)['estado'], 'PENALIZADO')
-        resp = self._reserve(ESTUDIANTE, 2)
-        self.assertEqual(resp.status_code, 403)
-
-
-# ── RF11–RF19: FEATURES COMPLEMENTARIAS ─────────────────────────────────────
-class FeaturesTests(GymApiTestCase):
-    ANA = 'ana@soyudemedellin.edu.co'
-
-    def setUp(self):
-        super().setUp()
-        self._register(email=PROFESOR, name='Coach')
-        self._register(email=self.ANA, name='Ana')
-        self.client.get('/api/slots/')
-
-    def test_rf11_historial_incluye_canceladas(self):
-        rid = self._reserve(self.ANA, 1).data['id']
-        self.client.delete(f'/api/reservations/{rid}/')
-        resp = self.client.get(f'/api/reservations/history/?email={self.ANA}')
-        self.assertEqual(resp.status_code, 200)
-        self.assertEqual(resp.data[0]['estado'], 'CANCELADA')
-
-    def test_rf17_completar_asistencia(self):
-        rid = self._reserve(self.ANA, 1).data['id']
-        resp = self.client.post(f'/api/reservations/{rid}/complete/',
-                                {'actor_email': PROFESOR}, format='json')
-        self.assertEqual(resp.status_code, 200)
-        hist = self.client.get(f'/api/reservations/history/?email={self.ANA}')
-        self.assertEqual(hist.data[0]['estado'], 'COMPLETADA')
-
-    def test_rf12_lista_de_espera(self):
-        db_module.get_db().slots.update_one({'slotId': 1}, {'$set': {'available': 0}})
-        r1 = self.client.post('/api/slots/1/waitlist/', {'email': self.ANA}, format='json')
-        self.assertEqual(r1.status_code, 201)
-        r2 = self.client.post('/api/slots/1/waitlist/', {'email': self.ANA}, format='json')
-        self.assertEqual(r2.status_code, 409)
-
-    def test_rf12_no_lista_si_hay_cupos(self):
-        resp = self.client.post('/api/slots/1/waitlist/', {'email': self.ANA}, format='json')
-        self.assertEqual(resp.status_code, 409)
-
-    def test_rf13_perfil_fisico(self):
-        resp = self.client.put('/api/users/profile/',
-                               {'email': self.ANA, 'peso': 65, 'altura': 170, 'meta': 'Resistencia'},
-                               format='json')
-        self.assertEqual(resp.status_code, 200)
-        self.assertEqual(resp.data['peso'], 65)
-        self.assertEqual(resp.data['meta'], 'Resistencia')
-
-    def test_rf13_el_perfil_muestra_las_cancelaciones_del_estudiante(self):
-        rid = self._reserve(self.ANA, 1).data['id']
-        self.client.delete(f'/api/reservations/{rid}/')
-        resp = self.client.get(f'/api/users/profile/?email={self.ANA}')
-        self.assertEqual(resp.data['cancel_count'], 1)
-        self.assertEqual(resp.data['cancelacion_limite'], db_module.CANCELACION_LIMITE)
-        self.assertEqual(resp.data['cancelaciones_restantes'], db_module.CANCELACION_LIMITE - 1)
-
-    def test_rf15_calificacion(self):
-        self.client.post('/api/ratings/', {'email': self.ANA, 'stars': 5, 'comment': 'Excelente'}, format='json')
-        self.client.post('/api/ratings/', {'email': self.ANA, 'stars': 3}, format='json')
-        resp = self.client.get('/api/ratings/')
-        self.assertEqual(resp.data['total'], 2)
-        self.assertEqual(resp.data['promedio'], 4.0)
-
-    def test_rf15_stars_invalido(self):
-        resp = self.client.post('/api/ratings/', {'email': self.ANA, 'stars': 9}, format='json')
+    def test_un_dominio_parecido_no_cuela(self):
+        resp = self.registrar('falsa@udemedellin.edu.co.otrositio.com', '1112223334')
         self.assertEqual(resp.status_code, 400)
 
-    def test_rf16_occupancy(self):
-        self._reserve(self.ANA, 1)
-        resp = self.client.get('/api/reports/occupancy/')
-        self.assertEqual(resp.status_code, 200)
-        bloque1 = next(b for b in resp.data if b['slotId'] == 1)
-        self.assertEqual(bloque1['reservados'], 1)
-
-    def test_rf17_reporte_por_estudiante(self):
-        """El reporte sale por persona: solo estudiantes, con sus contadores."""
-        rid = self._reserve(self.ANA, 1).data['id']
-        self.client.delete(f'/api/reservations/{rid}/')
-        resp = self.client.get('/api/reports/students/')
-        self.assertEqual(resp.status_code, 200)
-        estudiantes = resp.data['estudiantes']
-        # El profesor NO aparece: el reporte es de estudiantes.
-        self.assertEqual([e['email'] for e in estudiantes], [self.ANA])
-        fila = estudiantes[0]
-        self.assertEqual(fila['canceladas'], 1)
-        self.assertEqual(fila['cancel_count'], 1)
-        self.assertEqual(fila['cancelaciones_restantes'], db_module.CANCELACION_LIMITE - 1)
-        self.assertFalse(fila['en_alerta'])
-
-    def test_rf17_el_reporte_marca_a_quien_esta_en_alerta(self):
-        for _ in range(3):
-            rid = self._reserve(self.ANA, 1).data['id']
-            self.client.delete(f'/api/reservations/{rid}/')
-        fila = self.client.get('/api/reports/students/').data['estudiantes'][0]
-        self.assertEqual(fila['cancel_count'], 3)
-        self.assertTrue(fila['en_alerta'])
-
-    def test_rf18_maquinas_seed_y_mantenimiento(self):
-        listado = self.client.get('/api/machines/')
-        self.assertEqual(len(listado.data), 5)
-        # Estudiante NO puede cambiar estado
-        deny = self.client.patch('/api/machines/1/', {'actor_email': self.ANA, 'estado': 'FUERA_DE_SERVICIO'}, format='json')
-        self.assertEqual(deny.status_code, 403)
-        # Profesor SÍ
-        ok = self.client.patch('/api/machines/1/', {'actor_email': PROFESOR, 'estado': 'FUERA_DE_SERVICIO', 'note': 'Mantenimiento'}, format='json')
-        self.assertEqual(ok.status_code, 200)
-        m = db_module.get_db().machines.find_one({'machineId': 1})
-        self.assertEqual(m['estado'], 'FUERA_DE_SERVICIO')
-
-    def test_rf19_csv_export_por_estudiante(self):
-        resp = self.client.get('/api/reports/usage.csv')
-        self.assertEqual(resp.status_code, 200)
-        self.assertIn('text/csv', resp['Content-Type'])
-        cuerpo = resp.content.decode()
-        self.assertIn('email', cuerpo)
-        self.assertIn('canceladas', cuerpo)
-        self.assertIn(self.ANA, cuerpo)
+    def test_la_funcion_de_rol_reconoce_los_tres_dominios(self):
+        self.assertEqual(reglas.role_for_email(ESTUDIANTE), 'ESTUDIANTE')
+        self.assertEqual(reglas.role_for_email(ENTRENADOR), 'ENTRENADOR')
+        self.assertEqual(reglas.role_for_email(ADMIN), 'ADMIN')
+        self.assertIsNone(reglas.role_for_email('alguien@gmail.com'))
 
 
 # ══════════════════════════════════════════════════════════════════════════
-#  REQUISITOS FUNCIONALES RF01–RF25 DEL DOCUMENTO DE ANÁLISIS
+#  RF04 — PERFIL DEL ESTUDIANTE: EDAD, PESO, ALTURA Y OBJETIVO
 # ══════════════════════════════════════════════════════════════════════════
-
-class PerfilTests(GymApiTestCase):
-    """RF04 — Perfil del estudiante · RF05 — Perfil de entrenador/admin."""
+class RF04PerfilDelEstudiante(BaseGimnasio):
 
     def setUp(self):
         super().setUp()
-        self._register()
-        self._register(email=PROFESOR, name='Coach')
+        self.registrar(ESTUDIANTE, DOC_ESTUDIANTE, 'Ana Gómez')
 
-    def test_rf04_el_estudiante_gestiona_edad_peso_altura_y_objetivo(self):
+    def test_guarda_los_cuatro_datos_de_entrenamiento(self):
         resp = self.client.put('/api/users/profile/', {
-            'email': ESTUDIANTE, 'edad': 21, 'peso': 70, 'altura': 175,
-            'meta': 'Ganar resistencia',
+            'email': ESTUDIANTE, 'edad': 21, 'peso': 68,
+            'altura': 170, 'meta': 'Ganar resistencia',
         }, format='json')
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(resp.data['edad'], 21)
-        self.assertEqual(resp.data['peso'], 70)
-        self.assertEqual(resp.data['altura'], 175)
+        self.assertEqual(resp.data['peso'], 68)
+        self.assertEqual(resp.data['altura'], 170)
         self.assertEqual(resp.data['meta'], 'Ganar resistencia')
 
-    def test_rf04_el_estudiante_consulta_su_informacion_personal(self):
-        self.client.put('/api/users/profile/', {'email': ESTUDIANTE, 'edad': 22}, format='json')
+    def test_los_datos_guardados_se_recuperan_despues(self):
+        self.client.put('/api/users/profile/',
+                        {'email': ESTUDIANTE, 'meta': 'Ganar fuerza'}, format='json')
         resp = self.client.get(f'/api/users/profile/?email={ESTUDIANTE}')
-        self.assertEqual(resp.data['edad'], 22)
+        self.assertEqual(resp.data['meta'], 'Ganar fuerza')
 
-    def test_rf05_el_profesor_consulta_nombre_documento_y_rol(self):
-        resp = self.client.get(f'/api/users/profile/?email={PROFESOR}')
-        self.assertEqual(resp.data['name'], 'Coach')
-        self.assertEqual(resp.data['documento'], DOCUMENTOS[PROFESOR])
-        self.assertEqual(resp.data['role'], 'ENTRENADOR')
+    def test_el_perfil_no_deja_cambiar_el_rol_ni_el_documento(self):
+        """Nombre, correo, documento y rol identifican a la persona: el
+        formulario de entrenamiento no debe poder tocarlos."""
+        self.client.put('/api/users/profile/', {
+            'email': ESTUDIANTE, 'role': 'ADMIN', 'documento': '0000000000',
+        }, format='json')
+        cuenta = self.usuario(ESTUDIANTE)
+        self.assertEqual(cuenta['role'], 'ESTUDIANTE')
+        self.assertEqual(cuenta['documento'], DOC_ESTUDIANTE)
+
+    def test_perfil_de_un_correo_que_no_existe(self):
+        resp = self.client.get('/api/users/profile/?email=nadie@soyudemedellin.edu.co')
+        self.assertEqual(resp.status_code, 404)
+
+    def test_exige_indicar_de_quien_es_el_perfil(self):
+        resp = self.client.get('/api/users/profile/')
+        self.assertEqual(resp.status_code, 400)
 
 
-class AsistenciaTests(GymApiTestCase):
-    """RF11 · RF13 · RF14 · RF15 · RF16 — Asistencia, inasistencia y penalización."""
+# ══════════════════════════════════════════════════════════════════════════
+#  RF05 — PERFIL DE ENTRENADORES Y ADMINISTRADORES
+# ══════════════════════════════════════════════════════════════════════════
+class RF05PerfilDelPersonal(BaseGimnasio):
 
     def setUp(self):
         super().setUp()
-        self._register(email=PROFESOR, name='Coach')
-        self._register(email=ADMIN, name='Jefa')
-        self._register(email=ESTUDIANTE, name='Juan Perez')
-        self.client.get('/api/slots/')
-        # La jornada que se procesa es la de la reserva: siempre el día siguiente.
-        self.jornada = db_module.fecha_reserva().isoformat()
+        self.registrar(ENTRENADOR, DOC_ENTRENADOR, 'Sebastián Coach')
+        self.registrar(ADMIN, DOC_ADMIN, 'Violeta Admin')
 
-    # ── RF11 / HU11 — Buscar al estudiante por su documento ────────────────
-    def test_rf11_el_entrenador_encuentra_la_reserva_por_documento(self):
-        self._reserve(ESTUDIANTE, 1)
-        resp = self.client.get(
-            f'/api/students/lookup/?documento={DOCUMENTOS[ESTUDIANTE]}&actor_email={PROFESOR}')
+    def test_el_entrenador_ve_su_nombre_documento_y_rol(self):
+        resp = self.client.get(f'/api/users/profile/?email={ENTRENADOR}')
         self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.data['name'], 'Sebastián Coach')
+        self.assertEqual(resp.data['documento'], DOC_ENTRENADOR)
+        self.assertEqual(resp.data['role'], 'ENTRENADOR')
+
+    def test_el_administrador_ve_su_nombre_documento_y_rol(self):
+        resp = self.client.get(f'/api/users/profile/?email={ADMIN}')
+        self.assertEqual(resp.data['name'], 'Violeta Admin')
+        self.assertEqual(resp.data['documento'], DOC_ADMIN)
+        self.assertEqual(resp.data['role'], 'ADMIN')
+
+    def test_el_primer_administrador_es_el_principal(self):
+        resp = self.client.get(f'/api/users/profile/?email={ADMIN}')
+        self.assertTrue(resp.data['es_principal'])
+
+    def test_el_perfil_no_expone_la_contrasena(self):
+        resp = self.client.get(f'/api/users/profile/?email={ENTRENADOR}')
+        self.assertNotIn('password', resp.data)
+
+
+# ══════════════════════════════════════════════════════════════════════════
+#  RF08 — RESERVA DEL ESTUDIANTE PARA EL DÍA SIGUIENTE
+# ══════════════════════════════════════════════════════════════════════════
+class RF08Reserva(BaseGimnasio):
+
+    def setUp(self):
+        super().setUp()
+        self.registrar(ESTUDIANTE, DOC_ESTUDIANTE)
+        self.sembrar_bloques()
+
+    def test_la_reserva_se_crea_y_queda_activa(self):
+        resp = self.reservar(ESTUDIANTE, 1)
+        self.assertEqual(resp.status_code, 201)
+        self.assertEqual(resp.data['estado'], 'ACTIVA')
+
+    def test_la_reserva_queda_fechada_para_el_dia_siguiente(self):
+        resp = self.reservar(ESTUDIANTE, 1)
+        manana = reglas.hoy_local() + timedelta(days=1)
+        self.assertEqual(resp.data['reserva_date'], manana.isoformat())
+
+    def test_la_reserva_nunca_queda_fechada_para_hoy(self):
+        resp = self.reservar(ESTUDIANTE, 1)
+        self.assertNotEqual(resp.data['reserva_date'], reglas.hoy_local().isoformat())
+
+    def test_el_estudiante_no_puede_imponer_otra_fecha(self):
+        resp = self.client.post('/api/reservations/', {
+            'email': ESTUDIANTE, 'slotId': 1, 'reserva_date': '2030-12-25',
+        }, format='json')
+        manana = reglas.hoy_local() + timedelta(days=1)
+        self.assertEqual(resp.data['reserva_date'], manana.isoformat())
+
+    def test_la_reserva_guarda_la_hora_del_bloque(self):
+        resp = self.reservar(ESTUDIANTE, 1)
+        self.assertEqual(resp.data['hour'], self.bloque(1)['hour'])
+
+    def test_reservar_descuenta_exactamente_un_cupo(self):
+        antes = self.bloque(1)['available']
+        self.reservar(ESTUDIANTE, 1)
+        self.assertEqual(self.bloque(1)['available'], antes - 1)
+
+    def test_reservar_no_cambia_la_capacidad_total(self):
+        total_antes = self.bloque(1)['total']
+        self.reservar(ESTUDIANTE, 1)
+        self.assertEqual(self.bloque(1)['total'], total_antes)
+
+    def test_rechaza_un_bloque_que_no_existe(self):
+        resp = self.reservar(ESTUDIANTE, 99)
+        self.assertEqual(resp.status_code, 404)
+
+    def test_rechaza_a_un_usuario_no_registrado(self):
+        resp = self.reservar('nadie@soyudemedellin.edu.co', 1)
+        self.assertEqual(resp.status_code, 404)
+
+    def test_rechaza_la_peticion_sin_bloque(self):
+        resp = self.client.post('/api/reservations/', {'email': ESTUDIANTE}, format='json')
+        self.assertEqual(resp.status_code, 400)
+
+    def test_un_bloque_sin_cupos_rechaza_la_reserva(self):
+        datos.get_db().slots.update_one({'slotId': 1}, {'$set': {'available': 0}})
+        resp = self.reservar(ESTUDIANTE, 1)
+        self.assertEqual(resp.status_code, 409)
+
+    def test_el_rechazo_por_falta_de_cupo_no_crea_la_reserva(self):
+        datos.get_db().slots.update_one({'slotId': 1}, {'$set': {'available': 0}})
+        self.reservar(ESTUDIANTE, 1)
+        self.assertEqual(datos.contar_reservas({'email': ESTUDIANTE}), 0)
+        self.assertEqual(self.bloque(1)['available'], 0)  # nunca queda negativo
+
+
+# ══════════════════════════════════════════════════════════════════════════
+#  RF09 — UNA ÚNICA RESERVA POR ESTUDIANTE Y DÍA
+# ══════════════════════════════════════════════════════════════════════════
+class RF09UnaReservaPorDia(BaseGimnasio):
+
+    def setUp(self):
+        super().setUp()
+        self.registrar(ESTUDIANTE, DOC_ESTUDIANTE)
+        self.sembrar_bloques()
+        self.reservar(ESTUDIANTE, 1)
+
+    def test_no_deja_reservar_un_segundo_bloque_el_mismo_dia(self):
+        resp = self.reservar(ESTUDIANTE, 2)
+        self.assertEqual(resp.status_code, 409)
+
+    def test_tampoco_deja_repetir_el_mismo_bloque(self):
+        resp = self.reservar(ESTUDIANTE, 1)
+        self.assertEqual(resp.status_code, 409)
+
+    def test_el_rechazo_no_descuenta_cupo_del_otro_bloque(self):
+        antes = self.bloque(2)['available']
+        self.reservar(ESTUDIANTE, 2)
+        self.assertEqual(self.bloque(2)['available'], antes)
+
+    def test_el_estudiante_sigue_con_una_sola_reserva(self):
+        self.reservar(ESTUDIANTE, 2)
+        self.assertEqual(datos.contar_reservas({'email': ESTUDIANTE, 'estado': 'ACTIVA'}), 1)
+
+    def test_tras_cancelar_puede_reservar_otro_bloque_del_dia(self):
+        activa = datos.reservas_activas(ESTUDIANTE)[0]
+        self.cancelar(str(activa['_id']))
+        resp = self.reservar(ESTUDIANTE, 2)
+        self.assertEqual(resp.status_code, 201)
+
+    def test_el_limite_configurado_es_una_reserva(self):
+        self.assertEqual(reglas.MAX_RESERVAS_POR_DIA, 1)
+
+
+# ══════════════════════════════════════════════════════════════════════════
+#  RF10 — CONSULTA DE LAS RESERVAS HECHAS
+# ══════════════════════════════════════════════════════════════════════════
+class RF10ConsultarReservas(BaseGimnasio):
+
+    def setUp(self):
+        super().setUp()
+        self.registrar(ESTUDIANTE, DOC_ESTUDIANTE)
+        self.registrar(COMPANERA, DOC_COMPANERA)
+        self.sembrar_bloques()
+
+    def test_devuelve_la_reserva_recien_creada(self):
+        self.reservar(ESTUDIANTE, 1)
+        resp = self.client.get(f'/api/reservations/?email={ESTUDIANTE}')
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(len(resp.data), 1)
+
+    def test_sin_reservas_devuelve_una_lista_vacia(self):
+        resp = self.client.get(f'/api/reservations/?email={ESTUDIANTE}')
+        self.assertEqual(resp.data, [])
+
+    def test_no_muestra_las_reservas_canceladas(self):
+        self.reservar(ESTUDIANTE, 1)
+        activa = datos.reservas_activas(ESTUDIANTE)[0]
+        self.cancelar(str(activa['_id']))
+        resp = self.client.get(f'/api/reservations/?email={ESTUDIANTE}')
+        self.assertEqual(resp.data, [])
+
+    def test_cada_estudiante_ve_solo_lo_suyo(self):
+        self.reservar(ESTUDIANTE, 1)
+        self.reservar(COMPANERA, 2)
+        resp = self.client.get(f'/api/reservations/?email={ESTUDIANTE}')
+        self.assertEqual(len(resp.data), 1)
+        self.assertEqual(resp.data[0]['email'], ESTUDIANTE)
+
+    def test_exige_indicar_de_quien_son_las_reservas(self):
+        resp = self.client.get('/api/reservations/')
+        self.assertEqual(resp.status_code, 400)
+
+
+# ══════════════════════════════════════════════════════════════════════════
+#  RF11 — BÚSQUEDA DE LA RESERVA POR DOCUMENTO DE IDENTIDAD
+# ══════════════════════════════════════════════════════════════════════════
+class RF11BuscarPorDocumento(BaseGimnasio):
+
+    def setUp(self):
+        super().setUp()
+        self.registrar(ESTUDIANTE, DOC_ESTUDIANTE, 'Ana Gómez')
+        self.registrar(ENTRENADOR, DOC_ENTRENADOR)
+        self.registrar(ADMIN, DOC_ADMIN)
+        self.sembrar_bloques()
+        self.reservar(ESTUDIANTE, 1)
+
+    def buscar(self, documento, actor):
+        return self.client.get(
+            f'/api/students/lookup/?documento={documento}&actor_email={actor}')
+
+    def test_el_entrenador_encuentra_al_estudiante(self):
+        resp = self.buscar(DOC_ESTUDIANTE, ENTRENADOR)
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.data['estudiante']['name'], 'Ana Gómez')
+
+    def test_devuelve_la_reserva_del_estudiante(self):
+        resp = self.buscar(DOC_ESTUDIANTE, ENTRENADOR)
         self.assertTrue(resp.data['tiene_reserva'])
-        self.assertEqual(resp.data['estudiante']['name'], 'Juan Perez')
         self.assertEqual(len(resp.data['reservas']), 1)
 
-    def test_rf11_documento_sin_estudiante(self):
-        resp = self.client.get(f'/api/students/lookup/?documento=0000000&actor_email={PROFESOR}')
+    def test_el_administrador_tambien_puede_buscar(self):
+        resp = self.buscar(DOC_ESTUDIANTE, ADMIN)
+        self.assertEqual(resp.status_code, 200)
+
+    def test_un_estudiante_no_puede_buscar_a_otro(self):
+        resp = self.buscar(DOC_ESTUDIANTE, ESTUDIANTE)
+        self.assertEqual(resp.status_code, 403)
+
+    def test_documento_que_no_existe(self):
+        resp = self.buscar('0000000000', ENTRENADOR)
         self.assertEqual(resp.status_code, 404)
 
-    def test_rf11_el_estudiante_no_puede_buscar_a_otros(self):
-        resp = self.client.get(
-            f'/api/students/lookup/?documento={DOCUMENTOS[ESTUDIANTE]}&actor_email={ESTUDIANTE}')
+    def test_exige_indicar_el_documento(self):
+        resp = self.client.get(f'/api/students/lookup/?actor_email={ENTRENADOR}')
+        self.assertEqual(resp.status_code, 400)
+
+    def test_acepta_el_documento_escrito_con_puntos(self):
+        resp = self.buscar('1.001.234.567', ENTRENADOR)
+        self.assertEqual(resp.status_code, 200)
+
+
+# ══════════════════════════════════════════════════════════════════════════
+#  RF12 — EL PERSONAL VISUALIZA LOS BLOQUES SIN PODER RESERVAR
+# ══════════════════════════════════════════════════════════════════════════
+class RF12PersonalNoReserva(BaseGimnasio):
+
+    def setUp(self):
+        super().setUp()
+        self.registrar(ESTUDIANTE, DOC_ESTUDIANTE)
+        self.registrar(ENTRENADOR, DOC_ENTRENADOR)
+        self.registrar(ADMIN, DOC_ADMIN)
+        self.sembrar_bloques()
+
+    def test_el_entrenador_consulta_los_bloques_establecidos(self):
+        resp = self.client.get('/api/slots/')
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(len(resp.data['slots']), 6)
+
+    def test_la_disponibilidad_de_cada_bloque_es_coherente(self):
+        resp = self.client.get('/api/slots/')
+        for bloque in resp.data['slots']:
+            self.assertGreaterEqual(bloque['available'], 0)
+            self.assertLessEqual(bloque['available'], bloque['total'])
+
+    def test_el_entrenador_consulta_el_reporte_de_ocupacion(self):
+        resp = self.client.get(f'/api/reports/occupancy/?actor_email={ENTRENADOR}')
+        self.assertEqual(resp.status_code, 200)
+
+    def test_el_administrador_ve_el_mismo_aforo_que_el_entrenador(self):
+        del_entrenador = self.client.get(
+            f'/api/reports/occupancy/?actor_email={ENTRENADOR}').data
+        del_administrador = self.client.get(
+            f'/api/reports/occupancy/?actor_email={ADMIN}').data
+        self.assertEqual(del_entrenador, del_administrador)
+
+    def test_el_entrenador_no_puede_reservar(self):
+        resp = self.reservar(ENTRENADOR, 1)
         self.assertEqual(resp.status_code, 403)
 
-    # ── RF13 / HU12 — Registrar la asistencia ──────────────────────────────
-    def test_rf13_el_entrenador_registra_la_asistencia_por_documento(self):
-        self._reserve(ESTUDIANTE, 1)
-        resp = self.client.post('/api/attendance/register/', {
-            'actor_email': PROFESOR, 'documento': DOCUMENTOS[ESTUDIANTE], 'fecha': self.jornada,
-        }, format='json')
-        self.assertEqual(resp.status_code, 200)
-        reserva = db_module.get_db().reservations.find_one({'email': ESTUDIANTE})
-        self.assertEqual(reserva['estado'], 'COMPLETADA')
+    def test_el_administrador_no_puede_reservar(self):
+        resp = self.reservar(ADMIN, 1)
+        self.assertEqual(resp.status_code, 403)
 
-    def test_rf13_no_se_registra_asistencia_sin_reserva(self):
-        resp = self.client.post('/api/attendance/register/', {
-            'actor_email': PROFESOR, 'documento': DOCUMENTOS[ESTUDIANTE], 'fecha': self.jornada,
-        }, format='json')
+    def test_el_intento_del_personal_no_consume_cupos(self):
+        antes = self.bloque(1)['available']
+        self.reservar(ENTRENADOR, 1)
+        self.reservar(ADMIN, 1)
+        self.assertEqual(self.bloque(1)['available'], antes)
+
+    def test_el_estudiante_si_puede_reservar_ese_bloque(self):
+        self.reservar(ENTRENADOR, 1)
+        resp = self.reservar(ESTUDIANTE, 1)
+        self.assertEqual(resp.status_code, 201)
+
+    def test_el_aforo_refleja_la_reserva_al_instante(self):
+        antes = self.client.get(
+            f'/api/reports/occupancy/?actor_email={ENTRENADOR}').data[0]['available']
+        self.reservar(ESTUDIANTE, 1)
+        despues = self.client.get(
+            f'/api/reports/occupancy/?actor_email={ENTRENADOR}').data[0]['available']
+        self.assertEqual(despues, antes - 1)
+
+
+# ══════════════════════════════════════════════════════════════════════════
+#  RF13 — REGISTRO DE LA ASISTENCIA DEL ESTUDIANTE
+# ══════════════════════════════════════════════════════════════════════════
+class RF13RegistrarAsistencia(BaseGimnasio):
+
+    def setUp(self):
+        super().setUp()
+        self.registrar(ESTUDIANTE, DOC_ESTUDIANTE)
+        self.registrar(ENTRENADOR, DOC_ENTRENADOR)
+        self.registrar(ADMIN, DOC_ADMIN)
+        self.sembrar_bloques()
+        self.reservar(ESTUDIANTE, 1)
+
+    def registrar_asistencia(self, actor, documento=DOC_ESTUDIANTE):
+        return self.client.post('/api/attendance/register/',
+                                {'actor_email': actor, 'documento': documento},
+                                format='json')
+
+    def test_el_entrenador_registra_la_asistencia_el_dia_de_la_reserva(self):
+        self.hacer_que_llegue_la_jornada(ESTUDIANTE)
+        resp = self.registrar_asistencia(ENTRENADOR)
+        self.assertEqual(resp.status_code, 200)
+
+    def test_la_reserva_queda_marcada_como_completada(self):
+        self.hacer_que_llegue_la_jornada(ESTUDIANTE)
+        self.registrar_asistencia(ENTRENADOR)
+        self.assertEqual(
+            datos.contar_reservas({'email': ESTUDIANTE, 'estado': 'COMPLETADA'}), 1)
+
+    def test_no_se_puede_registrar_antes_del_dia_de_la_reserva(self):
+        """La reserva es para mañana: hoy el estudiante todavía no ha podido
+        presentarse, así que ni asistió ni faltó."""
+        resp = self.registrar_asistencia(ENTRENADOR)
+        self.assertEqual(resp.status_code, 409)
+
+    def test_el_administrador_tambien_registra_asistencia(self):
+        self.hacer_que_llegue_la_jornada(ESTUDIANTE)
+        resp = self.registrar_asistencia(ADMIN)
+        self.assertEqual(resp.status_code, 200)
+
+    def test_un_estudiante_no_puede_registrar_asistencias(self):
+        self.hacer_que_llegue_la_jornada(ESTUDIANTE)
+        resp = self.registrar_asistencia(ESTUDIANTE)
+        self.assertEqual(resp.status_code, 403)
+
+    def test_no_se_registra_dos_veces_la_misma_asistencia(self):
+        self.hacer_que_llegue_la_jornada(ESTUDIANTE)
+        self.registrar_asistencia(ENTRENADOR)
+        resp = self.registrar_asistencia(ENTRENADOR)
         self.assertEqual(resp.status_code, 404)
 
-    def test_rf13_solo_el_entrenador_registra_asistencia(self):
-        self._reserve(ESTUDIANTE, 1)
-        resp = self.client.post('/api/attendance/register/', {
-            'actor_email': ESTUDIANTE, 'documento': DOCUMENTOS[ESTUDIANTE],
-        }, format='json')
+    def test_no_se_registra_asistencia_de_quien_no_reservo(self):
+        self.registrar(COMPANERA, DOC_COMPANERA)
+        resp = self.registrar_asistencia(ENTRENADOR, DOC_COMPANERA)
+        self.assertEqual(resp.status_code, 404)
+
+    def test_la_asistencia_no_suma_inasistencias(self):
+        self.hacer_que_llegue_la_jornada(ESTUDIANTE)
+        self.registrar_asistencia(ENTRENADOR)
+        self.assertEqual(self.usuario(ESTUDIANTE).get('no_show_count', 0), 0)
+
+
+# ══════════════════════════════════════════════════════════════════════════
+#  RF16 — PENALIZACIÓN AL ALCANZAR CINCO INASISTENCIAS
+# ══════════════════════════════════════════════════════════════════════════
+class RF16Penalizacion(BaseGimnasio):
+
+    def setUp(self):
+        super().setUp()
+        self.registrar(ESTUDIANTE, DOC_ESTUDIANTE)
+        self.registrar(ENTRENADOR, DOC_ENTRENADOR)
+        self.sembrar_bloques()
+
+    def faltar_una_vez(self, slot_id=1):
+        """Reserva, deja pasar la jornada y marca la inasistencia."""
+        self.reservar(ESTUDIANTE, slot_id)
+        self.hacer_que_llegue_la_jornada(ESTUDIANTE)
+        reserva = datos.reservas_activas(ESTUDIANTE)[0]
+        return self.client.post(f"/api/reservations/{reserva['_id']}/no-show/",
+                                {'actor_email': ENTRENADOR}, format='json')
+
+    def test_el_limite_establecido_es_de_cinco(self):
+        self.assertEqual(reglas.NO_SHOW_LIMITE, 5)
+
+    def test_cada_inasistencia_suma_al_contador(self):
+        self.faltar_una_vez()
+        self.assertEqual(self.usuario(ESTUDIANTE)['no_show_count'], 1)
+
+    def test_con_cuatro_inasistencias_la_cuenta_sigue_activa(self):
+        for i in range(4):
+            self.faltar_una_vez(slot_id=(i % 6) + 1)
+        cuenta = self.usuario(ESTUDIANTE)
+        self.assertEqual(cuenta['no_show_count'], 4)
+        self.assertEqual(cuenta['estado'], 'ACTIVO')
+
+    def test_la_quinta_inasistencia_penaliza_la_cuenta(self):
+        for i in range(4):
+            self.faltar_una_vez(slot_id=(i % 6) + 1)
+        resp = self.faltar_una_vez(slot_id=5)
+        self.assertTrue(resp.data['penalizado'])
+        self.assertEqual(self.usuario(ESTUDIANTE)['estado'], 'PENALIZADO')
+
+    def test_la_cuenta_penalizada_no_puede_reservar(self):
+        for i in range(5):
+            self.faltar_una_vez(slot_id=(i % 6) + 1)
+        resp = self.reservar(ESTUDIANTE, 6)
         self.assertEqual(resp.status_code, 403)
 
-    # ── RF14 / HU13 / HU15 — Estudiantes sin asistencia registrada ─────────
-    def test_rf14_lista_los_estudiantes_sin_asistencia(self):
-        self._reserve(ESTUDIANTE, 1)
-        resp = self.client.get(f'/api/attendance/pending/?actor_email={PROFESOR}&fecha={self.jornada}')
+    def test_la_cuenta_penalizada_si_puede_iniciar_sesion(self):
+        """La penalización impide reservar, no entrar a consultar."""
+        for i in range(5):
+            self.faltar_una_vez(slot_id=(i % 6) + 1)
+        resp = self.entrar(ESTUDIANTE, DOC_ESTUDIANTE)
         self.assertEqual(resp.status_code, 200)
-        self.assertEqual(resp.data['total'], 1)
-        self.assertEqual(resp.data['pendientes'][0]['documento'], DOCUMENTOS[ESTUDIANTE])
+        self.assertEqual(resp.data['estado'], 'PENALIZADO')
 
-    def test_rf14_quien_ya_asistio_no_aparece_como_pendiente(self):
-        self._reserve(ESTUDIANTE, 1)
-        self.client.post('/api/attendance/register/', {
-            'actor_email': PROFESOR, 'documento': DOCUMENTOS[ESTUDIANTE], 'fecha': self.jornada,
-        }, format='json')
-        resp = self.client.get(f'/api/attendance/pending/?actor_email={PROFESOR}&fecha={self.jornada}')
-        self.assertEqual(resp.data['total'], 0)
-
-    def test_rf14_el_administrador_tambien_consulta_las_inasistencias(self):
-        self._reserve(ESTUDIANTE, 1)
-        resp = self.client.get(f'/api/attendance/pending/?actor_email={ADMIN}&fecha={self.jornada}')
-        self.assertEqual(resp.status_code, 200)
-        self.assertEqual(resp.data['total'], 1)
-
-    def test_rf14_el_estudiante_no_consulta_las_inasistencias(self):
-        resp = self.client.get(f'/api/attendance/pending/?actor_email={ESTUDIANTE}')
-        self.assertEqual(resp.status_code, 403)
-
-    # ── RF15 / HU14 / HU16 — Procesamiento general de inasistencias ────────
-    def test_rf15_procesa_de_forma_general_las_inasistencias(self):
-        ana = 'ana@soyudemedellin.edu.co'
-        self._register(email=ana, name='Ana')
-        self._reserve(ESTUDIANTE, 1)
-        self._reserve(ana, 2)
-
-        resp = self.client.post('/api/attendance/process/',
-                                {'actor_email': PROFESOR, 'fecha': self.jornada}, format='json')
-        self.assertEqual(resp.status_code, 200)
-        self.assertEqual(resp.data['total_procesadas'], 2)
-        self.assertEqual(self._user(ESTUDIANTE)['no_show_count'], 1)
-        self.assertEqual(self._user(ana)['no_show_count'], 1)
-
-    def test_rf15_no_toca_a_quien_si_asistio(self):
-        self._reserve(ESTUDIANTE, 1)
-        self.client.post('/api/attendance/register/', {
-            'actor_email': PROFESOR, 'documento': DOCUMENTOS[ESTUDIANTE], 'fecha': self.jornada,
-        }, format='json')
-        resp = self.client.post('/api/attendance/process/',
-                                {'actor_email': PROFESOR, 'fecha': self.jornada}, format='json')
-        self.assertEqual(resp.data['total_procesadas'], 0)
-        self.assertEqual(self._user(ESTUDIANTE)['no_show_count'], 0)
-
-    def test_rf15_procesar_dos_veces_no_cuenta_doble(self):
-        self._reserve(ESTUDIANTE, 1)
-        self.client.post('/api/attendance/process/',
-                         {'actor_email': PROFESOR, 'fecha': self.jornada}, format='json')
-        segunda = self.client.post('/api/attendance/process/',
-                                   {'actor_email': PROFESOR, 'fecha': self.jornada}, format='json')
-        self.assertEqual(segunda.data['total_procesadas'], 0)
-        self.assertEqual(self._user(ESTUDIANTE)['no_show_count'], 1)
-
-    def test_rf15_el_administrador_tambien_procesa(self):
-        self._reserve(ESTUDIANTE, 1)
-        resp = self.client.post('/api/attendance/process/',
-                                {'actor_email': ADMIN, 'fecha': self.jornada}, format='json')
-        self.assertEqual(resp.data['total_procesadas'], 1)
-
-    def test_rf15_el_estudiante_no_puede_procesar(self):
-        resp = self.client.post('/api/attendance/process/',
+    def test_solo_el_personal_marca_inasistencias(self):
+        self.reservar(ESTUDIANTE, 1)
+        self.hacer_que_llegue_la_jornada(ESTUDIANTE)
+        reserva = datos.reservas_activas(ESTUDIANTE)[0]
+        resp = self.client.post(f"/api/reservations/{reserva['_id']}/no-show/",
                                 {'actor_email': ESTUDIANTE}, format='json')
         self.assertEqual(resp.status_code, 403)
 
-    # ── RF16 — Penalización a las CINCO (5) inasistencias ──────────────────
-    def test_rf16_el_limite_de_inasistencias_es_cinco(self):
-        self.assertEqual(db_module.NO_SHOW_LIMITE, 5)
+    def test_no_se_marca_inasistencia_antes_del_dia_de_la_reserva(self):
+        self.reservar(ESTUDIANTE, 1)
+        reserva = datos.reservas_activas(ESTUDIANTE)[0]
+        resp = self.client.post(f"/api/reservations/{reserva['_id']}/no-show/",
+                                {'actor_email': ENTRENADOR}, format='json')
+        self.assertEqual(resp.status_code, 409)
 
-    def test_rf16_la_quinta_inasistencia_penaliza(self):
-        for i in range(db_module.NO_SHOW_LIMITE):
-            self._reserve(ESTUDIANTE, 1)
-            resp = self.client.post('/api/attendance/process/',
-                                    {'actor_email': PROFESOR, 'fecha': self.jornada}, format='json')
-            esperado = i == db_module.NO_SHOW_LIMITE - 1
-            self.assertEqual(resp.data['total_penalizados'], 1 if esperado else 0)
-        self.assertEqual(self._user(ESTUDIANTE)['estado'], 'PENALIZADO')
+    def test_el_proceso_general_no_cierra_una_jornada_futura(self):
+        self.reservar(ESTUDIANTE, 1)
+        manana = (reglas.hoy_local() + timedelta(days=1)).isoformat()
+        resp = self.client.post('/api/attendance/process/',
+                                {'actor_email': ENTRENADOR, 'fecha': manana}, format='json')
+        self.assertEqual(resp.data['total_procesadas'], 0)
+        self.assertEqual(self.usuario(ESTUDIANTE).get('no_show_count', 0), 0)
 
-    def test_rf16_con_cuatro_inasistencias_todavia_no_hay_penalizacion(self):
-        for _ in range(db_module.NO_SHOW_LIMITE - 1):
-            self._reserve(ESTUDIANTE, 1)
-            self.client.post('/api/attendance/process/',
-                             {'actor_email': PROFESOR, 'fecha': self.jornada}, format='json')
-        self.assertEqual(self._user(ESTUDIANTE)['estado'], 'ACTIVO')
-        self.assertEqual(self._user(ESTUDIANTE)['no_show_count'], 4)
+    def test_el_proceso_general_marca_las_inasistencias_de_la_jornada(self):
+        self.reservar(ESTUDIANTE, 1)
+        self.hacer_que_llegue_la_jornada(ESTUDIANTE)
+        resp = self.client.post('/api/attendance/process/',
+                                {'actor_email': ENTRENADOR}, format='json')
+        self.assertEqual(resp.data['total_procesadas'], 1)
+        self.assertEqual(self.usuario(ESTUDIANTE)['no_show_count'], 1)
+
+    def test_procesar_dos_veces_no_cuenta_doble(self):
+        self.reservar(ESTUDIANTE, 1)
+        self.hacer_que_llegue_la_jornada(ESTUDIANTE)
+        self.client.post('/api/attendance/process/',
+                         {'actor_email': ENTRENADOR}, format='json')
+        resp = self.client.post('/api/attendance/process/',
+                                {'actor_email': ENTRENADOR}, format='json')
+        self.assertEqual(resp.data['total_procesadas'], 0)
+        self.assertEqual(self.usuario(ESTUDIANTE)['no_show_count'], 1)
 
 
-class ReportesTests(GymApiTestCase):
-    """RF17 — Historial · RF18 — Reporte personal · RF19/RF20 — Reporte diario."""
+# ══════════════════════════════════════════════════════════════════════════
+#  RF17 — HISTORIAL DE RESERVAS, CANCELACIONES Y ASISTENCIAS
+# ══════════════════════════════════════════════════════════════════════════
+class RF17Historial(BaseGimnasio):
 
     def setUp(self):
         super().setUp()
-        self._register(email=PROFESOR, name='Coach')
-        self._register(email=ESTUDIANTE, name='Juan Perez')
-        self.client.get('/api/slots/')
-        self.jornada = db_module.fecha_reserva().isoformat()
+        self.registrar(ESTUDIANTE, DOC_ESTUDIANTE)
+        self.registrar(ENTRENADOR, DOC_ENTRENADOR)
+        self.sembrar_bloques()
 
-    def _procesar(self):
-        return self.client.post('/api/attendance/process/',
-                                {'actor_email': PROFESOR, 'fecha': self.jornada}, format='json')
+    def historial(self, email=ESTUDIANTE, extra=''):
+        return self.client.get(f'/api/reservations/history/?email={email}{extra}')
 
-    # ── RF17 / HU07 — Historial completo ───────────────────────────────────
-    def test_rf17_el_historial_incluye_reservas_cancelaciones_y_asistencias(self):
-        rid = self._reserve(ESTUDIANTE, 1).data['id']
-        self.client.delete(f'/api/reservations/{rid}/')          # CANCELADA
-        self._reserve(ESTUDIANTE, 2)
-        self.client.post('/api/attendance/register/', {
-            'actor_email': PROFESOR, 'documento': DOCUMENTOS[ESTUDIANTE], 'fecha': self.jornada,
-        }, format='json')                                        # COMPLETADA
-        self._reserve(ESTUDIANTE, 3)
-        self._procesar()                                         # NO_SHOW
+    def test_sin_actividad_el_historial_esta_vacio(self):
+        self.assertEqual(self.historial().data, [])
 
-        resp = self.client.get(f'/api/reservations/history/?email={ESTUDIANTE}')
-        estados = sorted(h['estado'] for h in resp.data)
-        self.assertEqual(estados, ['CANCELADA', 'COMPLETADA', 'NO_SHOW'])
+    def test_incluye_la_reserva_vigente(self):
+        self.reservar(ESTUDIANTE, 1)
+        resp = self.historial()
+        self.assertEqual(len(resp.data), 1)
+        self.assertEqual(resp.data[0]['estado'], 'ACTIVA')
 
-    # ── RF18 / HU08 — Reporte personal ─────────────────────────────────────
-    def test_rf18_el_estudiante_consulta_sus_inasistencias_y_penalizaciones(self):
-        self._reserve(ESTUDIANTE, 1)
-        self._procesar()
-        resp = self.client.get(f'/api/reports/personal/?email={ESTUDIANTE}')
+    def test_incluye_las_reservas_canceladas(self):
+        self.reservar(ESTUDIANTE, 1)
+        reserva = datos.reservas_activas(ESTUDIANTE)[0]
+        self.cancelar(str(reserva['_id']))
+        estados = [h['estado'] for h in self.historial().data]
+        self.assertIn('CANCELADA', estados)
+
+    def test_incluye_las_asistencias(self):
+        self.reservar(ESTUDIANTE, 1)
+        self.hacer_que_llegue_la_jornada(ESTUDIANTE)
+        self.client.post('/api/attendance/register/',
+                         {'actor_email': ENTRENADOR, 'documento': DOC_ESTUDIANTE},
+                         format='json')
+        estados = [h['estado'] for h in self.historial().data]
+        self.assertIn('COMPLETADA', estados)
+
+    def test_incluye_las_inasistencias(self):
+        self.reservar(ESTUDIANTE, 1)
+        self.hacer_que_llegue_la_jornada(ESTUDIANTE)
+        self.client.post('/api/attendance/process/',
+                         {'actor_email': ENTRENADOR}, format='json')
+        estados = [h['estado'] for h in self.historial().data]
+        self.assertIn('NO_SHOW', estados)
+
+    def test_el_filtro_de_pasadas_excluye_las_vigentes(self):
+        self.reservar(ESTUDIANTE, 1)
+        resp = self.historial(extra='&solo=pasadas')
+        self.assertEqual(resp.data, [])
+
+    def test_exige_indicar_de_quien_es_el_historial(self):
+        resp = self.client.get('/api/reservations/history/')
+        self.assertEqual(resp.status_code, 400)
+
+
+# ══════════════════════════════════════════════════════════════════════════
+#  RF18 — REPORTE PERSONAL DE INASISTENCIAS Y PENALIZACIONES
+# ══════════════════════════════════════════════════════════════════════════
+class RF18ReportePersonal(BaseGimnasio):
+
+    def setUp(self):
+        super().setUp()
+        self.registrar(ESTUDIANTE, DOC_ESTUDIANTE, 'Ana Gómez')
+        self.registrar(ENTRENADOR, DOC_ENTRENADOR)
+        self.sembrar_bloques()
+
+    def reporte(self, email=ESTUDIANTE):
+        return self.client.get(f'/api/reports/personal/?email={email}')
+
+    def faltar_una_vez(self, slot_id=1):
+        self.reservar(ESTUDIANTE, slot_id)
+        self.hacer_que_llegue_la_jornada(ESTUDIANTE)
+        reserva = datos.reservas_activas(ESTUDIANTE)[0]
+        self.client.post(f"/api/reservations/{reserva['_id']}/no-show/",
+                         {'actor_email': ENTRENADOR}, format='json')
+
+    def test_el_estudiante_consulta_su_reporte(self):
+        resp = self.reporte()
         self.assertEqual(resp.status_code, 200)
-        self.assertEqual(resp.data['no_show_count'], 1)
-        self.assertEqual(resp.data['no_show_limite'], 5)
-        self.assertEqual(resp.data['inasistencias_restantes'], 4)
-        self.assertFalse(resp.data['penalizado'])
-        self.assertEqual(len(resp.data['inasistencias']), 1)
 
-    def test_rf18_el_reporte_personal_muestra_la_penalizacion(self):
-        for _ in range(db_module.NO_SHOW_LIMITE):
-            self._reserve(ESTUDIANTE, 1)
-            self._procesar()
-        resp = self.client.get(f'/api/reports/personal/?email={ESTUDIANTE}')
+    def test_el_reporte_trae_los_contadores_de_inasistencias(self):
+        resp = self.reporte()
+        for campo in ('no_show_count', 'no_show_limite', 'inasistencias_restantes'):
+            self.assertIn(campo, resp.data)
+
+    def test_sin_inasistencias_conserva_las_cinco_oportunidades(self):
+        resp = self.reporte()
+        self.assertEqual(resp.data['no_show_count'], 0)
+        self.assertEqual(resp.data['inasistencias_restantes'], 5)
+
+    def test_el_reporte_identifica_a_su_titular(self):
+        resp = self.reporte()
+        self.assertEqual(resp.data['name'], 'Ana Gómez')
+        self.assertEqual(resp.data['documento'], DOC_ESTUDIANTE)
+
+    def test_refleja_la_primera_inasistencia(self):
+        self.faltar_una_vez()
+        resp = self.reporte()
+        self.assertEqual(resp.data['no_show_count'], 1)
+        self.assertEqual(resp.data['inasistencias_restantes'], 4)
+
+    def test_muestra_la_penalizacion_a_las_cinco_inasistencias(self):
+        for i in range(5):
+            self.faltar_una_vez(slot_id=(i % 6) + 1)
+        resp = self.reporte()
+        self.assertEqual(resp.data['estado'], 'PENALIZADO')
         self.assertTrue(resp.data['penalizado'])
         self.assertEqual(resp.data['inasistencias_restantes'], 0)
-        self.assertIsNotNone(resp.data['penalizado_hasta'])
 
-    # ── RF19 / HU17 / HU18 — Reporte general diario ────────────────────────
-    def test_rf19_reporte_general_diario_con_totales(self):
-        ana = 'ana@soyudemedellin.edu.co'
-        self._register(email=ana, name='Ana')
-        rid = self._reserve(ESTUDIANTE, 1).data['id']
-        self.client.delete(f'/api/reservations/{rid}/')            # cancelación
-        self._reserve(ESTUDIANTE, 2)
-        self.client.post('/api/attendance/register/', {
-            'actor_email': PROFESOR, 'documento': DOCUMENTOS[ESTUDIANTE], 'fecha': self.jornada,
-        }, format='json')                                          # asistencia
-        self._reserve(ana, 3)
-        self._procesar()                                           # inasistencia
+    def test_el_detalle_lista_cada_inasistencia(self):
+        self.faltar_una_vez()
+        resp = self.reporte()
+        self.assertEqual(len(resp.data['inasistencias']), 1)
 
-        resp = self.client.get(f'/api/reports/daily/?actor_email={PROFESOR}&fecha={self.jornada}')
-        self.assertEqual(resp.status_code, 200)
-        self.assertEqual(resp.data['totales']['asistencias'], 1)
-        self.assertEqual(resp.data['totales']['cancelaciones'], 1)
-        self.assertEqual(resp.data['totales']['inasistencias'], 1)
+    def test_cuenta_las_asistencias_cumplidas(self):
+        self.reservar(ESTUDIANTE, 1)
+        self.hacer_que_llegue_la_jornada(ESTUDIANTE)
+        self.client.post('/api/attendance/register/',
+                         {'actor_email': ENTRENADOR, 'documento': DOC_ESTUDIANTE},
+                         format='json')
+        self.assertEqual(self.reporte().data['total_asistencias'], 1)
 
-    def test_rf19_el_estudiante_no_ve_el_reporte_general(self):
-        resp = self.client.get(f'/api/reports/daily/?actor_email={ESTUDIANTE}')
-        self.assertEqual(resp.status_code, 403)
+    def test_reporte_de_un_usuario_que_no_existe(self):
+        resp = self.reporte('nadie@soyudemedellin.edu.co')
+        self.assertEqual(resp.status_code, 404)
 
-    def test_rf19_el_reporte_lista_a_los_estudiantes_penalizados(self):
-        for _ in range(db_module.NO_SHOW_LIMITE):
-            self._reserve(ESTUDIANTE, 1)
-            self._procesar()
-        resp = self.client.get(f'/api/reports/daily/?actor_email={PROFESOR}&fecha={self.jornada}')
-        self.assertEqual(resp.data['totales']['estudiantes_penalizados'], 1)
-        self.assertEqual(resp.data['penalizados'][0]['documento'], DOCUMENTOS[ESTUDIANTE])
-
-    # ── RF20 / HU19 / HU20 — El reporte diario en PDF ──────────────────────
-    def test_rf20_el_reporte_diario_se_genera_en_pdf(self):
-        self._reserve(ESTUDIANTE, 1)
-        self._procesar()
-        resp = self.client.get(f'/api/reports/daily.pdf?actor_email={PROFESOR}&fecha={self.jornada}')
-        self.assertEqual(resp.status_code, 200)
-        self.assertEqual(resp['Content-Type'], 'application/pdf')
-        self.assertTrue(resp.content.startswith(b'%PDF'))
-
-    def test_rf20_el_estudiante_no_genera_el_pdf_general(self):
-        resp = self.client.get(f'/api/reports/daily.pdf?actor_email={ESTUDIANTE}')
-        self.assertEqual(resp.status_code, 403)
-
-
-class AdministradorPrincipalTests(GymApiTestCase):
-    """RF21 — Crear administradores · RF22 — Retirar el rol de administrador."""
-
-    OTRO_ADMIN = 'segunda.admin@udemedellin.edu.co'
-
-    def setUp(self):
-        super().setUp()
-        self._register(email=ADMIN, name='Jefa')       # primer ADMIN = principal
-
-    def _crear_admin(self, actor=ADMIN, email=None):
-        email = email or self.OTRO_ADMIN
-        return self.client.post('/api/admin/users/', {
-            'actor_email': actor, 'name': 'Segunda Admin', 'email': email,
-            'documento': self._documento(email),
-        }, format='json')
-
-    def test_rf21_el_primer_admin_es_el_principal(self):
-        self.assertTrue(self._user(ADMIN)['es_principal'])
-
-    def test_rf21_el_principal_crea_cuentas_de_administrador(self):
-        resp = self._crear_admin()
-        self.assertEqual(resp.status_code, 201)
-        self.assertEqual(self._user(self.OTRO_ADMIN)['role'], 'ADMIN')
-        self.assertFalse(self._user(self.OTRO_ADMIN)['es_principal'])
-
-    def test_rf21_un_admin_no_principal_no_crea_administradores(self):
-        self._crear_admin()
-        resp = self._crear_admin(actor=self.OTRO_ADMIN, email='tercera@udemedellin.edu.co')
-        self.assertEqual(resp.status_code, 403)
-
-    def test_rf22_el_principal_retira_el_rol_de_administrador(self):
-        self._crear_admin()
-        resp = self.client.patch(f'/api/admin/users/{self.OTRO_ADMIN}/',
-                                 {'actor_email': ADMIN, 'accion': 'retirar'}, format='json')
-        self.assertEqual(resp.status_code, 200)
-        retirado = self._user(self.OTRO_ADMIN)
-        self.assertEqual(retirado['role'], 'SIN_ROL')
-        self.assertEqual(retirado['estado'], 'INACTIVO')
-
-    def test_rf22_la_cuenta_retirada_ya_no_inicia_sesion(self):
-        self._crear_admin()
-        self.client.patch(f'/api/admin/users/{self.OTRO_ADMIN}/',
-                          {'actor_email': ADMIN, 'accion': 'retirar'}, format='json')
-        self.assertEqual(self._login(self.OTRO_ADMIN).status_code, 403)
-
-    def test_rf22_el_principal_puede_restaurar_el_rol(self):
-        self._crear_admin()
-        self.client.patch(f'/api/admin/users/{self.OTRO_ADMIN}/',
-                          {'actor_email': ADMIN, 'accion': 'retirar'}, format='json')
-        resp = self.client.patch(f'/api/admin/users/{self.OTRO_ADMIN}/',
-                                 {'actor_email': ADMIN, 'accion': 'restaurar'}, format='json')
-        self.assertEqual(resp.status_code, 200)
-        self.assertEqual(self._user(self.OTRO_ADMIN)['role'], 'ADMIN')
-
-    def test_rf22_no_se_puede_retirar_al_administrador_principal(self):
-        self._crear_admin()
-        resp = self.client.patch(f'/api/admin/users/{ADMIN}/',
-                                 {'actor_email': ADMIN, 'accion': 'retirar'}, format='json')
+    def test_exige_indicar_de_quien_es_el_reporte(self):
+        resp = self.client.get('/api/reports/personal/')
         self.assertEqual(resp.status_code, 400)
-        self.assertEqual(self._user(ADMIN)['role'], 'ADMIN')
-
-    def test_rf22_un_admin_no_principal_no_retira_roles(self):
-        self._crear_admin()
-        resp = self.client.patch(f'/api/admin/users/{ADMIN}/',
-                                 {'actor_email': self.OTRO_ADMIN, 'accion': 'retirar'}, format='json')
-        self.assertEqual(resp.status_code, 403)
 
 
-class NotificacionesTests(GymApiTestCase):
-    """RF23 · RF24 · RF25 — Avisos al estudiante al reservar y cancelar."""
+# ══════════════════════════════════════════════════════════════════════════
+#  RF23 — NOTIFICACIÓN DE RESERVA CONFIRMADA
+# ══════════════════════════════════════════════════════════════════════════
+class RF23NotificacionDeReserva(BaseGimnasio):
 
     def setUp(self):
         super().setUp()
-        self._register(email=ESTUDIANTE, name='Juan Perez')
-        self.client.get('/api/slots/')
+        self.registrar(ESTUDIANTE, DOC_ESTUDIANTE)
+        self.registrar(COMPANERA, DOC_COMPANERA)
+        self.registrar(ENTRENADOR, DOC_ENTRENADOR)
+        self.sembrar_bloques()
 
-    def test_rf23_notifica_la_reserva_confirmada(self):
-        resp = self._reserve(ESTUDIANTE, 1)
-        self.assertEqual(resp.status_code, 201)
+    def test_la_reserva_confirmada_devuelve_un_aviso(self):
+        resp = self.reservar(ESTUDIANTE, 1)
+        self.assertTrue(resp.data['notificacion'])
+
+    def test_el_aviso_se_identifica_como_confirmacion(self):
+        resp = self.reservar(ESTUDIANTE, 1)
         self.assertEqual(resp.data['tipo'], 'RESERVA_CONFIRMADA')
-        self.assertIn('confirmada', resp.data['notificacion'].lower())
 
-    def test_rf24_notifica_la_segunda_reserva_del_mismo_dia(self):
-        self._reserve(ESTUDIANTE, 1)
-        resp = self._reserve(ESTUDIANTE, 2)
-        self.assertEqual(resp.status_code, 409)
-        self.assertEqual(resp.data['tipo'], 'RESERVA_DUPLICADA')
-        self.assertIn('ya tienes una reserva', resp.data['notificacion'].lower())
+    def test_el_aviso_menciona_la_hora_del_bloque(self):
+        resp = self.reservar(ESTUDIANTE, 1)
+        self.assertIn(resp.data['hour'], resp.data['notificacion'])
 
-    def test_rf25_notifica_la_cancelacion(self):
-        rid = self._reserve(ESTUDIANTE, 1).data['id']
-        resp = self.client.delete(f'/api/reservations/{rid}/')
+    def test_el_aviso_menciona_la_fecha_de_la_reserva(self):
+        resp = self.reservar(ESTUDIANTE, 1)
+        self.assertIn(resp.data['date'], resp.data['notificacion'])
+
+    def test_al_reservar_otro_bloque_el_aviso_cambia_de_hora(self):
+        primera = self.reservar(ESTUDIANTE, 1)
+        segunda = self.reservar(COMPANERA, 6)
+        self.assertIn(segunda.data['hour'], segunda.data['notificacion'])
+        self.assertNotIn(primera.data['hour'], segunda.data['notificacion'])
+
+    def test_cada_estudiante_recibe_su_propio_aviso(self):
+        de_ana = self.reservar(ESTUDIANTE, 1).data['notificacion']
+        de_sara = self.reservar(COMPANERA, 2).data['notificacion']
+        self.assertNotEqual(de_ana, de_sara)
+
+    def test_una_reserva_rechazada_no_confirma_nada(self):
+        resp = self.reservar(ESTUDIANTE, 99)
+        self.assertNotEqual(resp.data.get('tipo'), 'RESERVA_CONFIRMADA')
+
+    def test_el_intento_del_personal_no_confirma_nada(self):
+        resp = self.reservar(ENTRENADOR, 1)
+        self.assertIsNone(resp.data.get('notificacion'))
+
+    def test_consultar_las_reservas_no_repite_el_aviso(self):
+        self.reservar(ESTUDIANTE, 1)
+        resp = self.client.get(f'/api/reservations/?email={ESTUDIANTE}')
+        self.assertNotIn('notificacion', resp.data[0])
+
+
+# ══════════════════════════════════════════════════════════════════════════
+#  RF25 — NOTIFICACIÓN DE CANCELACIÓN DE RESERVA
+# ══════════════════════════════════════════════════════════════════════════
+class RF25NotificacionDeCancelacion(BaseGimnasio):
+
+    def setUp(self):
+        super().setUp()
+        self.registrar(ESTUDIANTE, DOC_ESTUDIANTE)
+        self.sembrar_bloques()
+        self.reserva = self.reservar(ESTUDIANTE, 1).data
+
+    def test_la_cancelacion_devuelve_un_aviso(self):
+        resp = self.cancelar(self.reserva['id'])
         self.assertEqual(resp.status_code, 200)
+        self.assertTrue(resp.data['notificacion'])
+
+    def test_el_aviso_se_identifica_como_cancelacion(self):
+        resp = self.cancelar(self.reserva['id'])
         self.assertEqual(resp.data['tipo'], 'RESERVA_CANCELADA')
-        self.assertIn('cancelaste', resp.data['notificacion'].lower())
+
+    def test_el_aviso_menciona_la_hora_de_la_reserva_cancelada(self):
+        resp = self.cancelar(self.reserva['id'])
+        self.assertIn(self.reserva['hour'], resp.data['notificacion'])
+
+    def test_el_aviso_informa_que_el_cupo_quedo_liberado(self):
+        resp = self.cancelar(self.reserva['id'])
+        self.assertIn('liberado', resp.data['notificacion'].lower())
+
+    def test_la_cancelacion_devuelve_el_cupo_al_bloque(self):
+        antes = self.bloque(1)['available']
+        self.cancelar(self.reserva['id'])
+        self.assertEqual(self.bloque(1)['available'], antes + 1)
+
+    def test_cancelar_dos_veces_no_duplica_el_cupo(self):
+        self.cancelar(self.reserva['id'])
+        despues_de_la_primera = self.bloque(1)['available']
+        resp = self.cancelar(self.reserva['id'])
+        self.assertEqual(resp.status_code, 409)
+        self.assertEqual(self.bloque(1)['available'], despues_de_la_primera)
+
+    def test_un_identificador_mal_formado_se_rechaza(self):
+        resp = self.cancelar('esto-no-es-un-identificador')
+        self.assertEqual(resp.status_code, 400)
+
+    # ── Cancelar NO es faltar ─────────────────────────────────────────────
+    def test_cancelar_no_suma_ninguna_inasistencia(self):
+        self.cancelar(self.reserva['id'])
+        self.assertEqual(self.usuario(ESTUDIANTE).get('no_show_count', 0), 0)
+
+    def test_las_cancelaciones_se_cuentan_aparte_de_las_inasistencias(self):
+        resp = self.cancelar(self.reserva['id'])
+        self.assertEqual(resp.data['cancel_count'], 1)
+        self.assertEqual(resp.data['no_show_count'], 0)
+
+    def test_cancelar_cinco_veces_no_penaliza_la_cuenta(self):
+        """Cancelar a tiempo devuelve el cupo a otra persona: es el
+        comportamiento que el gimnasio quiere, no una falta."""
+        self.cancelar(self.reserva['id'])
+        for slot in (2, 3, 4, 5):
+            reserva = self.reservar(ESTUDIANTE, slot).data
+            self.cancelar(reserva['id'])
+        cuenta = self.usuario(ESTUDIANTE)
+        self.assertEqual(cuenta['cancel_count'], 5)
+        self.assertEqual(cuenta['estado'], 'ACTIVO')
+
+    def test_tras_cancelar_cinco_veces_todavia_puede_reservar(self):
+        self.cancelar(self.reserva['id'])
+        for slot in (2, 3, 4, 5):
+            reserva = self.reservar(ESTUDIANTE, slot).data
+            self.cancelar(reserva['id'])
+        resp = self.reservar(ESTUDIANTE, 6)
+        self.assertEqual(resp.status_code, 201)

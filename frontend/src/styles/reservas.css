@@ -1,0 +1,223 @@
+/*
+ * MIS RESERVAS E HISTORIAL
+ *
+ * Listado de la reserva vigente con su opción de cancelar, ventana de
+ * confirmación y el historial de entrenamientos.
+ */
+@import './base.css';
+
+.reservas {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 36px 24px;
+  animation: fadeUp 0.4s ease;
+}
+
+.reservas__titulo   { font-size: 30px; font-weight: 900; letter-spacing: -0.5px; margin-bottom: 6px; }
+.reservas__subtitulo { color: var(--texto-tenue); font-size: 15px; margin-bottom: 32px; }
+.reservas__fecha     { color: var(--texto-suave); text-transform: capitalize; }
+
+.reservas__lista {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* ── Recordatorio de la política de cancelación ───────────────────────── */
+.reservas__recordatorio {
+  background-color: #fffbeb;
+  border: 1.5px solid #fcd34d;
+  border-radius: 14px;
+  padding: 14px 18px;
+  margin-bottom: 8px;
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.reservas__recordatorio-icono { font-size: 18px; flex-shrink: 0; }
+.reservas__recordatorio-texto { color: #78350f; font-size: 13px; line-height: 1.6; }
+
+/* ── Tarjeta de reserva ───────────────────────────────────────────────── */
+.reserva {
+  background-color: var(--superficie);
+  border-radius: 18px;
+  padding: 22px 26px;
+  box-shadow: 0 2px 14px rgba(0, 0, 0, 0.07);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+
+.reserva__datos { display: flex; align-items: center; gap: 18px; }
+
+.reserva__icono {
+  width: 60px;
+  height: 60px;
+  border-radius: var(--radio-grande);
+  background-color: #fee2e2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26px;
+  flex-shrink: 0;
+}
+
+.reserva__hora   { font-size: 26px; font-weight: 900; line-height: 1; margin-bottom: 4px; }
+.reserva__fecha  { font-size: 13px; color: var(--texto-tenue); margin-bottom: 6px; text-transform: capitalize; }
+.reserva__marcas { display: flex; gap: 6px; flex-wrap: wrap; }
+
+.reserva__marca {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.2px;
+  padding: 3px 10px;
+  border-radius: 24px;
+}
+
+.reserva__marca--activa  { background-color: #dcfce7; color: #15803d; }
+.reserva__marca--manana  { background-color: #fee2e2; color: var(--rojo); }
+
+.reserva__cancelar {
+  padding: 10px 22px;
+  border: 1.5px solid #fca5a5;
+  border-radius: var(--radio);
+  cursor: pointer;
+  background-color: var(--superficie);
+  color: var(--rojo);
+  font-size: 13px;
+  font-weight: 700;
+  font-family: inherit;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* ── Estado vacío ─────────────────────────────────────────────────────── */
+.reservas__vacio {
+  text-align: center;
+  padding: 64px 40px;
+  background-color: var(--superficie);
+  border-radius: 22px;
+  box-shadow: 0 2px 14px rgba(0, 0, 0, 0.07);
+}
+
+.reservas__vacio-icono  { font-size: 72px; margin-bottom: 20px; }
+.reservas__vacio-titulo { font-size: 22px; font-weight: 800; margin-bottom: 10px; }
+.reservas__vacio-texto  { color: var(--texto-tenue); font-size: 14px; max-width: 280px; margin: 0 auto 28px; }
+
+.reservas__vacio-boton {
+  padding: 13px 32px;
+  border: none;
+  border-radius: var(--radio);
+  cursor: pointer;
+  background-color: var(--rojo);
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 800;
+  font-family: inherit;
+  box-shadow: 0 4px 16px rgba(204, 0, 0, 0.35);
+}
+
+/* ── Ventana de cancelación ───────────────────────────────────────────── */
+.cancelar-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 999;
+  padding: 24px;
+  background-color: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cancelar-modal__tarjeta {
+  background-color: var(--superficie);
+  border-radius: 22px;
+  padding: 36px 32px;
+  max-width: 400px;
+  width: 100%;
+  text-align: center;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+  animation: scaleIn 0.25s ease;
+}
+
+.cancelar-modal__icono   { font-size: 52px; margin-bottom: 16px; }
+.cancelar-modal__titulo  { font-size: 22px; font-weight: 900; margin-bottom: 8px; }
+.cancelar-modal__bloque  { color: var(--texto-suave); font-size: 15px; margin-bottom: 8px; }
+.cancelar-modal__hora    { color: var(--rojo); }
+.cancelar-modal__nota    { color: var(--texto-tenue); font-size: 13px; line-height: 1.7; margin-bottom: 28px; }
+.cancelar-modal__acciones{ display: flex; gap: 12px; }
+
+.cancelar-modal__boton {
+  flex: 1;
+  padding: 14px;
+  border-radius: var(--radio);
+  cursor: pointer;
+  font-size: 14px;
+  font-family: inherit;
+}
+
+.cancelar-modal__boton--mantener {
+  border: 1.5px solid #e5e7eb;
+  background-color: var(--superficie);
+  color: var(--texto-suave);
+  font-weight: 600;
+}
+
+.cancelar-modal__boton--confirmar {
+  border: none;
+  background-color: var(--rojo);
+  color: #ffffff;
+  font-weight: 800;
+  box-shadow: 0 4px 16px rgba(204, 0, 0, 0.35);
+}
+
+/* ── Historial ────────────────────────────────────────────────────────── */
+.historial__lista {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 32px;
+}
+
+.historial__fila {
+  background-color: var(--superficie);
+  border-radius: 14px;
+  padding: 16px 20px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.historial__hora   { font-weight: 700; }
+.historial__fecha  { color: var(--texto-tenue); font-weight: 400; font-size: 13px; }
+
+.historial__estado {
+  font-size: 12px;
+  font-weight: 800;
+  padding: 4px 12px;
+  border-radius: 20px;
+}
+
+.historial__estado--asistio   { background-color: #dcfce7; color: #15803d; }
+.historial__estado--cancelada { background-color: #e5e7eb; color: #4b5563; }
+.historial__estado--falto     { background-color: #fee2e2; color: #991b1b; }
+.historial__estado--otro      { background-color: #eeeeee; color: var(--texto-suave); }
+
+.historial__vacio {
+  background-color: var(--superficie);
+  border-radius: 18px;
+  padding: 40px;
+  text-align: center;
+  box-shadow: 0 2px 14px rgba(0, 0, 0, 0.07);
+  color: var(--texto-tenue);
+}
+
+.historial__vacio-icono { font-size: 48px; margin-bottom: 12px; }
+
+@media (max-width: 560px) {
+  .reserva { flex-direction: column; align-items: stretch; }
+  .reserva__cancelar { width: 100%; }
+}

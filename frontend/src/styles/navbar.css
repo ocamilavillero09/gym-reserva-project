@@ -1,0 +1,144 @@
+/* BARRA DE NAVEGACIÓN SUPERIOR */
+
+.navbar {
+  background: linear-gradient(90deg, var(--rojo) 0%, var(--rojo-oscuro) 100%);
+  box-shadow: var(--sombra-barra);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.navbar__contenido {
+  max-width: var(--ancho-maximo);
+  margin: 0 auto;
+  padding: 0 24px;
+  height: var(--alto-barra);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.navbar__logo {
+  height: 38px;
+  filter: brightness(0) invert(1);
+}
+
+.navbar__acciones {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* ── Botones de navegación ────────────────────────────────────────────── */
+.navbar__boton {
+  padding: 8px 18px;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  background-color: transparent;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 500;
+  font-family: inherit;
+  transition: background-color 0.2s;
+}
+
+.navbar__boton:hover {
+  background-color: rgba(255, 255, 255, 0.12);
+}
+
+.navbar__boton--activo {
+  background-color: rgba(255, 255, 255, 0.22);
+  font-weight: 700;
+}
+
+/* ── Contador de reservas ─────────────────────────────────────────────── */
+.navbar__con-contador {
+  position: relative;
+}
+
+.navbar__contador {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background-color: #ffffff;
+  color: var(--rojo);
+  font-size: 11px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+/* ── Separador y bloque de usuario ────────────────────────────────────── */
+.navbar__separador {
+  width: 1px;
+  height: 28px;
+  background-color: rgba(255, 255, 255, 0.3);
+  margin: 0 6px;
+}
+
+.navbar__usuario {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.navbar__avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background-color: rgba(255, 255, 255, 0.25);
+  border: 2px solid rgba(255, 255, 255, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+
+.navbar__datos {
+  max-width: 150px;
+  overflow: hidden;
+}
+
+.navbar__nombre {
+  color: #ffffff;
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.navbar__rol {
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 11px;
+}
+
+.navbar__salir {
+  padding: 7px 14px;
+  border: 1.5px solid rgba(255, 255, 255, 0.45);
+  border-radius: var(--radio-chico);
+  cursor: pointer;
+  background-color: transparent;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+}
+
+.navbar__salir:hover {
+  background-color: rgba(255, 255, 255, 0.15);
+}
+
+@media (max-width: 768px) {
+  .navbar__contenido { padding: 0 12px; }
+  .navbar__datos     { display: none; }
+  .navbar__boton     { padding: 8px 10px; font-size: 13px; }
+}

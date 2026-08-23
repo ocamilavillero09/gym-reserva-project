@@ -1,0 +1,185 @@
+/*
+ * GESTIÓN DE USUARIOS (ADMINISTRADOR)
+ *
+ * Alta de cuentas, referencia de los dominios institucionales y listado de
+ * usuarios con las acciones sobre el rol de administrador.
+ */
+@import './base.css';
+
+.admin {
+  max-width: 820px;
+  margin: 0 auto;
+  padding: 36px 24px;
+  animation: fadeUp 0.4s ease;
+}
+
+.admin__titulo    { font-size: 30px; font-weight: 900; margin-bottom: 4px; }
+.admin__subtitulo { color: var(--texto-tenue); font-size: 15px; margin-bottom: 28px; }
+
+.admin__aviso {
+  background-color: #fff7ed;
+  border: 1.5px solid #f59e0b;
+  border-radius: var(--radio);
+  padding: 14px 16px;
+  margin-bottom: 20px;
+  font-size: 13px;
+  color: #78350f;
+  line-height: 1.6;
+}
+
+.admin__tarjeta {
+  background-color: var(--superficie);
+  border-radius: 18px;
+  padding: 26px;
+  margin-bottom: 24px;
+  box-shadow: 0 2px 14px rgba(0, 0, 0, 0.07);
+}
+
+.admin__seccion     { font-size: 18px; font-weight: 800; margin-bottom: 6px; }
+.admin__explicacion { color: #777777; font-size: 13px; line-height: 1.6; margin-bottom: 18px; }
+
+/* ── Referencia de dominios ───────────────────────────────────────────── */
+.admin__dominios {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.admin__dominio {
+  border: 1px solid #eeeeee;
+  border-radius: var(--radio);
+  padding: 12px 14px;
+}
+
+.admin__dominio-correo {
+  font-size: 12px;
+  color: var(--texto-suave);
+  margin-top: 8px;
+  word-break: break-all;
+}
+
+/* ── Formulario de alta ───────────────────────────────────────────────── */
+.admin__formulario {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.admin__entrada {
+  width: 100%;
+  padding: 12px 16px;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 10px;
+  font-size: 14px;
+  font-family: inherit;
+  background-color: #fafafa;
+}
+
+.admin__pista        { font-size: 13px; }
+.admin__pista--ok    { color: var(--verde); }
+.admin__pista--error { color: #991b1b; }
+
+.admin__crear {
+  padding: 13px;
+  border: none;
+  border-radius: var(--radio);
+  cursor: pointer;
+  background-color: var(--rojo);
+  color: #ffffff;
+  font-weight: 800;
+  font-family: inherit;
+}
+
+.admin__crear:disabled { cursor: not-allowed; opacity: 0.7; }
+
+/* ── Listado de usuarios ──────────────────────────────────────────────── */
+.admin__encabezado {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.admin__resumen { font-size: 12px; color: #777777; }
+.admin__vacio   { color: var(--texto-tenue); font-size: 14px; }
+
+.usuario {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.usuario__datos  { min-width: 0; }
+.usuario__nombre { font-size: 14px; font-weight: 700; }
+
+.usuario__principal {
+  margin-left: 8px;
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--rojo);
+}
+
+.usuario__correo {
+  font-size: 12px;
+  color: var(--texto-tenue);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.usuario__acciones {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.usuario__penalizado {
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--rojo);
+}
+
+.usuario__boton {
+  padding: 6px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  background-color: var(--superficie);
+  font-size: 11px;
+  font-weight: 800;
+  font-family: inherit;
+}
+
+.usuario__boton--retirar {
+  border: 1.5px solid #fca5a5;
+  color: var(--rojo);
+}
+
+.usuario__boton--restaurar {
+  border: 1.5px solid #86efac;
+  color: var(--verde);
+}
+
+/* ── Etiquetas de rol ─────────────────────────────────────────────────── */
+.rol {
+  font-size: 11px;
+  font-weight: 800;
+  padding: 4px 12px;
+  border-radius: 20px;
+  white-space: nowrap;
+}
+
+.rol--estudiante { background-color: #dbeafe; color: #1d4ed8; }
+.rol--entrenador { background-color: #dcfce7; color: #15803d; }
+.rol--admin      { background-color: #fee2e2; color: #991b1b; }
+.rol--sin-rol    { background-color: #e5e7eb; color: #4b5563; }
+.rol--otro       { background-color: #eeeeee; color: var(--texto-suave); }
+
+@media (max-width: 600px) {
+  .usuario { flex-direction: column; align-items: flex-start; }
+}

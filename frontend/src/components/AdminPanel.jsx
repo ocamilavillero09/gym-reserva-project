@@ -1,35 +1,34 @@
+/*
+ * GESTIÓN DE USUARIOS (ADMINISTRADOR)
+ *
+ * El administrador principal crea cuentas —el rol se deduce del dominio del
+ * correo— y puede retirar o restaurar el rol de administrador de otras
+ * cuentas.
+ *
+ * Solo estructura y comportamiento. La presentación vive en
+ * src/styles/admin.css.
+ */
 import { useCallback, useEffect, useState } from 'react';
 import { adminApi } from '../services/api';
+import '../styles/admin.css';
 
-const RED = '#CC0000';
-const inputStyle = { width: '100%', padding: '12px 16px', border: '1.5px solid #E5E7EB', borderRadius: 10, fontSize: 14, backgroundColor: '#FAFAFA' };
-const card = { backgroundColor: 'white', borderRadius: 18, padding: 26, boxShadow: '0 2px 14px rgba(0,0,0,0.07)', marginBottom: 24 };
-
-// Los tres dominios institucionales y el rol que otorga cada uno (RN01).
+// Los tres dominios institucionales y el rol que otorga cada uno.
 const DOMINIOS = [
-  { dominio: '@soyudemedellin.edu.co', rol: 'ESTUDIANTE',  etiqueta: 'Estudiante' },
-  { dominio: '@udem.edu.co',           rol: 'ENTRENADOR',  etiqueta: 'Entrenador' },
-  { dominio: '@udemedellin.edu.co',    rol: 'ADMIN',       etiqueta: 'Administrador' },
+  { dominio: '@soyudemedellin.edu.co', rol: 'ESTUDIANTE' },
+  { dominio: '@udem.edu.co',           rol: 'ENTRENADOR' },
+  { dominio: '@udemedellin.edu.co',    rol: 'ADMIN' },
 ];
 
-const ROLE_BADGE = {
-  ESTUDIANTE: { bg: '#DBEAFE', fg: '#1D4ED8', label: 'Estudiante' },
-  ENTRENADOR: { bg: '#DCFCE7', fg: '#15803D', label: 'Entrenador' },
-  ADMIN:      { bg: '#FEE2E2', fg: '#991B1B', label: 'Administrador' },
-  SIN_ROL:    { bg: '#E5E7EB', fg: '#4B5563', label: 'Rol retirado' },
+const ROL = {
+  ESTUDIANTE: { clase: 'estudiante', label: 'Estudiante' },
+  ENTRENADOR: { clase: 'entrenador', label: 'Entrenador' },
+  ADMIN:      { clase: 'admin',      label: 'Administrador' },
+  SIN_ROL:    { clase: 'sin-rol',    label: 'Rol retirado' },
 };
 
 const rolDeCorreo = (email) =>
   DOMINIOS.find((d) => email.trim().toLowerCase().endsWith(d.dominio))?.rol ?? null;
 
-/**
- * Panel del ADMINISTRADOR — gestión de usuarios.
- *
- *   RF21 / HU21 — El ADMINISTRADOR PRINCIPAL crea cuentas con rol de
- *                 administrador (el rol se deduce del dominio del correo).
- *   RF22 / HU22 — El administrador principal gestiona esas cuentas y puede
- *                 RETIRARLES el rol de administrador.
- */
 export default function AdminPanel({ user, showToast }) {
   const [users, setUsers] = useState([]);
   const [name, setName] = useState('');
@@ -63,9 +62,11 @@ export default function AdminPanel({ user, showToast }) {
     }
   };
 
-  // RF22 — Retirar o restaurar el rol de administrador de otra cuenta.
+  // Retirar o restaurar el rol de administrador de otra cuenta.
   const cambiarRol = async (objetivo, accion) => {
-    const verbo = accion === 'retirar' ? 'retirar el rol de administrador a' : 'restaurar el rol de administrador a';
+    const verbo = accion === 'retirar'
+      ? 'retirar el rol de administrador a'
+      : 'restaurar el rol de administrador a';
     if (!window.confirm(`¿Seguro que deseas ${verbo} ${objetivo.name}?`)) return;
     try {
       const r = await adminApi.setAdminRole(objetivo.email, accion, user.email);
@@ -82,129 +83,117 @@ export default function AdminPanel({ user, showToast }) {
   const esPrincipal = user.es_principal ?? false;
 
   return (
-    <div style={{ maxWidth: 820, margin: '0 auto', padding: '36px 24px', animation: 'fadeUp 0.4s ease' }}>
-      <h2 style={{ fontSize: 30, fontWeight: 900, marginBottom: 4 }}>Gestión de usuarios</h2>
-      <p style={{ color: '#999', fontSize: 15, marginBottom: 28 }}>
+    <div className="admin">
+      <h2 className="admin__titulo">Gestión de usuarios</h2>
+      <p className="admin__subtitulo">
         {esPrincipal ? 'Administrador principal' : 'Administrador'} · {user.email}
       </p>
 
       {!esPrincipal && (
-        <div style={{ background: '#FFF7ED', border: '1.5px solid #F59E0B', borderRadius: 12, padding: '14px 16px', marginBottom: 20 }}>
-          <p style={{ fontSize: 13, color: '#78350F', margin: 0, lineHeight: 1.6 }}>
-            ⚠️ Solo el <strong>administrador principal</strong> puede crear cuentas de administrador
-            y retirarles el rol. Desde aquí puedes consultar los usuarios y crear estudiantes o entrenadores.
-          </p>
+        <div className="admin__aviso">
+          ⚠️ Solo el <strong>administrador principal</strong> puede crear cuentas de administrador
+          y retirarles el rol. Desde aquí puedes consultar los usuarios y crear estudiantes o entrenadores.
         </div>
       )}
 
       {/* Crear usuario (incluye nuevos administradores) */}
-      <div style={card}>
-        <h3 style={{ fontSize: 18, fontWeight: 800, marginBottom: 6 }}>➕ Crear usuario</h3>
-        <p style={{ color: '#777', fontSize: 13, marginBottom: 18, lineHeight: 1.6 }}>
+      <div className="admin__tarjeta">
+        <h3 className="admin__seccion">➕ Crear usuario</h3>
+        <p className="admin__explicacion">
           El rol se asigna automáticamente según el dominio del correo. Para crear otro
-          <strong> administrador</strong> (RF21), usa un correo <strong>@udemedellin.edu.co</strong>.
+          <strong> administrador</strong>, usa un correo <strong>@udemedellin.edu.co</strong>.
           El documento de identidad será su contraseña de ingreso.
         </p>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px,1fr))', gap: 10, marginBottom: 20 }}>
-          {DOMINIOS.map((d) => {
-            const b = ROLE_BADGE[d.rol];
-            return (
-              <div key={d.dominio} style={{ border: '1px solid #eee', borderRadius: 12, padding: '12px 14px' }}>
-                <span style={{ background: b.bg, color: b.fg, fontSize: 11, fontWeight: 800, padding: '3px 10px', borderRadius: 20 }}>
-                  {b.label}
-                </span>
-                <p style={{ fontSize: 12, color: '#555', marginTop: 8, wordBreak: 'break-all' }}>{d.dominio}</p>
-              </div>
-            );
-          })}
+        <div className="admin__dominios">
+          {DOMINIOS.map((d) => (
+            <div key={d.dominio} className="admin__dominio">
+              <span className={`rol rol--${ROL[d.rol].clase}`}>{ROL[d.rol].label}</span>
+              <p className="admin__dominio-correo">{d.dominio}</p>
+            </div>
+          ))}
         </div>
 
-        <form onSubmit={crear} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nombre completo" style={inputStyle} required />
+        <form className="admin__formulario" onSubmit={crear}>
+          <input className="admin__entrada" value={name} onChange={(e) => setName(e.target.value)}
+                 placeholder="Nombre completo" required />
           <input
+            className="admin__entrada"
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="correo@udemedellin.edu.co"
-            style={inputStyle}
             autoCapitalize="none"
             required
           />
           <input
+            className="admin__entrada"
             type="text"
             value={documento}
             onChange={(e) => setDocumento(e.target.value)}
             placeholder="Documento de identidad (mínimo 6 caracteres)"
-            style={inputStyle}
             inputMode="numeric"
             required
           />
 
           {email && (
-            <p style={{ fontSize: 13, color: rolDetectado ? '#15803D' : '#991B1B', margin: 0 }}>
+            <p className={`admin__pista admin__pista--${rolDetectado ? 'ok' : 'error'}`}>
               {rolDetectado
-                ? `✓ Este correo creará un usuario con rol ${ROLE_BADGE[rolDetectado].label.toUpperCase()}.`
+                ? `✓ Este correo creará un usuario con rol ${ROL[rolDetectado].label.toUpperCase()}.`
                 : '⚠ El correo no pertenece a ninguno de los tres dominios institucionales.'}
             </p>
           )}
 
-          <button type="submit" disabled={enviando} style={{
-            padding: 13, border: 'none', borderRadius: 12, background: RED, color: 'white',
-            fontWeight: 800, cursor: enviando ? 'not-allowed' : 'pointer', opacity: enviando ? 0.7 : 1,
-          }}>
+          <button className="admin__crear" type="submit" disabled={enviando}>
             {enviando ? 'Creando...' : 'Crear usuario'}
           </button>
         </form>
       </div>
 
       {/* Listado de usuarios */}
-      <div style={card}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
-          <h3 style={{ fontSize: 18, fontWeight: 800 }}>👥 Usuarios registrados ({users.length})</h3>
-          <span style={{ fontSize: 12, color: '#777' }}>
+      <div className="admin__tarjeta">
+        <div className="admin__encabezado">
+          <h3 className="admin__seccion">👥 Usuarios registrados ({users.length})</h3>
+          <span className="admin__resumen">
             {porRol('ESTUDIANTE')} estudiantes · {porRol('ENTRENADOR')} profesores · {porRol('ADMIN')} administradores
           </span>
         </div>
 
         {users.length === 0 ? (
-          <p style={{ color: '#999', fontSize: 14 }}>Sin usuarios para mostrar.</p>
+          <p className="admin__vacio">Sin usuarios para mostrar.</p>
         ) : users.map((u) => {
-          const b = ROLE_BADGE[u.role] || { bg: '#eee', fg: '#555', label: u.role };
+          const rol = ROL[u.role] || { clase: 'otro', label: u.role };
           return (
-            <div key={u.email} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: '1px solid #F0F0F0' }}>
-              <div style={{ minWidth: 0 }}>
-                <p style={{ fontWeight: 700, fontSize: 14 }}>
+            <div key={u.email} className="usuario">
+              <div className="usuario__datos">
+                <p className="usuario__nombre">
                   {u.name}
-                  {u.es_principal && (
-                    <span style={{ marginLeft: 8, fontSize: 10, fontWeight: 800, color: RED }}>★ PRINCIPAL</span>
-                  )}
+                  {u.es_principal && <span className="usuario__principal">★ PRINCIPAL</span>}
                 </p>
-                <p style={{ fontSize: 12, color: '#999', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                <p className="usuario__correo">
                   {u.email} · doc. {u.documento || '—'}
                 </p>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+              <div className="usuario__acciones">
                 {u.estado === 'PENALIZADO' && (
-                  <span style={{ fontSize: 11, fontWeight: 800, color: RED }}>PENALIZADO</span>
+                  <span className="usuario__penalizado">PENALIZADO</span>
                 )}
-                <span style={{ background: b.bg, color: b.fg, fontSize: 11, fontWeight: 800, padding: '4px 12px', borderRadius: 20 }}>
-                  {b.label}
-                </span>
-                {/* RF22 — Retirar o restaurar el rol de administrador */}
+                <span className={`rol rol--${rol.clase}`}>{rol.label}</span>
+
+                {/* Retirar o restaurar el rol de administrador */}
                 {esPrincipal && !u.es_principal && u.role === 'ADMIN' && (
-                  <button onClick={() => cambiarRol(u, 'retirar')} style={{
-                    padding: '6px 12px', border: '1.5px solid #fca5a5', borderRadius: 8,
-                    background: 'white', color: RED, fontSize: 11, fontWeight: 800, cursor: 'pointer',
-                  }}>
+                  <button
+                    className="usuario__boton usuario__boton--retirar"
+                    onClick={() => cambiarRol(u, 'retirar')}
+                  >
                     Retirar rol
                   </button>
                 )}
                 {esPrincipal && u.role === 'SIN_ROL' && (
-                  <button onClick={() => cambiarRol(u, 'restaurar')} style={{
-                    padding: '6px 12px', border: '1.5px solid #86efac', borderRadius: 8,
-                    background: 'white', color: '#15803d', fontSize: 11, fontWeight: 800, cursor: 'pointer',
-                  }}>
+                  <button
+                    className="usuario__boton usuario__boton--restaurar"
+                    onClick={() => cambiarRol(u, 'restaurar')}
+                  >
                     Restaurar
                   </button>
                 )}

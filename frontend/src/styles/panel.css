@@ -1,0 +1,259 @@
+/*
+ * PANEL DEL GIMNASIO (ENTRENADOR / ADMINISTRADOR)
+ *
+ * Aforo por bloque, registro de asistencia, pendientes de la jornada y
+ * reporte general diario.
+ */
+@import './base.css';
+
+.panel {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 36px 24px;
+  animation: fadeUp 0.4s ease;
+}
+
+.panel__titulo    { font-size: 30px; font-weight: 900; margin-bottom: 4px; }
+.panel__subtitulo { color: var(--texto-tenue); font-size: 15px; margin-bottom: 28px; }
+
+.panel__tarjeta {
+  background-color: var(--superficie);
+  border-radius: 18px;
+  padding: 26px;
+  margin-bottom: 24px;
+  box-shadow: 0 2px 14px rgba(0, 0, 0, 0.07);
+}
+
+.panel__encabezado {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.panel__seccion     { font-size: 18px; font-weight: 800; }
+.panel__descripcion { font-size: 13px; color: #777777; margin-top: 4px; }
+.panel__nota        { font-size: 12px; color: var(--texto-tenue); margin-top: 14px; }
+.panel__vacio       { color: var(--texto-tenue); font-size: 14px; }
+.panel__fecha       { text-transform: capitalize; }
+
+/* ── Botones del panel ────────────────────────────────────────────────── */
+.panel__boton {
+  padding: 10px 18px;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  background-color: var(--rojo);
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 800;
+  font-family: inherit;
+  white-space: nowrap;
+  text-decoration: none;
+  display: inline-block;
+}
+
+.panel__boton:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.panel__boton--claro {
+  border: 1.5px solid #e5e7eb;
+  background-color: var(--superficie);
+  color: var(--texto);
+  font-weight: 700;
+}
+
+.panel__boton--asistio {
+  border: 1.5px solid #86efac;
+  background-color: var(--superficie);
+  color: var(--verde);
+  font-weight: 700;
+}
+
+.panel__boton--pequeno { padding: 6px 14px; font-size: 12px; }
+
+/* Grupo de botones de una cabecera (actualizar + generar PDF) */
+.panel__acciones {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* ── Aforo por bloque ─────────────────────────────────────────────────── */
+.panel__aforo {
+  background-color: #fee2e2;
+  color: var(--rojo);
+  font-size: 13px;
+  font-weight: 800;
+  padding: 8px 16px;
+  border-radius: 20px;
+}
+
+.panel__bloques {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 12px;
+}
+
+.aforo {
+  border: 1px solid #eeeeee;
+  border-radius: var(--radio);
+  padding: 14px;
+}
+
+.aforo__hora    { font-size: 20px; font-weight: 900; }
+.aforo__cifras  { font-size: 13px; color: var(--texto-suave); margin: 4px 0; }
+
+.aforo__barra {
+  height: 6px;
+  background-color: #f0f0f0;
+  border-radius: 6px;
+  overflow: hidden;
+  margin-top: 6px;
+}
+
+.aforo__barra-relleno          { height: 100%; }
+.aforo__barra-relleno--normal  { background-color: #16a34a; }
+.aforo__barra-relleno--alto    { background-color: #dc2626; }
+
+.aforo__porcentaje { font-size: 12px; color: var(--texto-tenue); margin-top: 6px; }
+
+/* ── Búsqueda y registro de asistencia ────────────────────────────────── */
+.panel__busqueda {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.panel__entrada {
+  width: 100%;
+  padding: 12px 16px;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 10px;
+  font-size: 14px;
+  font-family: inherit;
+  background-color: #fafafa;
+}
+
+.hallazgo {
+  border: 1px solid #eeeeee;
+  border-radius: var(--radio);
+  padding: 16px;
+}
+
+.hallazgo__cabecera {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.hallazgo__nombre  { font-size: 15px; font-weight: 800; }
+.hallazgo__correo  { font-size: 12px; color: var(--texto-tenue); }
+.hallazgo__cuenta  { font-size: 12px; color: #777777; margin-bottom: 12px; }
+
+.hallazgo__estado {
+  font-size: 11px;
+  font-weight: 800;
+  padding: 4px 12px;
+  border-radius: 20px;
+  height: fit-content;
+}
+
+.hallazgo__estado--activo     { background-color: #dcfce7; color: #15803d; }
+.hallazgo__estado--penalizado { background-color: #fee2e2; color: #991b1b; }
+
+.hallazgo__sin-reserva { color: #991b1b; font-size: 14px; font-weight: 700; }
+
+.hallazgo__reserva {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 0;
+  border-top: 1px solid #f0f0f0;
+  flex-wrap: wrap;
+}
+
+.hallazgo__hora   { font-weight: 700; }
+.hallazgo__fecha  { color: var(--texto-tenue); font-weight: 400; font-size: 13px; }
+.hallazgo__hoy    { margin-left: 8px; font-size: 11px; font-weight: 800; color: var(--verde); }
+
+/* Reserva de una jornada que todavía no ha llegado: no se puede marcar */
+.hallazgo__pendiente {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--texto-tenue);
+  background-color: #f4f4f5;
+  border-radius: 20px;
+  padding: 8px 14px;
+  white-space: nowrap;
+}
+
+/* ── Tabla de pendientes ──────────────────────────────────────────────── */
+.panel__tabla-marco { overflow-x: auto; }
+
+.panel__tabla {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  min-width: 520px;
+}
+
+.panel__tabla th {
+  text-align: left;
+  color: #777777;
+  padding: 8px 6px;
+  font-weight: 700;
+}
+
+.panel__tabla td { padding: 10px 6px; }
+.panel__tabla tbody tr { border-top: 1px solid #f0f0f0; }
+
+.panel__tabla-centro  { text-align: center; }
+.panel__tabla-derecha { text-align: right; }
+
+.pendiente__nombre   { font-weight: 700; }
+.pendiente__correo   { color: var(--texto-tenue); font-size: 12px; }
+.pendiente__contador { font-weight: 800; }
+.pendiente__restante { font-size: 10px; font-weight: 500; color: var(--texto-tenue); }
+
+/* ── Reporte diario ───────────────────────────────────────────────────── */
+.panel__totales {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.total {
+  border: 1px solid #eeeeee;
+  border-radius: var(--radio);
+  padding: 16px;
+  text-align: center;
+}
+
+.total__valor { font-size: 32px; font-weight: 900; line-height: 1; }
+.total__label { font-size: 12px; font-weight: 700; color: var(--texto-suave); margin-top: 8px; }
+
+.total--asistencias   .total__valor { color: #15803d; }
+.total--cancelaciones .total__valor { color: #4b5563; }
+.total--inasistencias .total__valor { color: #b45309; }
+.total--penalizados   .total__valor { color: var(--rojo); }
+
+.panel__lista-titulo { font-size: 13px; font-weight: 700; color: var(--texto-suave); margin-bottom: 8px; }
+
+.penalizado {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid #f0f0f0;
+  font-size: 13px;
+}
+
+.penalizado__nombre    { font-weight: 700; }
+.penalizado__documento { color: var(--texto-tenue); font-weight: 400; }
+.penalizado__faltas    { color: var(--rojo); font-weight: 800; }
