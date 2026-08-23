@@ -9,24 +9,26 @@ propios; para eso llama a las otras dos capas del backend:
     datos.py    -> las consultas a la base de datos
     seguridad.py-> el tratamiento de las contraseñas
 
-REQUISITOS FUNCIONALES QUE CUBRE ESTE ARCHIVO
+REQUISITOS EN USO EN ESTE ARCHIVO (con pruebas en tests.py)
     RF01  Registro de usuarios con nombre, correo institucional y documento
     RF02  Inicio de sesión con el documento de identidad como contraseña
     RF03  Asignación automática del rol según el dominio del correo
-    RF06  Consulta de los bloques horarios disponibles
-    RF07  Cupos ocupados y disponibles de cada bloque
     RF08  Reserva del estudiante para el día siguiente
     RF09  Una única reserva por estudiante y día
     RF10  Consulta de las reservas hechas
-    RF12  El personal visualiza los bloques sin poder reservar
     RF16  Penalización al alcanzar cinco inasistencias
+
+REQUISITOS IGNORADOS EN ESTE ARCHIVO
+    Están implementados y funcionan, pero quedaron fuera del alcance acordado
+    con el equipo: no se diseñaron escenarios ni casos de prueba para ellos.
+    RF06  Consulta de los bloques horarios disponibles
+    RF07  Cupos ocupados y disponibles de cada bloque
+    RF12  El personal visualiza los bloques sin poder reservar
     RF21  Creación de cuentas de administrador
     RF22  Gestión de las cuentas de otros administradores
     RF23  Notificación de reserva confirmada
     RF24  Cancelación de reservas
     RF25  Notificación de cancelación
-
-Todos ellos tienen escenarios y casos de prueba en `tests.py`.
 """
 from datetime import datetime
 
@@ -252,7 +254,7 @@ def session(request):
 #  ADMINISTRACIÓN DE USUARIOS
 # ══════════════════════════════════════════════════════════════════════════
 
-# ── RF21 · Creación de cuentas de administrador ───────────────
+# ── RF21 · [IGNORADO] Creación de cuentas de administrador ───────────────
 @swagger_auto_schema(
     method='get',
     operation_description="Lista los usuarios del sistema (solo ADMIN).",
@@ -381,7 +383,7 @@ def _es_principal(actor: dict) -> bool:
     return bool(primero and primero['email'] == actor['email'])
 
 
-# ── RF22 · Gestión de las cuentas de otros administradores ────
+# ── RF22 · [IGNORADO] Gestión de las cuentas de otros administradores ────
 @swagger_auto_schema(
     method='patch',
     operation_description=(
@@ -467,9 +469,9 @@ def admin_user_detail(request, user_email):
 #  BLOQUES HORARIOS
 # ══════════════════════════════════════════════════════════════════════════
 
-# ── RF06 · Consulta de los bloques horarios disponibles ───────
-# ── RF07 · Cupos ocupados y disponibles de cada bloque ────────
-# ── RF12 · El personal visualiza los bloques y su disponibilidad ─────────
+# ── RF06 · [IGNORADO] Consulta de los bloques horarios disponibles ───────
+# ── RF07 · [IGNORADO] Cupos ocupados y disponibles de cada bloque ────────
+# ── RF12 · [IGNORADO] El personal visualiza los bloques y su disponibilidad ─────────
 @swagger_auto_schema(
     method='get',
     operation_description="Bloques horarios y cupos disponibles para la fecha de reserva (el día siguiente).",
@@ -507,7 +509,7 @@ def get_slots(request):
 # ══════════════════════════════════════════════════════════════════════════
 
 # ── RF08 · Reserva del estudiante para el día siguiente ──────────────────
-# ── RF23 · Notificación de reserva confirmada ────────────────────────────
+# ── RF23 · [IGNORADO] Notificación de reserva confirmada ────────────────────────────
 # ── RF09 · Una única reserva por estudiante y día ─────────────
 # ── RF10 · Consulta de las reservas hechas ────────────────────
 @swagger_auto_schema(
@@ -633,8 +635,8 @@ def reservations(request):
     return Response(respuesta, status=201)
 
 
-# ── RF24 · Cancelación de reservas ────────────────────────────
-# ── RF25 · Notificación de cancelación ────────────────────────
+# ── RF24 · [IGNORADO] Cancelación de reservas ────────────────────────────
+# ── RF25 · [IGNORADO] Notificación de cancelación ────────────────────────
 @swagger_auto_schema(
     method='delete',
     operation_description=("Cancela la reserva y libera el cupo de inmediato. Cancelar no tiene "

@@ -4,14 +4,16 @@ PERFIL, HISTORIAL Y AFORO
 Como el resto del backend, este archivo no consulta MongoDB directamente ni
 define límites propios: se apoya en `datos.py` y en `reglas.py`.
 
-REQUISITOS FUNCIONALES QUE CUBRE ESTE ARCHIVO
+REQUISITOS EN USO EN ESTE ARCHIVO (con pruebas en tests.py)
     RF04  Perfil del estudiante: edad, peso, altura y objetivo   (user_profile)
     RF05  Perfil de entrenadores y administradores               (user_profile)
-    RF07  Cupos ocupados y disponibles de cada bloque      (occupancy_report)
-    RF12  El personal visualiza los bloques y su disponibilidad (occupancy_report)
     RF17  Historial de reservas, cancelaciones y asistencias (reservation_history)
 
-Todos ellos tienen escenarios y casos de prueba en `tests.py`.
+REQUISITOS IGNORADOS EN ESTE ARCHIVO
+    Están implementados y funcionan, pero quedaron fuera del alcance acordado
+    con el equipo: no se diseñaron escenarios ni casos de prueba para ellos.
+    RF07  Cupos ocupados y disponibles de cada bloque      (occupancy_report)
+    RF12  El personal visualiza los bloques y su disponibilidad (occupancy_report)
 """
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
@@ -91,8 +93,8 @@ def user_profile(request):
     })
 
 
-# ── RF07 · Cupos ocupados y disponibles de cada bloque ───────────────────
-# ── RF12 · El personal consulta el aforo del gimnasio ────────────────────
+# ── RF07 · [IGNORADO] Cupos ocupados y disponibles de cada bloque ───────────────────
+# ── RF12 · [IGNORADO] El personal consulta el aforo del gimnasio ────────────────────
 @api_view(['GET'])
 def occupancy_report(request):
     """Ocupación de cada bloque horario para entrenadores y administradores.

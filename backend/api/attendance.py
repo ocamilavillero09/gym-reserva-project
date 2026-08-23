@@ -5,16 +5,18 @@ Este archivo expone la API de la jornada del gimnasio. No consulta MongoDB
 directamente ni define límites propios: llama a `datos.py` para leer y escribir
 y a `reglas.py` para saber cuándo corresponde penalizar una cuenta.
 
-REQUISITOS FUNCIONALES QUE CUBRE ESTE ARCHIVO
+REQUISITOS EN USO EN ESTE ARCHIVO (con pruebas en tests.py)
     RF11  Búsqueda del estudiante por su documento de identidad
     RF13  Registro de la asistencia del estudiante
-    RF14  Estudiantes con reserva y sin asistencia registrada
-    RF15  Procesamiento general de las inasistencias de la jornada
     RF16  Penalización al alcanzar cinco inasistencias
     RF18  Reporte personal de inasistencias y penalizaciones
-    RF19  Reporte general diario del gimnasio
 
-Todos ellos tienen escenarios y casos de prueba en `tests.py`.
+REQUISITOS IGNORADOS EN ESTE ARCHIVO
+    Están implementados y funcionan, pero quedaron fuera del alcance acordado
+    con el equipo: no se diseñaron escenarios ni casos de prueba para ellos.
+    RF14  Estudiantes con reserva y sin asistencia registrada
+    RF15  Procesamiento general de las inasistencias de la jornada
+    RF19  Reporte general diario del gimnasio
 """
 from datetime import date as _date, datetime
 
@@ -199,7 +201,7 @@ def register_attendance(request):
     })
 
 
-# ── RF14 · Estudiantes sin asistencia registrada ─────────────
+# ── RF14 · [IGNORADO] Estudiantes sin asistencia registrada ─────────────
 @api_view(['GET'])
 def pending_attendance(request):
     """Reservas de la jornada que siguen ACTIVAS: nadie les registró asistencia.
@@ -241,7 +243,7 @@ def pending_attendance(request):
     })
 
 
-# ── RF15 · Procesamiento general de las inasistencias ────────
+# ── RF15 · [IGNORADO] Procesamiento general de las inasistencias ────────
 # ── RF16 · Penalización al alcanzar cinco inasistencias ──────
 @api_view(['POST'])
 def process_no_shows(request):
@@ -341,7 +343,7 @@ def personal_report(request):
     })
 
 
-# ── RF19 · Reporte general diario del gimnasio ───────────────
+# ── RF19 · [IGNORADO] Reporte general diario del gimnasio ───────────────
 def build_daily_report(fecha_iso: str) -> dict:
     """Totales del día: asistencias, cancelaciones e inasistencias.
 

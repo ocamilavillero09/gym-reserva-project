@@ -1,9 +1,11 @@
 """
 EXPORTACIÓN DEL REPORTE GENERAL DIARIO EN PDF
 
-REQUISITOS FUNCIONALES CUBIERTOS EN ESTE ARCHIVO
+REQUISITO IGNORADO EN ESTE ARCHIVO
     RF20  Generación e impresión en PDF del reporte general diario, con el
           total de asistencias, cancelaciones y estudiantes penalizados.
+          Está implementado y funciona, pero quedó fuera del alcance acordado
+          con el equipo: no se diseñaron escenarios ni casos de prueba.
 
 Los datos los arma `attendance.build_daily_report`, el mismo que alimenta la
 consulta en pantalla (RF19): así el PDF y el panel muestran siempre lo mismo.
@@ -15,7 +17,7 @@ from django.http import HttpResponse, JsonResponse
 from rest_framework.decorators import api_view
 
 
-# ── RF20 · Reporte general diario en PDF ────────────────────────────────
+# ── RF20 · [IGNORADO] Reporte general diario en PDF ────────────────────────────────
 @api_view(['GET'])
 def daily_pdf(request):
     """Genera el reporte general diario en PDF para imprimirlo.
