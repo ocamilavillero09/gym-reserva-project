@@ -8,15 +8,19 @@ import { useState } from 'react';
 import { authApi } from '../services/api';
 import '../styles/login.css';
 
-// Tres tipos de correo institucional: el dominio determina el rol.
+// Tres tipos de correo institucional: el dominio determina el rol. Solo dos de
+// ellos pueden registrarse por su cuenta; las cuentas de administrador las crea
+// el administrador principal desde su panel.
 const DOMINIOS = [
-  { dominio: '@soyudemedellin.edu.co', etiqueta: 'Estudiante' },
-  { dominio: '@udem.edu.co',           etiqueta: 'Entrenador' },
-  { dominio: '@udemedellin.edu.co',    etiqueta: 'Administrador' },
+  { dominio: '@soyudemedellin.edu.co', etiqueta: 'Estudiante',    registroPublico: true },
+  { dominio: '@udem.edu.co',           etiqueta: 'Entrenador',    registroPublico: true },
+  { dominio: '@udemedellin.edu.co',    etiqueta: 'Administrador', registroPublico: false },
 ];
 
-const rolDeCorreo = (email) =>
-  DOMINIOS.find((d) => email.trim().toLowerCase().endsWith(d.dominio))?.etiqueta ?? null;
+const dominioDe = (email) =>
+  DOMINIOS.find((d) => email.trim().toLowerCase().endsWith(d.dominio)) ?? null;
+
+const REGISTRABLES = DOMINIOS.filter((d) => d.registroPublico);
 
 const CARACTERISTICAS = ['Reservas en línea', 'Horarios en tiempo real', 'Aforo actualizado'];
 
@@ -163,13 +167,22 @@ export default function Login({ onLogin }) {
                   autoCorrect="off"
                 />
                 {/* Se avisa en vivo qué rol otorga el dominio escrito */}
-                {tab === 'register' && email.trim() !== '' && (
-                  <p className={`acceso__pista acceso__pista--${rolDeCorreo(email) ? 'ok' : 'error'}`}>
-                    {rolDeCorreo(email)
-                      ? `✓ Entrarás como ${rolDeCorreo(email).toUpperCase()}`
-                      : '⚠ Ese dominio no es institucional'}
-                  </p>
-                )}
+                {tab === 'register' && email.trim() !== '' && (() => {
+                  const d = dominioDe(email);
+                  if (!d) return <p className="acceso__pista acceso__pista--error">⚠ Ese dominio no es institucional</p>;
+                  if (!d.registroPublico) {
+                    return (
+                      <p className="acceso__pista acceso__pista--error">
+                        ⚠ Las cuentas de administrador las crea el administrador principal
+                      </p>
+                    );
+                  }
+                  return (
+                    <p className="acceso__pista acceso__pista--ok">
+                      ✓ Entrarás como {d.etiqueta.toUpperCase()}
+                    </p>
+                  );
+                })()}
               </div>
 
               {/* Documento de identidad: dato de registro y contraseña */}
@@ -202,12 +215,19 @@ export default function Login({ onLogin }) {
               </button>
 
               <div className="acceso__dominios">
-                <p className="acceso__dominios-titulo">🔒 Tres tipos de correo institucional</p>
-                {DOMINIOS.map(d => (
+                <p className="acceso__dominios-titulo">
+                  🔒 {tab === 'register' ? 'Puedes registrarte con' : 'Correos institucionales'}
+                </p>
+                {(tab === 'register' ? REGISTRABLES : DOMINIOS).map(d => (
                   <p key={d.dominio} className="acceso__dominio">
                     <strong>{d.dominio}</strong> → {d.etiqueta}
                   </p>
                 ))}
+                {tab === 'register' && (
+                  <p className="acceso__dominio acceso__dominio--nota">
+                    Las cuentas de administrador las crea el administrador principal.
+                  </p>
+                )}
               </div>
             </form>
           </div>

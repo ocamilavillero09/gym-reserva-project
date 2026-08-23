@@ -77,10 +77,14 @@ export default function AdminPanel({ user, showToast }) {
     }
   };
 
-  const rolDetectado = rolDeCorreo(email);
-  const porRol = (rol) => users.filter((u) => u.role === rol).length;
   // Solo el administrador principal gestiona las cuentas de administrador.
   const esPrincipal = user.es_principal ?? false;
+  const rolDetectado = rolDeCorreo(email);
+  // A un administrador que no es el principal ni se le ofrece el dominio de
+  // administración ni se le deja enviar el formulario con él.
+  const DISPONIBLES = esPrincipal ? DOMINIOS : DOMINIOS.filter((d) => d.rol !== 'ADMIN');
+  const rolNoPermitido = rolDetectado === 'ADMIN' && !esPrincipal;
+  const porRol = (rol) => users.filter((u) => u.role === rol).length;
 
   return (
     <div className="admin">
@@ -96,17 +100,19 @@ export default function AdminPanel({ user, showToast }) {
         </div>
       )}
 
-      {/* Crear usuario (incluye nuevos administradores) */}
+      {/* Crear usuario. Los administradores solo los crea el principal. */}
       <div className="admin__tarjeta">
         <h3 className="admin__seccion">➕ Crear usuario</h3>
         <p className="admin__explicacion">
-          El rol se asigna automáticamente según el dominio del correo. Para crear otro
-          <strong> administrador</strong>, usa un correo <strong>@udemedellin.edu.co</strong>.
-          El documento de identidad será su contraseña de ingreso.
+          El rol se asigna automáticamente según el dominio del correo, y el documento de
+          identidad será su contraseña de ingreso.
+          {esPrincipal
+            ? ' Para crear otro administrador, usa un correo @udemedellin.edu.co.'
+            : ' Puedes crear estudiantes y entrenadores; las cuentas de administrador solo las crea el administrador principal.'}
         </p>
 
         <div className="admin__dominios">
-          {DOMINIOS.map((d) => (
+          {DISPONIBLES.map((d) => (
             <div key={d.dominio} className="admin__dominio">
               <span className={`rol rol--${ROL[d.rol].clase}`}>{ROL[d.rol].label}</span>
               <p className="admin__dominio-correo">{d.dominio}</p>
@@ -137,14 +143,16 @@ export default function AdminPanel({ user, showToast }) {
           />
 
           {email && (
-            <p className={`admin__pista admin__pista--${rolDetectado ? 'ok' : 'error'}`}>
-              {rolDetectado
-                ? `✓ Este correo creará un usuario con rol ${ROL[rolDetectado].label.toUpperCase()}.`
-                : '⚠ El correo no pertenece a ninguno de los tres dominios institucionales.'}
+            <p className={`admin__pista admin__pista--${rolDetectado && !rolNoPermitido ? 'ok' : 'error'}`}>
+              {rolNoPermitido
+                ? '⚠ Solo el administrador principal puede crear cuentas de administrador.'
+                : rolDetectado
+                  ? `✓ Este correo creará un usuario con rol ${ROL[rolDetectado].label.toUpperCase()}.`
+                  : '⚠ El correo no pertenece a ninguno de los tres dominios institucionales.'}
             </p>
           )}
 
-          <button className="admin__crear" type="submit" disabled={enviando}>
+          <button className="admin__crear" type="submit" disabled={enviando || rolNoPermitido}>
             {enviando ? 'Creando...' : 'Crear usuario'}
           </button>
         </form>

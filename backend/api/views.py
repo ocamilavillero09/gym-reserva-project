@@ -94,6 +94,9 @@ def _leer_documento(data) -> str:
 
 # ── RF01 · [IGNORADO] Registro de usuarios ────────────────────────────────
 # ── RF03 · [IGNORADO] Asignación automática del rol según el dominio ──────
+#
+# El registro público solo crea ESTUDIANTES y ENTRENADORES. Los administradores
+# los da de alta el administrador principal desde su panel (RF21).
 @swagger_auto_schema(
     method='post',
     operation_description="Registro de usuarios. El rol se deduce del dominio del correo institucional.",
@@ -144,15 +147,22 @@ def register(request):
             status=400,
         )
 
+    # Las cuentas de administrador NO se crean desde el formulario de registro:
+    # solo el administrador principal puede darlas de alta. De lo contrario
+    # cualquiera con un correo del dominio de administración se concedería a sí
+    # mismo el mando del sistema.
+    if role == 'ADMIN':
+        return Response(
+            {'error': 'Las cuentas de administrador no se crean desde el registro. '
+                      'Pídele al administrador principal que cree la tuya.'},
+            status=403,
+        )
+
     if datos.buscar_usuario(email):
         return Response({'error': 'Ya existe una cuenta con este correo.'}, status=409)
 
     if datos.buscar_usuario_por_documento(documento):
         return Response({'error': 'Ya existe una cuenta con este documento de identidad.'}, status=409)
-
-    # El PRIMER administrador del sistema es el administrador principal: es
-    # quien puede crear y gestionar las cuentas de los demás administradores.
-    es_principal = role == 'ADMIN' and datos.contar_administradores() == 0
 
     datos.crear_usuario({
         'name':       name,
@@ -161,7 +171,7 @@ def register(request):
         'password':   hash_password(documento),  # el documento es la contraseña
         'role':       role,
         'estado':     'ACTIVO',                 # ACTIVO | PENALIZADO | INACTIVO
-        'es_principal': es_principal,
+        'es_principal': False,                  # solo la cuenta de arranque lo es
         'no_show_count': 0,
         'cancel_count':  0,
         'penalizado_hasta': None,
@@ -172,7 +182,7 @@ def register(request):
         'message': 'Registro exitoso.',
         'role': role,
         'documento': documento,
-        'es_principal': es_principal,
+        'es_principal': False,
     }, status=201)
 
 

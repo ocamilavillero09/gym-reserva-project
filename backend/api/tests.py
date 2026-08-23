@@ -24,6 +24,7 @@ REQUISITOS CUBIERTOS
     RF16  Penalización al alcanzar cinco inasistencias
     RF17  Historial de reservas, cancelaciones y asistencias
     RF18  Reporte personal de inasistencias y penalizaciones
+    RF21  Creación de cuentas de administrador por el administrador principal
     RF23  Notificación de reserva confirmada
     RF25  Notificación de cancelación de reserva
 """
@@ -33,7 +34,7 @@ import mongomock
 from django.test import TestCase
 from rest_framework.test import APIClient
 
-from api import datos, reglas
+from api import arranque, datos, reglas
 
 # ── Cuentas de ejemplo (el dominio del correo decide el rol) ───────────────
 ESTUDIANTE, DOC_ESTUDIANTE = 'ana.gomez@soyudemedellin.edu.co', '1001234567'
@@ -57,6 +58,18 @@ class BaseGimnasio(TestCase):
         return self.client.post('/api/auth/register/',
                                 {'name': nombre, 'email': email, 'documento': documento},
                                 format='json')
+
+    def registrar_admin(self, email=ADMIN, documento=DOC_ADMIN, nombre='Persona admin'):
+        """Da de alta un administrador por la vía real.
+
+        El formulario público ya no crea administradores: los da de alta el
+        administrador principal, que es la cuenta de arranque del sistema.
+        """
+        arranque.asegurar_administrador_principal()
+        return self.client.post('/api/admin/users/', {
+            'actor_email': arranque.CORREO, 'name': nombre,
+            'email': email, 'documento': documento,
+        }, format='json')
 
     def entrar(self, email, documento):
         return self.client.post('/api/auth/login/',
@@ -152,6 +165,21 @@ class RF01Registro(BaseGimnasio):
         resp = self.registrar(ESTUDIANTE, '123')
         self.assertEqual(resp.status_code, 400)
 
+    def test_el_registro_publico_no_crea_administradores(self):
+        """Si el formulario abierto creara administradores, cualquiera con un
+        correo del dominio de administración se daría el mando del sistema."""
+        resp = self.registrar(ADMIN, DOC_ADMIN)
+        self.assertEqual(resp.status_code, 403)
+        self.assertIsNone(self.usuario(ADMIN))
+
+    def test_el_registro_publico_si_crea_estudiantes_y_entrenadores(self):
+        self.assertEqual(self.registrar(ESTUDIANTE, DOC_ESTUDIANTE).status_code, 201)
+        self.assertEqual(self.registrar(ENTRENADOR, DOC_ENTRENADOR).status_code, 201)
+
+    def test_nadie_se_registra_como_administrador_principal(self):
+        self.registrar(ESTUDIANTE, DOC_ESTUDIANTE)
+        self.assertFalse(self.usuario(ESTUDIANTE)['es_principal'])
+
     def test_rechaza_campos_vacios(self):
         resp = self.client.post('/api/auth/register/',
                                 {'name': '', 'email': ESTUDIANTE, 'documento': DOC_ESTUDIANTE},
@@ -222,7 +250,11 @@ class RF03RolSegunDominio(BaseGimnasio):
         self.assertEqual(resp.data['role'], 'ENTRENADOR')
 
     def test_dominio_de_administracion_da_rol_admin(self):
-        resp = self.registrar(ADMIN, DOC_ADMIN)
+        """El dominio sigue determinando el rol, pero esa cuenta ya no se crea
+        desde el formulario público: la da de alta el administrador principal."""
+        self.assertEqual(reglas.role_for_email(ADMIN), 'ADMIN')
+        resp = self.registrar_admin()
+        self.assertEqual(resp.status_code, 201)
         self.assertEqual(resp.data['role'], 'ADMIN')
 
     def test_el_cliente_no_puede_elegir_su_rol(self):
@@ -361,7 +393,7 @@ class RF05PerfilDelPersonal(BaseGimnasio):
     def setUp(self):
         super().setUp()
         self.registrar(ENTRENADOR, DOC_ENTRENADOR, 'Sebastián Coach')
-        self.registrar(ADMIN, DOC_ADMIN, 'Violeta Admin')
+        self.registrar_admin(nombre='Violeta Admin')
 
     def test_el_entrenador_ve_su_nombre_documento_y_rol(self):
         resp = self.client.get(f'/api/users/profile/?email={ENTRENADOR}')
@@ -376,9 +408,12 @@ class RF05PerfilDelPersonal(BaseGimnasio):
         self.assertEqual(resp.data['documento'], DOC_ADMIN)
         self.assertEqual(resp.data['role'], 'ADMIN')
 
-    def test_el_primer_administrador_es_el_principal(self):
+    def test_solo_la_cuenta_de_arranque_es_la_principal(self):
+        """Un administrador dado de alta por el principal no hereda el mando."""
         resp = self.client.get(f'/api/users/profile/?email={ADMIN}')
-        self.assertTrue(resp.data['es_principal'])
+        self.assertFalse(resp.data['es_principal'])
+        principal = self.client.get(f'/api/users/profile/?email={arranque.CORREO}')
+        self.assertTrue(principal.data['es_principal'])
 
     def test_el_perfil_no_expone_la_contrasena(self):
         resp = self.client.get(f'/api/users/profile/?email={ENTRENADOR}')
@@ -560,7 +595,7 @@ class RF11BuscarPorDocumento(BaseGimnasio):
         super().setUp()
         self.registrar(ESTUDIANTE, DOC_ESTUDIANTE, 'Ana Gómez')
         self.registrar(ENTRENADOR, DOC_ENTRENADOR)
-        self.registrar(ADMIN, DOC_ADMIN)
+        self.registrar_admin()
         self.sembrar_bloques()
         self.reservar(ESTUDIANTE, 1)
 
@@ -608,7 +643,7 @@ class RF12PersonalNoReserva(BaseGimnasio):
         super().setUp()
         self.registrar(ESTUDIANTE, DOC_ESTUDIANTE)
         self.registrar(ENTRENADOR, DOC_ENTRENADOR)
-        self.registrar(ADMIN, DOC_ADMIN)
+        self.registrar_admin()
         self.sembrar_bloques()
 
     def test_el_entrenador_consulta_los_bloques_establecidos(self):
@@ -670,7 +705,7 @@ class RF13RegistrarAsistencia(BaseGimnasio):
         super().setUp()
         self.registrar(ESTUDIANTE, DOC_ESTUDIANTE)
         self.registrar(ENTRENADOR, DOC_ENTRENADOR)
-        self.registrar(ADMIN, DOC_ADMIN)
+        self.registrar_admin()
         self.sembrar_bloques()
         self.reservar(ESTUDIANTE, 1)
 
@@ -1095,3 +1130,99 @@ class RF25NotificacionDeCancelacion(BaseGimnasio):
             self.cancelar(reserva['id'])
         resp = self.reservar(ESTUDIANTE, 6)
         self.assertEqual(resp.status_code, 201)
+
+
+# ══════════════════════════════════════════════════════════════════════════
+#  RF21 — CREACIÓN DE CUENTAS DE ADMINISTRADOR
+# ══════════════════════════════════════════════════════════════════════════
+class RF21CuentasDeAdministrador(BaseGimnasio):
+    """Solo el administrador principal crea administradores.
+
+    El principal es la cuenta de arranque del sistema (`arranque.py`), que se
+    asegura en cada encendido del servidor. Aquí se crea a mano porque las
+    pruebas usan una base en memoria vacía.
+    """
+
+    OTRO_ADMIN, DOC_OTRO = 'suplente@udemedellin.edu.co', '3009998887'
+
+    def setUp(self):
+        super().setUp()
+        arranque.asegurar_administrador_principal()
+        self.principal = arranque.CORREO
+        # El principal da de alta a un segundo administrador, que NO es principal.
+        self.client.post('/api/admin/users/', {
+            'actor_email': self.principal, 'name': 'Admin Suplente',
+            'email': self.OTRO_ADMIN, 'documento': self.DOC_OTRO,
+        }, format='json')
+
+    def crear(self, actor, email, documento, nombre='Cuenta nueva'):
+        return self.client.post('/api/admin/users/', {
+            'actor_email': actor, 'name': nombre, 'email': email, 'documento': documento,
+        }, format='json')
+
+    # ── La cuenta de arranque ─────────────────────────────────────────────
+    def test_la_cuenta_de_arranque_existe_y_es_la_principal(self):
+        cuenta = self.usuario(arranque.CORREO)
+        self.assertIsNotNone(cuenta)
+        self.assertEqual(cuenta['role'], 'ADMIN')
+        self.assertEqual(cuenta['estado'], 'ACTIVO')
+        self.assertTrue(cuenta['es_principal'])
+
+    def test_la_cuenta_de_arranque_entra_con_su_contrasena(self):
+        resp = self.entrar(arranque.CORREO, arranque.CLAVE)
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.data['role'], 'ADMIN')
+        self.assertTrue(resp.data['es_principal'])
+
+    def test_asegurarla_dos_veces_no_la_duplica(self):
+        arranque.asegurar_administrador_principal()
+        self.assertEqual(datos.contar_reservas({}), 0)
+        self.assertEqual(
+            len([u for u in datos.listar_usuarios() if u['email'] == arranque.CORREO]), 1)
+
+    def test_si_la_desactivan_se_restaura_sola(self):
+        """El sistema no puede quedarse sin administrador principal."""
+        datos.actualizar_usuario(arranque.CORREO,
+                                 {'role': 'SIN_ROL', 'estado': 'INACTIVO', 'es_principal': False})
+        self.assertEqual(arranque.asegurar_administrador_principal(), 'restaurada')
+        cuenta = self.usuario(arranque.CORREO)
+        self.assertEqual(cuenta['role'], 'ADMIN')
+        self.assertTrue(cuenta['es_principal'])
+
+    # ── Quién puede crear qué ─────────────────────────────────────────────
+    def test_el_principal_crea_administradores(self):
+        resp = self.crear(self.principal, 'nueva.admin@udemedellin.edu.co', '3001112220')
+        self.assertEqual(resp.status_code, 201)
+        self.assertEqual(resp.data['role'], 'ADMIN')
+
+    def test_un_administrador_no_principal_no_crea_administradores(self):
+        resp = self.crear(self.OTRO_ADMIN, 'colada@udemedellin.edu.co', '3001112221')
+        self.assertEqual(resp.status_code, 403)
+        self.assertIsNone(self.usuario('colada@udemedellin.edu.co'))
+
+    def test_un_administrador_no_principal_si_crea_estudiantes(self):
+        resp = self.crear(self.OTRO_ADMIN, 'nuevo.est@soyudemedellin.edu.co', '3001112222')
+        self.assertEqual(resp.status_code, 201)
+        self.assertEqual(resp.data['role'], 'ESTUDIANTE')
+
+    def test_un_administrador_no_principal_si_crea_entrenadores(self):
+        resp = self.crear(self.OTRO_ADMIN, 'nuevo.coach@udem.edu.co', '3001112223')
+        self.assertEqual(resp.status_code, 201)
+        self.assertEqual(resp.data['role'], 'ENTRENADOR')
+
+    def test_un_estudiante_no_gestiona_usuarios(self):
+        self.registrar(ESTUDIANTE, DOC_ESTUDIANTE)
+        resp = self.crear(ESTUDIANTE, 'otra@soyudemedellin.edu.co', '3001112224')
+        self.assertEqual(resp.status_code, 403)
+
+    def test_la_cuenta_creada_por_el_principal_no_hereda_el_mando(self):
+        self.crear(self.principal, 'tercera.admin@udemedellin.edu.co', '3001112225')
+        self.assertFalse(self.usuario('tercera.admin@udemedellin.edu.co')['es_principal'])
+
+    def test_el_rol_debe_coincidir_con_el_dominio(self):
+        resp = self.client.post('/api/admin/users/', {
+            'actor_email': self.principal, 'name': 'Incoherente',
+            'email': 'quiere.mando@soyudemedellin.edu.co', 'documento': '3001112226',
+            'role': 'ADMIN',
+        }, format='json')
+        self.assertEqual(resp.status_code, 400)
