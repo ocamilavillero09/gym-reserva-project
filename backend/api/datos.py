@@ -51,17 +51,26 @@ def a_object_id(valor):
 # DATOS INICIALES
 # ──────────────────────────────────────────────────────────────────────────
 def sembrar_bloques():
-    """Crea los bloques horarios del gimnasio si la colección está vacía."""
+    """Crea los bloques horarios del gimnasio si la colección está vacía.
+
+    Un bloque guarda solo su CONFIGURACIÓN —identificador, hora y capacidad—.
+    Cuántos cupos hay tomados NO se guarda: se cuenta a partir de las reservas
+    de esa fecha. Así no hay dos versiones de la verdad que puedan discrepar,
+    y cada jornada empieza con el gimnasio entero libre sin reiniciar nada.
+    """
     db = get_db()
     if db.slots.count_documents({}) == 0:
         db.slots.insert_many([
-            {'slotId': 1, 'hour': '06:00', 'available': 20, 'total': 20},
-            {'slotId': 2, 'hour': '08:00', 'available': 20, 'total': 20},
-            {'slotId': 3, 'hour': '10:00', 'available': 20, 'total': 20},
-            {'slotId': 4, 'hour': '12:00', 'available': 20, 'total': 20},
-            {'slotId': 5, 'hour': '14:00', 'available': 20, 'total': 20},
-            {'slotId': 6, 'hour': '16:00', 'available': 20, 'total': 20},
+            {'slotId': 1, 'hour': '06:00', 'total': 20},
+            {'slotId': 2, 'hour': '08:00', 'total': 20},
+            {'slotId': 3, 'hour': '10:00', 'total': 20},
+            {'slotId': 4, 'hour': '12:00', 'total': 20},
+            {'slotId': 5, 'hour': '14:00', 'total': 20},
+            {'slotId': 6, 'hour': '16:00', 'total': 20},
         ])
+    # Buscar las reservas de un bloque en una fecha es la consulta más
+    # frecuente del sistema: se indexa.
+    db.reservations.create_index([('slotId', 1), ('reserva_date', 1)])
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -146,22 +155,41 @@ def buscar_bloque(slot_id):
     return get_db().slots.find_one({'slotId': slot_id})
 
 
-def tomar_cupo(slot_id):
-    """Descuenta un cupo SOLO si todavía queda alguno.
+def ocupados_del_dia(fecha_iso: str) -> dict:
+    """Cuántos cupos hay tomados en cada bloque para esa fecha.
 
-    Es una única operación atómica de MongoDB: evita que dos estudiantes que
-    piden el último cupo a la vez lo obtengan los dos. Devuelve el bloque
-    anterior al descuento, o None si ya no había cupos.
+    Se cuenta directamente sobre las reservas: una reserva cancelada libera su
+    cupo, y una cumplida o marcada como inasistencia lo mantiene ocupado, pero
+    SOLO en su día. Devuelve {slotId: ocupados}; un bloque que no aparece está
+    entero.
     """
-    return get_db().slots.find_one_and_update(
-        {'slotId': slot_id, 'available': {'$gt': 0}},
-        {'$inc': {'available': -1}},
-    )
+    agrupado = get_db().reservations.aggregate([
+        {'$match': {'reserva_date': fecha_iso, 'estado': {'$ne': 'CANCELADA'}}},
+        {'$group': {'_id': '$slotId', 'n': {'$sum': 1}}},
+    ])
+    return {d['_id']: d['n'] for d in agrupado}
 
 
-def devolver_cupo(slot_id):
-    """Devuelve un cupo al bloque."""
-    return get_db().slots.update_one({'slotId': slot_id}, {'$inc': {'available': 1}})
+def ocupacion_de_bloque(slot_id: int, fecha_iso: str) -> int:
+    """Cuántas reservas vivas tiene ese bloque en esa fecha."""
+    return contar_reservas({
+        'slotId': slot_id, 'reserva_date': fecha_iso, 'estado': {'$ne': 'CANCELADA'},
+    })
+
+
+def reserva_dentro_del_aforo(oid, slot_id: int, fecha_iso: str, total: int) -> bool:
+    """¿Esta reserva cabe en el bloque, o llegó tarde?
+
+    Se ordenan las reservas vivas de ese bloque y día por orden de creación y
+    se toman las primeras `total`. Todas las peticiones aplican exactamente el
+    mismo criterio, así que si varias entran a la vez sobreviven justo las que
+    caben y las demás se descartan: no hay sobreventa ni empates.
+    """
+    primeras = get_db().reservations.find(
+        {'slotId': slot_id, 'reserva_date': fecha_iso, 'estado': {'$ne': 'CANCELADA'}},
+        {'_id': 1},
+    ).sort('_id', 1).limit(total)
+    return oid in [d['_id'] for d in primeras]
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -172,6 +200,11 @@ def crear_reserva(datos: dict):
     db = get_db()
     resultado = db.reservations.insert_one(datos)
     return db.reservations.find_one({'_id': resultado.inserted_id})
+
+
+def eliminar_reserva(oid):
+    """Borra una reserva. Solo se usa para deshacer una que no cabía."""
+    return get_db().reservations.delete_one({'_id': oid})
 
 
 def buscar_reserva(oid):

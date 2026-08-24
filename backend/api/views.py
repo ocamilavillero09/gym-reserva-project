@@ -478,11 +478,16 @@ def get_slots(request):
     # ║ para que la interfaz la muestre de forma explícita.               ║
     # ╚══════════════════════════════════════════════════════════════════╝
     datos.sembrar_bloques()
-    bloques = [
-        {'id': s['slotId'], 'hour': s['hour'], 'available': s['available'], 'total': s['total']}
-        for s in datos.listar_bloques(sin_id=True)
-    ]
     fecha = reglas.fecha_reserva()
+    # La disponibilidad se calcula PARA ESA FECHA: lo que se reservó otros días
+    # no resta cupos a esta jornada.
+    ocupados = datos.ocupados_del_dia(fecha.isoformat())
+    bloques = [{
+        'id': s['slotId'],
+        'hour': s['hour'],
+        'total': s['total'],
+        'available': s['total'] - ocupados.get(s['slotId'], 0),
+    } for s in datos.listar_bloques(sin_id=True)]
     return Response({
         'fecha': fecha.isoformat(),
         'fecha_label': reglas.formato_fecha_es(fecha),
@@ -535,12 +540,12 @@ def reservations(request):
         return Response([datos.serialize(r) for r in datos.reservas_activas(email)])
 
     # ╔══════════════════════════════════════════════════════════════════╗
-    # ║ CASO DE USO CRÍTICO #4 — CREAR RESERVA (DESCUENTO ATÓMICO)       ║
-    # ║ El más crítico del sistema. Con varios estudiantes reservando el  ║
-    # ║ último cupo a la vez, un patrón "leer-luego-escribir" permitiría  ║
-    # ║ SOBREVENTA. Por eso el cupo se descuenta con una única operación  ║
-    # ║ atómica condicional (datos.tomar_cupo) y la reserva solo se       ║
-    # ║ inserta DESPUÉS de haber ganado el cupo.                          ║
+    # ║ CASO DE USO CRÍTICO #4 — CREAR RESERVA SIN SOBREVENTA            ║
+    # ║ El más crítico del sistema. El aforo NO se guarda en un contador   ║
+    # ║ aparte: se cuenta sobre las reservas de esa fecha, así nunca puede ║
+    # ║ discrepar de la realidad ni arrastrarse de un día a otro. Contra   ║
+    # ║ la sobreventa se comprueba después de insertar si la reserva cabe  ║
+    # ║ (datos.reserva_dentro_del_aforo) y, si no, se deshace.             ║
     # ║ Reglas aplicadas aquí:                                            ║
     # ║   Solo los ESTUDIANTES reservan; el personal solo consulta.       ║
     # ║   La reserva es SIEMPRE para el día siguiente.                    ║
@@ -591,9 +596,9 @@ def reservations(request):
                  'Solo se permite una reserva por día: cancela la actual si quieres cambiar de horario.')
         return Response({'error': aviso, 'notificacion': aviso, 'tipo': 'RESERVA_DUPLICADA'}, status=409)
 
-    # Descuento ATÓMICO: solo descuenta si todavía queda cupo.
-    if datos.tomar_cupo(slot_id) is None:
-        # Otro estudiante tomó el último cupo entre la lectura y este punto.
+    # El aforo se mide sobre las reservas de ESA FECHA, no sobre un contador
+    # aparte: lo reservado otros días no ocupa cupos de esta jornada.
+    if datos.ocupacion_de_bloque(slot_id, fecha_iso) >= slot['total']:
         return Response({'error': 'No hay cupos disponibles en este horario.'}, status=409)
 
     nueva = datos.crear_reserva({
@@ -606,6 +611,13 @@ def reservations(request):
         'created_by':   email,
         'created_at':   datetime.utcnow(),
     })
+
+    # Si varias peticiones entraron a la vez pudieron colarse más reservas de
+    # las que caben. Todas aplican el mismo desempate —se quedan las primeras
+    # por orden de creación—, así que sobreviven exactamente las que caben.
+    if not datos.reserva_dentro_del_aforo(nueva['_id'], slot_id, fecha_iso, slot['total']):
+        datos.eliminar_reserva(nueva['_id'])
+        return Response({'error': 'No hay cupos disponibles en este horario.'}, status=409)
 
     respuesta = datos.serialize(nueva)
     # Notificación de confirmación que muestra la aplicación.
@@ -640,6 +652,8 @@ def cancel_reservation(request, reservation_id):
     if oid is None:
         return Response({'error': 'ID de reserva inválido.'}, status=400)
 
+    # Al pasar a CANCELADA la reserva deja de contar para el aforo de su día:
+    # el cupo queda libre sin tocar ningún contador.
     reservation = datos.cambiar_estado_reserva(
         oid, 'ACTIVA', {'estado': 'CANCELADA', 'cancelled_at': datetime.utcnow()})
     if reservation is None:
@@ -647,8 +661,6 @@ def cancel_reservation(request, reservation_id):
         if datos.buscar_reserva(oid):
             return Response({'error': 'La reserva ya no está activa.'}, status=409)
         return Response({'error': 'Reserva no encontrada.'}, status=404)
-
-    datos.devolver_cupo(reservation['slotId'])
 
     # Contador de cancelaciones del estudiante. Es SOLO INFORMATIVO: cancelar
     # no suma inasistencias ni penaliza la cuenta, porque avisar a tiempo

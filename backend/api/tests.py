@@ -75,6 +75,30 @@ class BaseGimnasio(TestCase):
     def bloque(self, slot_id=1):
         return datos.buscar_bloque(slot_id)
 
+    def cupos_libres(self, slot_id=1, fecha=None):
+        """Cupos libres de un bloque PARA UNA FECHA (por defecto, mañana).
+
+        La ocupación se lleva por día, así que preguntar «cuántos cupos hay»
+        sin decir cuándo no tiene sentido.
+        """
+        fecha = fecha or reglas.fecha_reserva().isoformat()
+        return (self.bloque(slot_id)['total']
+                - datos.ocupados_del_dia(fecha).get(slot_id, 0))
+
+    def llenar_bloque(self, slot_id=1, fecha=None):
+        """Deja un bloque sin cupos para esa fecha.
+
+        Se ocupa con reservas reales de otros estudiantes, porque el aforo se
+        mide contando reservas: no hay ningún contador que falsear.
+        """
+        fecha = fecha or reglas.fecha_reserva().isoformat()
+        bloque = self.bloque(slot_id)
+        datos.get_db().reservations.insert_many([{
+            'email': f'relleno{i}@soyudemedellin.edu.co',
+            'slotId': slot_id, 'hour': bloque['hour'],
+            'reserva_date': fecha, 'estado': 'ACTIVA',
+        } for i in range(bloque['total'])])
+
     def sembrar_bloques(self):
         """Los bloques se crean la primera vez que alguien los consulta."""
         self.client.get('/api/slots/')
@@ -335,9 +359,9 @@ class RF08Reserva(BaseGimnasio):
         self.assertEqual(resp.data['hour'], self.bloque(1)['hour'])
 
     def test_reservar_descuenta_exactamente_un_cupo(self):
-        antes = self.bloque(1)['available']
+        antes = self.cupos_libres(1)
         self.reservar(ESTUDIANTE, 1)
-        self.assertEqual(self.bloque(1)['available'], antes - 1)
+        self.assertEqual(self.cupos_libres(1), antes - 1)
 
     def test_reservar_no_cambia_la_capacidad_total(self):
         total_antes = self.bloque(1)['total']
@@ -357,15 +381,34 @@ class RF08Reserva(BaseGimnasio):
         self.assertEqual(resp.status_code, 400)
 
     def test_un_bloque_sin_cupos_rechaza_la_reserva(self):
-        datos.get_db().slots.update_one({'slotId': 1}, {'$set': {'available': 0}})
+        self.llenar_bloque(1)
         resp = self.reservar(ESTUDIANTE, 1)
         self.assertEqual(resp.status_code, 409)
 
+    def test_los_cupos_de_un_bloque_se_cuentan_por_dia(self):
+        """El arreglo del reinicio diario: lo reservado un día no descuenta
+        cupos de otro. Antes había un único contador por bloque, sin fecha, y
+        la disponibilidad iba bajando día tras día hasta agotar el gimnasio."""
+        manana = reglas.fecha_reserva().isoformat()
+        otro_dia = (reglas.fecha_reserva() + timedelta(days=1)).isoformat()
+        self.reservar(ESTUDIANTE, 1)
+        self.assertEqual(self.cupos_libres(1, manana), 19)
+        self.assertEqual(self.cupos_libres(1, otro_dia), 20)
+
+    def test_una_reserva_cumplida_no_descuenta_cupos_de_los_dias_siguientes(self):
+        """El estudiante reservó, asistió y el día pasó: ese cupo pertenecía a
+        aquella jornada y no puede seguir descontándose."""
+        self.reservar(ESTUDIANTE, 1)
+        self.hacer_que_llegue_la_jornada(ESTUDIANTE)
+        datos.get_db().reservations.update_many(
+            {'email': ESTUDIANTE}, {'$set': {'estado': 'COMPLETADA'}})
+        self.assertEqual(self.cupos_libres(1), 20)
+
     def test_el_rechazo_por_falta_de_cupo_no_crea_la_reserva(self):
-        datos.get_db().slots.update_one({'slotId': 1}, {'$set': {'available': 0}})
+        self.llenar_bloque(1)
         self.reservar(ESTUDIANTE, 1)
         self.assertEqual(datos.contar_reservas({'email': ESTUDIANTE}), 0)
-        self.assertEqual(self.bloque(1)['available'], 0)  # nunca queda negativo
+        self.assertEqual(self.cupos_libres(1), 0)  # nunca queda negativo
 
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -388,9 +431,9 @@ class RF09UnaReservaPorDia(BaseGimnasio):
         self.assertEqual(resp.status_code, 409)
 
     def test_el_rechazo_no_descuenta_cupo_del_otro_bloque(self):
-        antes = self.bloque(2)['available']
+        antes = self.cupos_libres(2)
         self.reservar(ESTUDIANTE, 2)
-        self.assertEqual(self.bloque(2)['available'], antes)
+        self.assertEqual(self.cupos_libres(2), antes)
 
     def test_el_estudiante_sigue_con_una_sola_reserva(self):
         self.reservar(ESTUDIANTE, 2)
@@ -537,10 +580,10 @@ class RF12PersonalNoReserva(BaseGimnasio):
         self.assertEqual(resp.status_code, 403)
 
     def test_el_intento_del_personal_no_consume_cupos(self):
-        antes = self.bloque(1)['available']
+        antes = self.cupos_libres(1)
         self.reservar(ENTRENADOR, 1)
         self.reservar(ADMIN, 1)
-        self.assertEqual(self.bloque(1)['available'], antes)
+        self.assertEqual(self.cupos_libres(1), antes)
 
     def test_el_estudiante_si_puede_reservar_ese_bloque(self):
         self.reservar(ENTRENADOR, 1)
@@ -929,16 +972,16 @@ class RF25NotificacionDeCancelacion(BaseGimnasio):
         self.assertIn('liberado', resp.data['notificacion'].lower())
 
     def test_la_cancelacion_devuelve_el_cupo_al_bloque(self):
-        antes = self.bloque(1)['available']
+        antes = self.cupos_libres(1)
         self.cancelar(self.reserva['id'])
-        self.assertEqual(self.bloque(1)['available'], antes + 1)
+        self.assertEqual(self.cupos_libres(1), antes + 1)
 
     def test_cancelar_dos_veces_no_duplica_el_cupo(self):
         self.cancelar(self.reserva['id'])
-        despues_de_la_primera = self.bloque(1)['available']
+        despues_de_la_primera = self.cupos_libres(1)
         resp = self.cancelar(self.reserva['id'])
         self.assertEqual(resp.status_code, 409)
-        self.assertEqual(self.bloque(1)['available'], despues_de_la_primera)
+        self.assertEqual(self.cupos_libres(1), despues_de_la_primera)
 
     def test_un_identificador_mal_formado_se_rechaza(self):
         resp = self.cancelar('esto-no-es-un-identificador')

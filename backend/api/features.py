@@ -94,13 +94,21 @@ def user_profile(request):
 # ── RF12 · El personal consulta el aforo del gimnasio ────────────────────
 @api_view(['GET'])
 def occupancy_report(request):
-    """Ocupación de cada bloque horario para entrenadores y administradores."""
+    """Ocupación de cada bloque horario para entrenadores y administradores.
+
+    Se informa de la jornada que se está reservando (el día siguiente), no del
+    acumulado histórico: cada día arranca con el gimnasio entero disponible.
+    """
+    fecha = (request.query_params.get('fecha') or '').strip() or reglas.fecha_reserva().isoformat()
+    ocupados = datos.ocupados_del_dia(fecha)
     data = []
     for s in datos.listar_bloques():
-        reservados = datos.contar_reservas({'slotId': s['slotId'], 'estado': 'ACTIVA'})
+        reservados = ocupados.get(s['slotId'], 0)
         data.append({
             'slotId': s['slotId'], 'hour': s['hour'], 'total': s['total'],
-            'available': s['available'], 'reservados': reservados,
+            'fecha': fecha,
+            'available': s['total'] - reservados,
+            'reservados': reservados,
             'ocupacion_pct': round((reservados / s['total']) * 100) if s['total'] else 0,
         })
     return Response(data)
