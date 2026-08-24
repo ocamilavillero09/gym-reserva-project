@@ -141,6 +141,12 @@
   background-color: #fafafa;
 }
 
+.perfil__ayuda {
+  font-size: 12px;
+  color: var(--texto-tenue);
+  margin-top: 5px;
+}
+
 .perfil__guardar {
   padding: 13px;
   border: none;

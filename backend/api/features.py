@@ -63,9 +63,12 @@ def user_profile(request):
         # El estudiante gestiona edad, peso, altura y objetivo de entrenamiento.
         # El nombre, el correo, el documento y el rol NO se editan desde aquí:
         # identifican a la persona.
-        cambios = {campo: request.data.get(campo)
-                   for campo in ('edad', 'peso', 'altura', 'meta')
-                   if campo in request.data}
+        enviados = {campo: request.data.get(campo)
+                    for campo in ('edad', 'peso', 'altura', 'meta')
+                    if campo in request.data}
+        cambios, error = reglas.validar_datos_entrenamiento(enviados)
+        if error:
+            return Response({'error': error}, status=400)
         if cambios:
             datos.actualizar_usuario(email, cambios)
             user = datos.buscar_usuario(email)

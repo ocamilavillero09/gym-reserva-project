@@ -282,6 +282,55 @@ class RF04PerfilDelEstudiante(BaseGimnasio):
         self.assertEqual(cuenta['role'], 'ESTUDIANTE')
         self.assertEqual(cuenta['documento'], DOC_ESTUDIANTE)
 
+    # ── Validación de los datos de entrenamiento ──────────────────────────
+    def test_rechaza_una_edad_negativa(self):
+        resp = self.client.put('/api/users/profile/',
+                               {'email': ESTUDIANTE, 'edad': -5}, format='json')
+        self.assertEqual(resp.status_code, 400)
+        self.assertIsNone(self.usuario(ESTUDIANTE).get('edad'))
+
+    def test_rechaza_un_peso_negativo(self):
+        resp = self.client.put('/api/users/profile/',
+                               {'email': ESTUDIANTE, 'peso': -70}, format='json')
+        self.assertEqual(resp.status_code, 400)
+
+    def test_rechaza_una_altura_negativa(self):
+        resp = self.client.put('/api/users/profile/',
+                               {'email': ESTUDIANTE, 'altura': -170}, format='json')
+        self.assertEqual(resp.status_code, 400)
+
+    def test_rechaza_valores_fuera_de_rango(self):
+        for campo, valor in (('edad', 999), ('peso', 9999), ('altura', 5)):
+            resp = self.client.put('/api/users/profile/',
+                                   {'email': ESTUDIANTE, campo: valor}, format='json')
+            self.assertEqual(resp.status_code, 400, campo)
+
+    def test_rechaza_texto_donde_va_un_numero(self):
+        for valor in ('muy alto', 'e', 'abc'):
+            resp = self.client.put('/api/users/profile/',
+                                   {'email': ESTUDIANTE, 'altura': valor}, format='json')
+            self.assertEqual(resp.status_code, 400, valor)
+
+    def test_un_dato_invalido_no_guarda_los_demas(self):
+        """La actualización es todo o nada: si un campo falla, no se guarda
+        ninguno y el perfil queda como estaba."""
+        self.client.put('/api/users/profile/',
+                        {'email': ESTUDIANTE, 'edad': 21, 'peso': -70}, format='json')
+        self.assertIsNone(self.usuario(ESTUDIANTE).get('edad'))
+
+    def test_se_puede_borrar_un_dato_dejandolo_vacio(self):
+        self.client.put('/api/users/profile/',
+                        {'email': ESTUDIANTE, 'peso': 68}, format='json')
+        resp = self.client.put('/api/users/profile/',
+                               {'email': ESTUDIANTE, 'peso': ''}, format='json')
+        self.assertEqual(resp.status_code, 200)
+        self.assertIsNone(resp.data['peso'])
+
+    def test_rechaza_un_objetivo_demasiado_largo(self):
+        resp = self.client.put('/api/users/profile/',
+                               {'email': ESTUDIANTE, 'meta': 'x' * 200}, format='json')
+        self.assertEqual(resp.status_code, 400)
+
     def test_perfil_de_un_correo_que_no_existe(self):
         resp = self.client.get('/api/users/profile/?email=nadie@soyudemedellin.edu.co')
         self.assertEqual(resp.status_code, 404)

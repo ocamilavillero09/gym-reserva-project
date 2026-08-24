@@ -105,6 +105,58 @@ def formato_fecha_es(d: date) -> str:
     return f'{_DIAS[d.weekday()]} {d.day} de {_MESES[d.month - 1]} de {d.year}'
 
 
+# ──────────────────────────────────────────────────────────────────────────
+# INFORMACIÓN DE ENTRENAMIENTO DEL ESTUDIANTE
+#
+# Rangos con los que se acepta un dato como creíble. No son caprichos: un peso
+# negativo o una altura de 9 metros ensucian el perfil y falsean cualquier
+# cálculo que se haga después con ellos.
+# ──────────────────────────────────────────────────────────────────────────
+RANGO_EDAD   = (10, 100)    # años
+RANGO_PESO   = (20, 300)    # kilogramos
+RANGO_ALTURA = (100, 250)   # centímetros
+META_MAX     = 120          # caracteres del objetivo de entrenamiento
+
+_RANGOS = {'edad': RANGO_EDAD, 'peso': RANGO_PESO, 'altura': RANGO_ALTURA}
+_UNIDAD = {'edad': 'años', 'peso': 'kg', 'altura': 'cm'}
+_ARTICULO = {'edad': 'La edad', 'peso': 'El peso', 'altura': 'La altura'}
+
+
+def validar_datos_entrenamiento(datos: dict):
+    """Revisa edad, peso, altura y objetivo antes de guardarlos.
+
+    Devuelve (valores_limpios, error). Si error no es None, no se guarda nada.
+    Un campo enviado vacío o nulo significa «borrar este dato», y se acepta.
+    """
+    limpios = {}
+
+    for campo, (minimo, maximo) in _RANGOS.items():
+        if campo not in datos:
+            continue
+        valor = datos[campo]
+        if valor is None or valor == '':
+            limpios[campo] = None          # el estudiante borra el dato
+            continue
+        try:
+            numero = float(valor)
+        except (TypeError, ValueError):
+            return None, f'{_ARTICULO[campo]} debe ser un número.'
+        if numero != numero or numero in (float('inf'), float('-inf')):
+            return None, f'{_ARTICULO[campo]} debe ser un número.'
+        if not (minimo <= numero <= maximo):
+            return None, (f'{_ARTICULO[campo]} debe estar entre {minimo} y {maximo} '
+                          f'{_UNIDAD[campo]}.')
+        limpios[campo] = int(numero) if campo == 'edad' else round(numero, 1)
+
+    if 'meta' in datos:
+        meta = str(datos['meta'] or '').strip()
+        if len(meta) > META_MAX:
+            return None, f'El objetivo no puede pasar de {META_MAX} caracteres.'
+        limpios['meta'] = meta
+
+    return limpios, None
+
+
 def jornada_ya_llegada(fecha_iso: str) -> bool:
     """True si esa fecha es hoy o ya pasó.
 

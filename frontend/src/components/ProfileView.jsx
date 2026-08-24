@@ -47,6 +47,12 @@ export default function ProfileView({ user, showToast }) {
     reportsApi.personal(user.email).then(setReporte).catch(() => {});
   }, [user.email, esEstudiante, datos]);
 
+  // <input type="number"> acepta notación científica, así que deja teclear
+  // «e», «E», «+» y «-». Se bloquean: en edad, peso y altura no significan nada.
+  const soloNumeros = (e) => {
+    if (['e', 'E', '+', '-'].includes(e.key)) e.preventDefault();
+  };
+
   const save = async (e) => {
     e.preventDefault();
     try {
@@ -172,22 +178,28 @@ export default function ProfileView({ user, showToast }) {
           </div>
           <div>
             <label className="perfil__etiqueta">Edad (años)</label>
-            <input className="perfil__entrada" type="number" min="1" value={edad}
+            <input className="perfil__entrada" type="number" min="10" max="100" step="1"
+                   value={edad} onKeyDown={soloNumeros}
                    onChange={(e) => setEdad(e.target.value)} />
+            <p className="perfil__ayuda">Entre 10 y 100 años.</p>
           </div>
           <div>
             <label className="perfil__etiqueta">Peso (kg)</label>
-            <input className="perfil__entrada" type="number" value={peso}
+            <input className="perfil__entrada" type="number" min="20" max="300" step="0.1"
+                   value={peso} onKeyDown={soloNumeros}
                    onChange={(e) => setPeso(e.target.value)} />
+            <p className="perfil__ayuda">Entre 20 y 300 kg.</p>
           </div>
           <div>
             <label className="perfil__etiqueta">Altura (cm)</label>
-            <input className="perfil__entrada" type="number" value={altura}
+            <input className="perfil__entrada" type="number" min="100" max="250" step="1"
+                   value={altura} onKeyDown={soloNumeros}
                    onChange={(e) => setAltura(e.target.value)} />
+            <p className="perfil__ayuda">Entre 100 y 250 cm.</p>
           </div>
           <div>
             <label className="perfil__etiqueta">Objetivo de entrenamiento</label>
-            <input className="perfil__entrada" type="text" value={meta}
+            <input className="perfil__entrada" type="text" value={meta} maxLength={120}
                    onChange={(e) => setMeta(e.target.value)} placeholder="Ej: Ganar resistencia" />
           </div>
           <button className="perfil__guardar" type="submit">Guardar perfil</button>

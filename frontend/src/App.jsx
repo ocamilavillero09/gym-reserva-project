@@ -16,13 +16,18 @@ import ProfileView from './components/ProfileView';
 import { authApi, slotsApi, reservationsApi } from './services/api';
 import './styles/app.css';
 
-// Clave de la sesión guardada en el navegador: gracias a esto, recargar la
-// página (F5) NO cierra la sesión.
+// La sesión se guarda en el almacenamiento DE LA PESTAÑA, no del navegador.
+//
+// Con localStorage todas las pestañas compartían una sola sesión: abrir una
+// segunda cuenta pisaba la primera y, al recargar, las dos mostraban la misma
+// persona —de ahí que a un administrador le apareciera la vista de estudiante—.
+// sessionStorage es propio de cada pestaña, así que se pueden tener varias
+// sesiones a la vez y recargar (F5) sigue sin cerrarlas.
 const SESSION_KEY = 'gym_udem_session';
 
 const readStoredSession = () => {
   try {
-    return JSON.parse(localStorage.getItem(SESSION_KEY)) || null;
+    return JSON.parse(sessionStorage.getItem(SESSION_KEY)) || null;
   } catch {
     return null;
   }
@@ -30,6 +35,18 @@ const readStoredSession = () => {
 
 const isStaff = (u) => u?.role === 'ENTRENADOR' || u?.role === 'ADMIN';
 const defaultView = (u) => (isStaff(u) ? 'panel' : 'dashboard');
+
+// Qué pantallas puede ver cada rol. Sirve de red de seguridad: si por lo que
+// sea la vista guardada no corresponde al rol de quien entra, se vuelve a la
+// pantalla propia de ese rol en lugar de mostrar algo que no le toca.
+const VISTAS_POR_ROL = {
+  ESTUDIANTE: ['dashboard', 'my-reservations', 'history', 'profile'],
+  ENTRENADOR: ['panel', 'profile'],
+  ADMIN:      ['panel', 'admin', 'profile'],
+};
+
+const vistaPermitida = (u, vista) => (VISTAS_POR_ROL[u?.role] || []).includes(vista);
+const vistaParaRol = (u, vista) => (vistaPermitida(u, vista) ? vista : defaultView(u));
 
 const TOAST_CLASE = { success: 'exito', warning: 'atencion', info: 'info', error: 'error' };
 const TOAST_ICONO = { success: '\u2713', warning: '\u26A0', info: '\u2139', error: '\u2715' };
@@ -87,8 +104,8 @@ export default function App() {
 
   const saveSession = (u) => {
     setUser(u);
-    if (u) localStorage.setItem(SESSION_KEY, JSON.stringify(u));
-    else localStorage.removeItem(SESSION_KEY);
+    if (u) sessionStorage.setItem(SESSION_KEY, JSON.stringify(u));
+    else sessionStorage.removeItem(SESSION_KEY);
   };
 
   const refreshData = useCallback(async (email) => {
@@ -114,7 +131,7 @@ export default function App() {
         const fresh = await authApi.session(restored.email);
         if (cancelado) return;
         saveSession(fresh);
-        setView((v) => (v === 'login' ? defaultView(fresh) : v));
+        setView((v) => (v === 'login' ? defaultView(fresh) : vistaParaRol(fresh, v)));
         await refreshData(fresh.email);
       } catch {
         if (!cancelado) {
@@ -131,7 +148,11 @@ export default function App() {
   // Mantiene la sesión al día tras reservar/cancelar (contadores y alerta).
   const refreshSession = async (email) => {
     try {
-      saveSession(await authApi.session(email));
+      const fresh = await authApi.session(email);
+      saveSession(fresh);
+      // Si el rol cambió mientras la sesión estaba abierta, la pantalla se
+      // ajusta al rol nuevo en vez de quedarse en una que ya no le toca.
+      setView((v) => vistaParaRol(fresh, v));
     } catch { /* si falla, se conserva la sesión actual */ }
   };
 
