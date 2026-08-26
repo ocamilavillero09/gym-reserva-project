@@ -179,10 +179,10 @@ export default function ProfileView({ user, showToast }) {
           </div>
           <div>
             <label className="perfil__etiqueta">Edad (años)</label>
-            <input className="perfil__entrada" type="number" min="10" max="100" step="1"
+            <input className="perfil__entrada" type="number" min="16" max="50" step="1"
                    value={edad} onKeyDown={soloNumeros}
                    onChange={(e) => setEdad(e.target.value)} />
-            <p className="perfil__ayuda">Entre 10 y 100 años.</p>
+            <p className="perfil__ayuda">Entre 16 y 50 años.</p>
           </div>
           <div>
             <label className="perfil__etiqueta">Peso (kg)</label>

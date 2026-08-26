@@ -299,6 +299,19 @@ class RF04PerfilDelEstudiante(BaseGimnasio):
                                {'email': ESTUDIANTE, 'altura': -170}, format='json')
         self.assertEqual(resp.status_code, 400)
 
+    def test_la_edad_admitida_va_de_16_a_50_anos(self):
+        for edad in (16, 33, 50):                       # los extremos entran
+            resp = self.client.put('/api/users/profile/',
+                                   {'email': ESTUDIANTE, 'edad': edad}, format='json')
+            self.assertEqual(resp.status_code, 200, edad)
+            self.assertEqual(resp.data['edad'], edad)
+        for edad in (15, 51):                           # justo fuera, no
+            resp = self.client.put('/api/users/profile/',
+                                   {'email': ESTUDIANTE, 'edad': edad}, format='json')
+            self.assertEqual(resp.status_code, 400, edad)
+            self.assertIn('16', resp.data['error'])
+            self.assertIn('50', resp.data['error'])
+
     def test_rechaza_valores_fuera_de_rango(self):
         for campo, valor in (('edad', 999), ('peso', 9999), ('altura', 5)):
             resp = self.client.put('/api/users/profile/',

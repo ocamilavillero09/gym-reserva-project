@@ -112,7 +112,7 @@ def formato_fecha_es(d: date) -> str:
 # negativo o una altura de 9 metros ensucian el perfil y falsean cualquier
 # cálculo que se haga después con ellos.
 # ──────────────────────────────────────────────────────────────────────────
-RANGO_EDAD   = (10, 100)    # años
+RANGO_EDAD   = (16, 50)     # años
 RANGO_PESO   = (20, 300)    # kilogramos
 RANGO_ALTURA = (100, 250)   # centímetros
 META_MAX     = 120          # caracteres del objetivo de entrenamiento
