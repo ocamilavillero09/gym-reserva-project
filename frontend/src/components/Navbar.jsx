@@ -2,7 +2,7 @@ const RED = '#CC0000';
 
 const ROLE_LABEL = {
   ESTUDIANTE: 'Estudiante',
-  ENTRENADOR: 'Profesor',
+  ENTRENADOR: 'Entrenador',
   ADMIN:      'Administrador',
 };
 
@@ -65,7 +65,7 @@ export default function Navbar({ user, view, reservationCount, onNavigate, onLog
           {/* Panel de aforo y gestión — solo profesor/admin */}
           {staff && (
             <NavBtn active={view === 'panel'} onClick={() => onNavigate('panel')}>
-              Aforo
+              Panel
             </NavBtn>
           )}
 

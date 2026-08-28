@@ -16,7 +16,9 @@ from rest_framework.response import Response
 
 from .db import (
     get_db, seed_machines, cancelaciones_restantes, alerta_cancelaciones,
-    CANCELACION_LIMITE, NO_SHOW_LIMITE,
+    inasistencias_restantes, alerta_inasistencias, normalizar_documento,
+    add_business_days, hoy_local, formato_fecha_es,
+    CANCELACION_LIMITE, NO_SHOW_LIMITE, PENALIZACION_DIAS_HABILES,
 )
 
 
@@ -29,16 +31,27 @@ def _is_staff(email: str) -> bool:
 # ── RF11 — HISTORIAL DE ENTRENAMIENTO ───────────────────────────────────────
 @api_view(['GET'])
 def reservation_history(request):
-    """Reservas pasadas del usuario (canceladas, no-show o completadas)."""
+    """RF17 — Historial completo del estudiante.
+
+    Incluye TODOS sus movimientos: reservas vigentes, cancelaciones,
+    asistencias (COMPLETADA) e inasistencias (NO_SHOW). Con ?solo=pasadas se
+    excluyen las reservas todavía activas.
+    """
     email = request.query_params.get('email', '').strip().lower()
     if not email:
         return Response({'error': 'Parámetro email requerido.'}, status=400)
     db = get_db()
+
+    filtro = {'email': email}
+    if request.query_params.get('solo') == 'pasadas':
+        filtro['estado'] = {'$ne': 'ACTIVA'}
+
     docs = []
-    for r in db.reservations.find({'email': email, 'estado': {'$ne': 'ACTIVA'}}).sort('created_at', -1):
+    for r in db.reservations.find(filtro).sort('created_at', -1):
         docs.append({
             'id': str(r['_id']), 'slotId': r['slotId'], 'hour': r['hour'],
-            'date': r.get('date'), 'estado': r.get('estado'),
+            'date': r.get('date'), 'reserva_date': r.get('reserva_date'),
+            'estado': r.get('estado'),
         })
     return Response(docs)
 
@@ -114,8 +127,11 @@ def user_profile(request):
         return Response({'error': 'Usuario no encontrado.'}, status=404)
 
     if request.method == 'PUT':
+        # RF04 — El estudiante gestiona edad, peso, altura y objetivo de
+        # entrenamiento. El nombre, el correo, el documento y el rol NO se
+        # editan desde aquí: identifican a la persona.
         update = {}
-        for field in ('peso', 'altura', 'meta'):
+        for field in ('edad', 'peso', 'altura', 'meta'):
             if field in request.data:
                 update[field] = request.data.get(field)
         if update:
@@ -123,14 +139,25 @@ def user_profile(request):
             user = db.users.find_one({'email': email})
 
     return Response({
-        'name': user['name'], 'email': user['email'], 'role': user.get('role'),
-        'estado': user.get('estado'), 'no_show_count': user.get('no_show_count', 0),
+        # RF05 — nombre, documento de identidad y rol asignado.
+        'name': user['name'], 'email': user['email'],
+        'documento': user.get('documento', ''),
+        'role': user.get('role'),
+        'estado': user.get('estado'),
+        'es_principal': bool(user.get('es_principal')),
+        # RF16/RF18 — inasistencias y cuántas faltan para la penalización.
+        'no_show_count': user.get('no_show_count', 0),
+        'inasistencias_restantes': inasistencias_restantes(user),
+        'no_show_limite': NO_SHOW_LIMITE,
+        'alerta_inasistencias': alerta_inasistencias(user),
         # RN10 — el estudiante ve cuántas veces ha cancelado y cuánto le queda.
         'cancel_count': user.get('cancel_count', 0),
         'cancelaciones_restantes': cancelaciones_restantes(user),
         'cancelacion_limite': CANCELACION_LIMITE,
         'alerta': alerta_cancelaciones(user),
-        'peso': user.get('peso'), 'altura': user.get('altura'), 'meta': user.get('meta'),
+        # RF04 — información personal de entrenamiento.
+        'edad': user.get('edad'), 'peso': user.get('peso'),
+        'altura': user.get('altura'), 'meta': user.get('meta'),
     })
 
 

@@ -6,7 +6,7 @@ const RED = '#CC0000';
 // RN01 — Tres tipos de correo institucional: el dominio determina el rol.
 const DOMINIOS = [
   { dominio: '@soyudemedellin.edu.co', etiqueta: 'Estudiante' },
-  { dominio: '@udem.edu.co',           etiqueta: 'Profesor' },
+  { dominio: '@udem.edu.co',           etiqueta: 'Entrenador' },
   { dominio: '@udemedellin.edu.co',    etiqueta: 'Administrador' },
 ];
 
@@ -27,7 +27,9 @@ const inputStyle = {
 export default function Login({ onLogin }) {
   const [tab, setTab]               = useState('login');
   const [email, setEmail]           = useState('');
-  const [password, setPassword]     = useState('');
+  // RF01/RF02 — El documento de identidad es el dato de registro y, a la vez,
+  // la contraseña con la que se inicia sesión.
+  const [documento, setDocumento]   = useState('');
   const [name, setName]             = useState('');
   const [error, setError]           = useState('');
   const [registered, setRegistered] = useState(false);
@@ -39,10 +41,10 @@ export default function Login({ onLogin }) {
     setSubmitting(true);
     try {
       if (tab === 'register') {
-        await authApi.register({ name, email, password });
+        await authApi.register({ name, email, documento });
         setRegistered(true);
       } else {
-        const user = await authApi.login({ email, password });
+        const user = await authApi.login({ email, documento });
         onLogin(user);
       }
     } catch (err) {
@@ -55,7 +57,7 @@ export default function Login({ onLogin }) {
   const handleGoToLogin = () => {
     setRegistered(false);
     setTab('login');
-    setPassword('');
+    setDocumento('');
     setName('');
     setError('');
   };
@@ -74,7 +76,8 @@ export default function Login({ onLogin }) {
             Tu cuenta ha sido creada correctamente, <strong>{name}</strong>.
           </p>
           <p style={{ color: '#888', fontSize: 14, lineHeight: 1.7, marginBottom: 32 }}>
-            Ya puedes iniciar sesión con tu correo <strong style={{ color: RED }}>{email}</strong> para acceder al sistema de reservas.
+            Ya puedes iniciar sesión con tu correo <strong style={{ color: RED }}>{email}</strong> y tu
+            documento de identidad como contraseña.
           </p>
           <button onClick={handleGoToLogin} style={{
             width: '100%', padding: 15, backgroundColor: RED, color: 'white',
@@ -151,8 +154,8 @@ export default function Login({ onLogin }) {
             </h2>
             <p style={{ color: '#888', fontSize: 14, marginBottom: 28 }}>
               {tab === 'login'
-                ? 'Ingresa con tu correo institucional'
-                : 'Tu rol se asigna según el dominio de tu correo institucional'}
+                ? 'Ingresa con tu correo institucional y tu documento de identidad'
+                : 'Regístrate con tu nombre, correo institucional y documento de identidad'}
             </p>
 
             {/* Tabs */}
@@ -215,18 +218,25 @@ export default function Login({ onLogin }) {
                 )}
               </div>
 
+              {/* RF01/RF02 — Documento de identidad: dato de registro y contraseña */}
               <div>
                 <label style={{ display: 'block', fontSize: 13, color: '#555', marginBottom: 6, fontWeight: 600 }}>
-                  Contraseña
+                  Documento de identidad
                 </label>
                 <input
                   type="password"
-                  value={password}
-                  onChange={e => setPassword(e.target.value)}
-                  placeholder="Mínimo 6 caracteres"
+                  value={documento}
+                  onChange={e => setDocumento(e.target.value)}
+                  placeholder="Ej: 1001234567"
                   style={inputStyle}
+                  inputMode="numeric"
                   required
                 />
+                <p style={{ fontSize: 12, color: '#888', marginTop: 6 }}>
+                  {tab === 'login'
+                    ? 'Tu documento de identidad es tu contraseña.'
+                    : 'Con este documento iniciarás sesión (mínimo 6 caracteres).'}
+                </p>
               </div>
 
               {error && (

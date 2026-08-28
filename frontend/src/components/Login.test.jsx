@@ -23,6 +23,13 @@ describe('Login', () => {
     expect(screen.getByText('@udemedellin.edu.co')).toBeInTheDocument();
   });
 
+  it('pide el documento de identidad como contraseña (RF01/RF02)', () => {
+    render(<Login onLogin={() => {}} />);
+    expect(screen.getByText('Documento de identidad')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('Ej: 1001234567')).toBeInTheDocument();
+    expect(screen.getByText(/Tu documento de identidad es tu contraseña/i)).toBeInTheDocument();
+  });
+
   it('al escribir el correo en el registro indica el rol que se asignará', () => {
     render(<Login onLogin={() => {}} />);
     fireEvent.click(screen.getByText('Registrarse'));

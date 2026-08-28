@@ -4,7 +4,8 @@ import { test, expect } from '@playwright/test';
 // registro → login → reservar el bloque del día siguiente → cancelar.
 test('flujo completo de reserva de un estudiante', async ({ page }) => {
   const email = `e2e.${Date.now()}@soyudemedellin.edu.co`;
-  const password = 'secreto123';
+  // RF01/RF02 — El documento de identidad es el dato de registro y la contraseña.
+  const documento = `${Date.now()}`.slice(-10);
 
   await page.goto('/');
 
@@ -12,7 +13,7 @@ test('flujo completo de reserva de un estudiante', async ({ page }) => {
   await page.getByRole('button', { name: 'Registrarse' }).click();
   await page.getByPlaceholder('Ej: María García').fill('Estudiante E2E');
   await page.getByPlaceholder('nombre@soyudemedellin.edu.co').fill(email);
-  await page.getByPlaceholder('Mínimo 6 caracteres').fill(password);
+  await page.getByPlaceholder('Ej: 1001234567').fill(documento);
   await page.getByRole('button', { name: /Crear cuenta/ }).click();
 
   // Pantalla de éxito → ir a login
@@ -21,7 +22,7 @@ test('flujo completo de reserva de un estudiante', async ({ page }) => {
 
   // --- Login ---
   await page.getByPlaceholder('nombre@soyudemedellin.edu.co').fill(email);
-  await page.getByPlaceholder('Mínimo 6 caracteres').fill(password);
+  await page.getByPlaceholder('Ej: 1001234567').fill(documento);
   await page.getByRole('button', { name: /Ingresar/ }).click();
 
   // --- Dashboard: se anuncia que la reserva es para el día siguiente ---
